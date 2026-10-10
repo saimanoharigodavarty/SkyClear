@@ -60,6 +60,10 @@ Data caveats:
 - Zones are built from open data (OurAirports, OpenStreetMap) and labeled as derived.
 - Notices are sample data and are labeled as such.
 
+## Prototype scope
+
+Two parts: real airport zones for India on the map (built by `backend/build_zones.py` from OurAirports), and a simulated drone. In the "Simulate flight" tab the pilot clicks waypoints, the backend checks the route every 100 m with the same engine as a single check (`POST /simulate/route`), and the drone flies the route on the map with a live verdict and a summary of the first issue.
+
 ## Tech stack (all free / open source)
 
 - MongoDB (Docker, or free Atlas) for storage, geo search, vector search and hybrid search
@@ -79,7 +83,7 @@ Numbers in the presentation must come from real runs of this evaluation.
 
 ## Out of scope for the hackathon
 
-Live drone connection, multi-agent loops, user accounts, flight-plan upload. The roadmap is route upload, change-stream alerts for new notices, and live telemetry from open-source autopilots (MAVLink, tested on a simulator first).
+A real drone connection (a simulated drone is in scope), multi-agent loops, user accounts, flight-plan upload. The roadmap is route upload, change-stream alerts for new notices, and live telemetry from open-source autopilots (MAVLink, tested on a simulator first).
 
 ## Design rules
 
@@ -111,7 +115,7 @@ If the venue Wi-Fi blocks laptop-to-laptop traffic, use a phone hotspot.
 
 ```
 data/       rules.json, zones.geojson, drones.json, notices.json, eval_cases.json
-backend/    config.py, geo.py, search.py, verdict.py, explain.py, main.py, load_data.py, eval.py, tests/
+backend/    config.py, geo.py, build_zones.py, sim.py, search.py, verdict.py, explain.py, main.py, load_data.py, eval.py, tests/
 frontend/   index.html, terms.html, privacy.html
 scripts/    check_design.sh
 ```
@@ -121,7 +125,8 @@ scripts/    check_design.sh
 - [x] Folder structure, drones.json, requirements.txt
 - [x] Design rules (CLAUDE.md, DESIGN_RULES.md, scripts/check_design.sh), skeleton loader, Terms and Privacy pages
 - [x] Base: sample data, local search, rule engine, template explanation, API, map page, tests (runs without MongoDB or Ollama)
-- [ ] Real rules, zones and notices
+- [x] Airport zones for India (derived, 5 km / 3 km circles), simulated drone route check and playback
+- [ ] Real rules and notices, military and park zones
 - [ ] load_data.py and MongoStore (geo, vector, hybrid search, embeddings)
 - [ ] LLM explanation and citation validation
 - [ ] 20 eval cases and metrics

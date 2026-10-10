@@ -1,0 +1,9 @@
+[
+  {"case_id": "E-01", "input": {"lat": 12.96, "lng": 77.61, "drone_id": "small-1800", "datetime": "2026-10-12T10:00:00+05:30"}, "expected_verdict": "permission_needed", "expected_rule_ids": ["R-001"]},
+  {"case_id": "E-02", "input": {"lat": 12.96, "lng": 77.61, "drone_id": "medium-20000", "datetime": "2026-10-12T10:00:00+05:30"}, "expected_verdict": "prohibited", "expected_rule_ids": ["R-001B"]},
+  {"case_id": "E-03", "input": {"lat": 13.01, "lng": 77.56, "drone_id": "nano-200", "datetime": "2026-10-12T10:00:00+05:30"}, "expected_verdict": "prohibited", "expected_rule_ids": ["R-002"]},
+  {"case_id": "E-04", "input": {"lat": 12.93, "lng": 77.59, "drone_id": "nano-200", "datetime": "2026-10-12T10:00:00+05:30"}, "expected_verdict": "can_fly", "expected_rule_ids": ["R-003B"]},
+  {"case_id": "E-05", "input": {"lat": 12.98, "lng": 77.59, "drone_id": "micro-800", "datetime": "2026-10-12T17:00:00+05:30"}, "expected_verdict": "prohibited", "expected_rule_ids": ["R-004"]},
+  {"case_id": "E-06", "input": {"lat": 12.98, "lng": 77.59, "drone_id": "micro-800", "datetime": "2026-10-12T21:00:00+05:30"}, "expected_verdict": "can_fly", "expected_rule_ids": []},
+  {"case_id": "E-07", "input": {"lat": 28.61, "lng": 77.20, "drone_id": "small-1800", "datetime": "2026-10-12T10:00:00+05:30"}, "expected_verdict": "cannot_determine", "expected_rule_ids": []}
+]

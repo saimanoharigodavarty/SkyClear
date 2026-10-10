@@ -26,3 +26,8 @@ Sources:
 
 - OpenStreetMap copyright and licence: https://www.openstreetmap.org/copyright
 - Overpass API and usage guidance: https://wiki.openstreetmap.org/wiki/Overpass_API
+
+
+## Real regulation passages
+
+`python ingestion/import_rules.py rules.csv` checks a sheet of passages (see `data/rules_template.csv` for the columns) and prints every problem with its row. Add `--write` to merge them into `data/rules.json`, `--replace-samples` to drop the placeholder rules, `--reviewed-by "Name"` to record who checked them against the official text. Then `cd backend && python load_data.py` embeds them and rebuilds the search indexes. A person must read each passage against the official document, the script only checks the shape.

@@ -1,0 +1,2 @@
+rule_id,zone_type,drone_classes,effect,text,effective_from,source,section
+R-101,airport,nano;micro;small;medium,permission_needed,"Write the rule in your own words, 25 to 600 characters.",2021-08-25,"Name of the official document and its issuer","Section number"

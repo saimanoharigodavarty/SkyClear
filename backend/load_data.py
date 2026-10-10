@@ -12,6 +12,33 @@ import config
 from db import get_db
 from embeddings import DIMENSIONS, embed
 
+RULES_SEARCH_INDEX = "rules_search"
+ZONES_SEARCH_INDEX = "zones_autocomplete"
+RULES_SEARCH_DEFINITION = {
+    "mappings": {
+        "dynamic": False,
+        "fields": {
+            "text": {"type": "string"},
+            "zone_type": {"type": "token"},
+            "drone_classes": {"type": "token"},
+        },
+    }
+}
+ZONES_SEARCH_DEFINITION = {
+    "mappings": {
+        "dynamic": False,
+        "fields": {
+            "name": {
+                "type": "autocomplete",
+                "tokenization": "edgeGram",
+                "minGrams": 2,
+                "maxGrams": 15,
+                "foldDiacritics": True,
+            }
+        },
+    }
+}
+
 
 ZONE_VALIDATOR = {
     "$jsonSchema": {
@@ -40,7 +67,10 @@ def ensure_zones_collection(db):
     """Create zones or enforce its GeoJSON and attribution contract on future writes."""
     options = {"validator": ZONE_VALIDATOR, "validationLevel": "strict", "validationAction": "error"}
     if "zones" in db.list_collection_names():
-        db.command("collMod", "zones", **options)
+        info = db.command("listCollections", filter={"name": "zones"})["cursor"]["firstBatch"][0]
+        current = info.get("options", {})
+        if any(current.get(key) != value for key, value in options.items()):
+            db.command("collMod", "zones", **options)
     else:
         db.create_collection("zones", **options)
 
@@ -50,6 +80,24 @@ def ensure_zone_indexes(db):
     db.zones.create_index([("geometry", "2dsphere")])
     db.zones.create_index("zone_id", unique=True)
     db.zones.create_index("zone_type")
+
+
+def ensure_search_index(collection, name, definition, log):
+    """Create or update one MongoDB Search index and wait briefly for it to become queryable."""
+    current = next((i for i in collection.list_search_indexes() if i["name"] == name), None)
+    if current:
+        collection.update_search_index(name, definition)
+    else:
+        from pymongo.operations import SearchIndexModel
+        collection.create_search_index(SearchIndexModel(name=name, definition=definition))
+    for _ in range(30):
+        index = next((i for i in collection.list_search_indexes() if i["name"] == name), None)
+        if index and index.get("queryable") and index.get("status") == "READY":
+            log(f"search index ready: {name}")
+            return True
+        time.sleep(2)
+    log(f"search index still building: {name}")
+    return False
 
 
 def _read(name):
@@ -87,6 +135,9 @@ def load(verbose=True):
     db.rules.insert_many(rules)
     db.rules.create_index([("text", "text")])
     db.rules.create_index([("zone_type", 1), ("drone_classes", 1)])
+
+    ensure_search_index(db.rules, RULES_SEARCH_INDEX, RULES_SEARCH_DEFINITION, log)
+    ensure_search_index(db.zones, ZONES_SEARCH_INDEX, ZONES_SEARCH_DEFINITION, log)
 
     if vectors:
         _vector_index(db, log)

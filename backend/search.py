@@ -12,6 +12,10 @@ import runtime
 from embeddings import embed
 from geo import circle, distance_to_polygon_km, point_in_polygon
 
+RULES_SEARCH_INDEX = "rules_search"
+RULES_VECTOR_INDEX = "rules_vector"
+ZONES_SEARCH_INDEX = "zones_autocomplete"
+
 
 def _load(name):
     with open(config.DATA_DIR / name, encoding="utf-8") as f:
@@ -116,9 +120,16 @@ class MongoStore(LocalStore):
         return {"type": "FeatureCollection", "features": feats}
 
     def search_zones(self, q, limit=8):
-        """TODO (Manohari): replace with an Atlas Search autocomplete query on zones.name."""
-        import re
-        found = self.db.zones.find({"name": {"$regex": re.escape(q.strip()), "$options": "i"}}, {"_id": 0}).limit(limit)
+        """Fuzzy search-as-you-type over zone names using MongoDB Search autocomplete."""
+        pipeline = [
+            {"$search": {"index": ZONES_SEARCH_INDEX, "autocomplete": {
+                "query": q.strip(), "path": "name", "tokenOrder": "sequential",
+                "fuzzy": {"maxEdits": 1, "prefixLength": 1, "maxExpansions": 32},
+            }}},
+            {"$limit": limit},
+            {"$project": {"_id": 0}},
+        ]
+        found = self.db.zones.aggregate(pipeline)
         return [{**{k: v for k, v in z.items() if k != "geometry"}, "center": _center(z["geometry"])} for z in found]
 
     def zones_in_bbox(self, w, s, e, n):
@@ -155,30 +166,40 @@ class MongoStore(LocalStore):
         return list(found)
 
     def search_rules(self, query, k=5, mode="hybrid"):
-        """Rank rule passages for a natural-language query. mode: vector, text or hybrid (reciprocal rank fusion)."""
-        ranked = {"vector": self._vector(query, k * 3) if mode in ("vector", "hybrid") else [],
-                  "text": self._text(query, k * 3) if mode in ("text", "hybrid") else []}
-        if mode != "hybrid":
-            return ranked[mode][:k]
-        score, byid = {}, {}
-        for lst in ranked.values():
-            for rank, r in enumerate(lst):
-                score[r["rule_id"]] = score.get(r["rule_id"], 0) + 1 / (60 + rank)
-                byid[r["rule_id"]] = r
-        return [{**byid[i], "score": round(s, 5)} for i, s in sorted(score.items(), key=lambda x: -x[1])][:k]
+        """Rank rules with MongoDB Search, Vector Search, or server-side rank fusion."""
+        if mode == "text":
+            return self._text(query, k)
+        if mode == "vector":
+            return self._vector(query, k)
+        vector = embed([query], "query")
+        if not vector:
+            return self._text(query, k)
+        candidates = max(k * 3, 10)
+        pipeline = [{"$rankFusion": {"input": {"pipelines": {
+            "vector": [{"$vectorSearch": {
+                "index": RULES_VECTOR_INDEX, "path": "embedding", "queryVector": vector[0],
+                "numCandidates": max(candidates * 5, 50), "limit": candidates,
+            }}],
+            "text": [
+                {"$search": {"index": RULES_SEARCH_INDEX, "text": {"query": query, "path": "text"}}},
+                {"$limit": candidates},
+            ],
+        }}}}, {"$limit": k}, {"$project": {"_id": 0, "embedding": 0}}]
+        return list(self.db.rules.aggregate(pipeline))
 
     def _vector(self, query, limit):
         vec = embed([query], "query")
         if not vec:
             return []
-        pipeline = [{"$vectorSearch": {"index": "rules_vector", "path": "embedding", "queryVector": vec[0],
+        pipeline = [{"$vectorSearch": {"index": RULES_VECTOR_INDEX, "path": "embedding", "queryVector": vec[0],
                                        "numCandidates": 50, "limit": limit}},
                     {"$project": {"_id": 0, "embedding": 0, "score": {"$meta": "vectorSearchScore"}}}]
         return list(self.db.rules.aggregate(pipeline))
 
     def _text(self, query, limit):
-        pipeline = [{"$match": {"$text": {"$search": query}}}, {"$addFields": {"score": {"$meta": "textScore"}}},
-                    {"$sort": {"score": -1}}, {"$limit": limit}, {"$project": {"_id": 0, "embedding": 0}}]
+        pipeline = [{"$search": {"index": RULES_SEARCH_INDEX, "text": {"query": query, "path": "text"}}},
+                    {"$limit": limit}, {"$project": {"_id": 0, "embedding": 0,
+                                                       "score": {"$meta": "searchScore"}}}]
         return list(self.db.rules.aggregate(pipeline))
 
 

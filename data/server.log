@@ -845,3 +845,13 @@ INFO:     127.0.0.1:63982 - "POST /flights/F-8843AF/control HTTP/1.1" 200 OK
 INFO:     127.0.0.1:63982 - "POST /flights/F-8843AF/control HTTP/1.1" 200 OK
 INFO:     127.0.0.1:63982 - "GET /flights/F-8843AF/live HTTP/1.1" 200 OK
 INFO:     127.0.0.1:63982 - "POST /flights/F-8843AF/control HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64039 - "GET /live/drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64040 - "GET /overview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64040 - "GET /verification/queue HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64056 - "GET /live/drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64057 - "GET /overview HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:64057 - "POST /auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64057 - "GET /overview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64057 - "GET /verification/queue HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64068 - "POST /auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64068 - "GET /events?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJVLUJGMzQ1MCIsInJvbGUiOiJvZmZpY2lhbCIsImFpZCI6bnVsbCwidHlwIjoiYWNjZXNzIiwiaWF0IjoxNzkxNjYwNTUwLCJleHAiOjE3OTE2NjE0NTAsImp0aSI6ImFmMzA4YTljZDMyOCJ9.OdPtqQCpve3HlNKj304yLbhAaEsuMnNVBcaCX_82jDQ HTTP/1.1" 200 OK

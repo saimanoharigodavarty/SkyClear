@@ -35,7 +35,8 @@ Gap: no Atlas Charts dashboard, no sharding or replica-set write concern discuss
 - Simulator: kinematics with wind, battery and sensor noise, permit-aware geofence with look-ahead warnings, altitude limits, manual 10 Hz control from a phone, return home, recall by an officer.
 - 3D live view: satellite chase camera, drone camera with a heads-up display and distance to the nearest zone, zone and permit volumes.
 - MAVLink telemetry adapter (tested with a mocked message).
-- Gap: no real drone hardware, no real video feed, no terrain or building heights in 3D.
+- Real tracker input: `POST /ingest/position` with a per-tracker key (`docs/TRACKERS.md`), so a Remote ID receiver or radar feeds the same geofence and alerts.
+- Gap: no real drone hardware tested, no real video feed, no terrain or building heights in 3D, tracker drones are not drawn on the live map.
 
 ## AI/ML implementation and integration
 

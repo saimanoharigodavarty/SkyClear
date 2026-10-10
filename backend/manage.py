@@ -230,6 +230,12 @@ def cmd_prepare_demo(a):
     print(f"\nSign in on the presentation computer as the demo pilot:\n  {a.pilot_email}   {pw}\nThen open http://localhost:8000/display.html")
 
 
+def cmd_create_tracker(a):
+    from ingest_api import create_tracker
+    rec, key = create_tracker(a.name)
+    print(f"Tracker {rec['tracker_id']} ({rec['name']}) created.\nKey, shown once, copy it now:\n  {key}\nSend positions with:  POST /ingest/position  header X-Tracker-Key: <key>")
+
+
 def cmd_seed_showcase(a):
     """Fill the platform with believable demo data: fictional pilots and flights in every state, a verification queue, three notices, history.
     Safe to run once on a fresh database. Run prepare-demo afterwards for the flights you fly live."""
@@ -306,6 +312,7 @@ def main(argv=None):
     s.add_argument("--password"); s.add_argument("--generate", action="store_true"); s.set_defaults(fn=cmd_create_admin)
     s = sub.add_parser("seed-officers"); s.add_argument("--domain", default="officers.skyclear.local"); s.set_defaults(fn=cmd_seed_officers)
     s = sub.add_parser("seed-demo"); s.add_argument("--pilot-email", default="demo.pilot@example.com"); s.set_defaults(fn=cmd_seed_demo)
+    s = sub.add_parser("create-tracker"); s.add_argument("--name", required=True); s.set_defaults(fn=cmd_create_tracker)
     s = sub.add_parser("seed-showcase"); s.set_defaults(fn=cmd_seed_showcase)
     s = sub.add_parser("prepare-demo"); s.add_argument("--pilot-email", default="demo.pilot@example.com"); s.set_defaults(fn=cmd_prepare_demo)
     s = sub.add_parser("list-users"); s.set_defaults(fn=cmd_list_users)

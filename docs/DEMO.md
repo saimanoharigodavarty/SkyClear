@@ -47,3 +47,15 @@ Logins are in `data/demo_credentials.txt` (not in git). Never read passwords out
 - Is the LLM deciding if a flight is allowed? No. Code decides, the model explains.
 - Is the rule text real? No, it is a clearly marked sample paraphrase. Loading the real regulation is the next step and the retrieval numbers must be re-run then.
 - What is not done? See `docs/RUBRIC_COVERAGE.md`.
+
+## Honest answers to the awkward questions
+
+| Question | Answer |
+|---|---|
+| Is the drone real? | The drone in the demo is simulated. A real tracker can post positions to `POST /ingest/position` with its own key, and then everything after is the same (geofence, breach in MongoDB, officer feed, guard siren). That path is tested with a script, not with a real receiver. |
+| Does every phone on the Wi-Fi beep? | No. A browser needs one tap to allow sound and cannot receive anything when closed. People open the guard page once. A phone app or Web Push is the next step. |
+| Can someone fake an alert? | The alert is made only from a breach recorded by the server. A test siren needs an official login and is audited. Tracker positions need a tracker key, which can be revoked. A leaked key can report false positions. |
+| Does the guard page leak who is flying? | No. Only the area name, the kind and the time are sent. |
+| Is the regulation text real? | No, seven marked sample passages. Retrieval numbers need the real corpus. |
+| Where does it slow down? | About 390 checks per second on one process. The zone map and live list queue at 200 users. Numbers and the fix are in `docs/RESULTS.md`. |
+| Warning before entering? | The drone view and the display screen beep as the drone nears an area. The guard devices sound on entry only. |

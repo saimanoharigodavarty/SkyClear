@@ -19,6 +19,8 @@ from security import require
 router = APIRouter()
 _open = 0
 MAX_LISTENERS = 300
+PER_ADDRESS = 25  # one device or one Wi-Fi network cannot use up every listener slot
+_by_ip = {}
 
 
 def alert_for(ev, area=None):
@@ -39,8 +41,10 @@ def alert_for(ev, area=None):
 @router.get("/guard/stream")
 async def guard_stream(request: Request, area: Optional[str] = Query(default=None, max_length=120)):
     global _open
-    if _open >= MAX_LISTENERS:
+    ip = request.client.host if request.client else "x"
+    if _open >= MAX_LISTENERS or _by_ip.get(ip, 0) >= PER_ADDRESS:
         raise HTTPException(503, "too many listeners")
+    _by_ip[ip] = _by_ip.get(ip, 0) + 1
     loop = asyncio.get_running_loop()
     aq: asyncio.Queue = asyncio.Queue(maxsize=100)
 
@@ -68,6 +72,7 @@ async def guard_stream(request: Request, area: Optional[str] = Query(default=Non
         finally:
             events.unsubscribe(push)
             _open -= 1
+            _by_ip[ip] = max(0, _by_ip.get(ip, 1) - 1)
 
     return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 

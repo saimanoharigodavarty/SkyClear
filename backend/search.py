@@ -18,6 +18,13 @@ def _load(name):
         return json.load(f)
 
 
+def _touches_box(geometry, w, s, e, n):
+    """Cheap test: the polygon's own bounding box overlaps the query box."""
+    xs = [x for x, _ in geometry["coordinates"][0]]
+    ys = [y for _, y in geometry["coordinates"][0]]
+    return not (max(xs) < w or min(xs) > e or max(ys) < s or min(ys) > n)
+
+
 class LocalStore:
     def __init__(self):
         self.zones = _load("zones.geojson")["features"]
@@ -54,6 +61,11 @@ class LocalStore:
         """Metadata-filtered rules. MongoStore also ranks them by vector + keyword search using `query`."""
         return [r for r in self.rules if r["zone_type"] in zone_types and drone_class in r["drone_classes"]]
 
+    def zones_in_bbox(self, w, s, e, n):
+        box = {"type": "Polygon", "coordinates": [[[w, s], [e, s], [e, n], [w, n], [w, s]]]}
+        feats = [f for f in self.zones if _touches_box(f["geometry"], w, s, e, n)]
+        return {"type": "FeatureCollection", "features": feats}
+
     def active_notices(self):
         return self.notices + [n for n in runtime.all_("notices") if n["status"] == "active"]
 
@@ -88,6 +100,14 @@ class MongoStore(LocalStore):
     def all_zones_geojson(self):
         feats = []
         for z in self.db.zones.find({}, {"_id": 0}):
+            geom = z.pop("geometry")
+            feats.append({"type": "Feature", "properties": z, "geometry": geom})
+        return {"type": "FeatureCollection", "features": feats}
+
+    def zones_in_bbox(self, w, s, e, n):
+        box = {"type": "Polygon", "coordinates": [[[w, s], [e, s], [e, n], [w, n], [w, s]]]}
+        feats = []
+        for z in self.db.zones.find({"geometry": {"$geoIntersects": {"$geometry": box}}}, {"_id": 0}):
             geom = z.pop("geometry")
             feats.append({"type": "Feature", "properties": z, "geometry": geom})
         return {"type": "FeatureCollection", "features": feats}

@@ -8,13 +8,19 @@ from pydantic import BaseModel
 
 import config
 from explain import NEXT_STEPS, explain
+from analytics import router as analytics_router
 from bridge import router as bridge_router
+from live import router as live_router
+from zones_api import router as zones_router
 from pipeline import evaluate, get_drone, parse_when, store
 import runtime
 from sim import sample_route, summarize_route
 
 app = FastAPI(title="SkyClear")
 app.include_router(bridge_router)
+app.include_router(zones_router)
+app.include_router(live_router)
+app.include_router(analytics_router)
 runtime.seed_official()
 
 
@@ -33,11 +39,6 @@ def health():
 @app.get("/drones")
 def drones():
     return store.all_drones()
-
-
-@app.get("/zones")
-def zones():
-    return store.all_zones_geojson()
 
 
 @app.post("/check")

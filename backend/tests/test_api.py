@@ -46,3 +46,16 @@ def test_route_through_airport_flags_issue():
 def test_route_needs_two_points():
     body = {"drone_id": "small-1800", "waypoints": [{"lat": 12.9, "lng": 77.6}]}
     assert client.post("/simulate/route", json=body).status_code == 422
+
+
+def test_zones_bbox_returns_only_zones_in_view():
+    all_n = len(client.get("/zones").json()["features"])
+    hyd = client.get("/zones?bbox=78.3,17.1,78.6,17.7").json()["features"]
+    names = {f["properties"]["name"] for f in hyd}
+    assert "Rajiv Gandhi International Airport" in names and 0 < len(hyd) < all_n
+    assert client.get("/zones?bbox=bad").status_code == 422
+
+
+def test_live_and_analytics_stubs_have_the_contract_shape():
+    assert client.get("/live/drones").json()["drones"] == []
+    assert "zones" in client.get("/analytics/summary").json()

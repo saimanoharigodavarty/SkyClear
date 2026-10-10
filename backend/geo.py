@@ -15,8 +15,29 @@ def point_in_ring(lng, lat, ring):
 
 
 def point_in_polygon(lng, lat, geometry):
-    """geometry is a GeoJSON Polygon (holes are ignored in this base version)."""
-    return point_in_ring(lng, lat, geometry["coordinates"][0])
+    """geometry is a GeoJSON Polygon or MultiPolygon with hole support (A5)."""
+    geom_type = geometry.get("type", "Polygon")
+    if geom_type == "Polygon":
+        rings = geometry.get("coordinates", [])
+        if not rings:
+            return False
+        if not point_in_ring(lng, lat, rings[0]):
+            return False
+        # Check holes (inner rings)
+        for hole in rings[1:]:
+            if point_in_ring(lng, lat, hole):
+                return False
+        return True
+    elif geom_type == "MultiPolygon":
+        for poly_coords in geometry.get("coordinates", []):
+            if not poly_coords:
+                continue
+            if point_in_ring(lng, lat, poly_coords[0]):
+                in_hole = any(point_in_ring(lng, lat, hole) for hole in poly_coords[1:])
+                if not in_hole:
+                    return True
+        return False
+    return False
 
 
 def haversine_km(lat1, lng1, lat2, lng2):
@@ -27,11 +48,107 @@ def haversine_km(lat1, lng1, lat2, lng2):
     return 2 * r * math.asin(math.sqrt(a))
 
 
+def point_to_segment_dist_km(lat, lng, lat1, lng1, lat2, lng2):
+    """True point-to-segment distance in km (A4 fix)."""
+    lat_mid = (lat1 + lat2) / 2.0
+    scale_x = 111.32 * math.cos(math.radians(lat_mid))
+    scale_y = 110.57
+    x = (lng - lng1) * scale_x
+    y = (lat - lat1) * scale_y
+    dx = (lng2 - lng1) * scale_x
+    dy = (lat2 - lat1) * scale_y
+    denom = dx * dx + dy * dy
+    if denom < 1e-12:
+        return haversine_km(lat, lng, lat1, lng1)
+    t = max(0.0, min(1.0, (x * dx + y * dy) / denom))
+    closest_lat = lat1 + t * (lat2 - lat1)
+    closest_lng = lng1 + t * (lng2 - lng1)
+    return haversine_km(lat, lng, closest_lat, closest_lng)
+
+
+def _iter_polygon_segments(geometry):
+    """Yield all segment coordinate pairs ((lng1, lat1), (lng2, lat2)) in the geometry."""
+    geom_type = geometry.get("type", "Polygon")
+    if geom_type == "Polygon":
+        polygons = [geometry.get("coordinates", [])]
+    elif geom_type == "MultiPolygon":
+        polygons = geometry.get("coordinates", [])
+    else:
+        polygons = []
+    for rings in polygons:
+        for ring in rings:
+            for i in range(len(ring) - 1):
+                yield ring[i], ring[i + 1]
+
+
 def distance_to_polygon_km(lat, lng, geometry):
-    """Approximate: distance to the nearest vertex. 0 if inside. Good enough for 'nearby' lists."""
+    """True minimum distance to polygon in km. 0 if inside (A4 fix)."""
     if point_in_polygon(lng, lat, geometry):
         return 0.0
-    return min(haversine_km(lat, lng, y, x) for x, y in geometry["coordinates"][0])
+    min_dist = float("inf")
+    for (x1, y1), (x2, y2) in _iter_polygon_segments(geometry):
+        d = point_to_segment_dist_km(lat, lng, y1, x1, y2, x2)
+        if d < min_dist:
+            min_dist = d
+    return 0.0 if min_dist == float("inf") else min_dist
+
+
+def segment_intersection_param(p1, p2, p3, p4):
+    """Return t in [0, 1] for segment p1->p2 intersecting p3->p4, or None."""
+    x1, y1 = p1
+    x2, y2 = p2
+    x3, y3 = p3
+    x4, y4 = p4
+    d1x, d1y = x2 - x1, y2 - y1
+    d2x, d2y = x4 - x3, y4 - y3
+    denom = d1x * d2y - d1y * d2x
+    if abs(denom) < 1e-14:
+        return None
+    dx, dy = x3 - x1, y3 - y1
+    t = (dx * d2y - dy * d2x) / denom
+    u = (dx * d1y - dy * d1x) / denom
+    if 0.0 <= t <= 1.0 and 0.0 <= u <= 1.0:
+        return t
+    return None
+
+
+def segment_polygon_intersections(lng1, lat1, lng2, lat2, geometry):
+    """Return sorted list of t values in [0, 1] where the segment crosses polygon boundaries (A3 fix)."""
+    p1 = (lng1, lat1)
+    p2 = (lng2, lat2)
+    ts = []
+    for q1, q2 in _iter_polygon_segments(geometry):
+        t = segment_intersection_param(p1, p2, q1, q2)
+        if t is not None:
+            ts.append(t)
+    return sorted(set(ts))
+
+
+def segment_intersects_polygon(lng1, lat1, lng2, lat2, geometry):
+    """Test whether segment intersects or enters polygon geometry."""
+    if point_in_polygon(lng1, lat1, geometry) or point_in_polygon(lng2, lat2, geometry):
+        return True
+    return bool(segment_polygon_intersections(lng1, lat1, lng2, lat2, geometry))
+
+
+def corridor_intersects_polygon(waypoints, corridor_m, geometry):
+    """Test whether a route buffered by corridor_m touches or enters a polygon (P1)."""
+    corridor_km = corridor_m / 1000.0
+    for i in range(len(waypoints) - 1):
+        la1, ln1 = waypoints[i]
+        la2, ln2 = waypoints[i + 1]
+        if segment_intersects_polygon(ln1, la1, ln2, la2, geometry):
+            return True
+        # Check endpoints and segments distance
+        if distance_to_polygon_km(la1, ln1, geometry) <= corridor_km:
+            return True
+        if distance_to_polygon_km(la2, ln2, geometry) <= corridor_km:
+            return True
+        # Check polygon vertices distance to route segment
+        for (vx, vy), _ in _iter_polygon_segments(geometry):
+            if point_to_segment_dist_km(vy, vx, la1, ln1, la2, ln2) <= corridor_km:
+                return True
+    return False
 
 
 def circle(lat, lng, radius_km, n=32):

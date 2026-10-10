@@ -15,7 +15,13 @@ if os.environ.get("USE_MONGO") == "1":
     os.environ["MONGO_DB"] = "skyclear_test"
     import config
     from db import get_db
-    get_db().client.drop_database("skyclear_test")
+    try:
+        get_db().client.drop_database("skyclear_test")
+    except Exception:
+        db = get_db()
+        for col in db.list_collection_names():
+            if not col.startswith("system."):
+                db[col].drop()
     import load_data
     load_data.load(verbose=False)
 
@@ -28,3 +34,4 @@ routing.setup()
 manage.create_user(ADMIN_EMAIL, "Test Admin", "official", PASSWORD)
 for _a in routing.all_authorities():
     manage.create_user(officer_email(_a["authority_id"]), _a["name"], "official", PASSWORD, authority_id=_a["authority_id"])
+

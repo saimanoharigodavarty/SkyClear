@@ -6,12 +6,18 @@ The official map is the legal source for red, yellow and green classification. A
 
 ## Required next input
 
-Add one official coordinate source to `data/official_airspace/`:
+Add an official **GeoJSON FeatureCollection** as `data/official_airspace/hyderabad_airspace.geojson` (preferred). Its feature properties must include one of `digital_sky_zone_id`, `digitalSkyZoneId`, `zone_id`, `zoneId`, or `id`, containing an ID already recorded in the metadata file.
 
-- `hyderabad_airspace.geojson` (preferred)
-- `hyderabad_airspace.kml`
-- an official JSON/API response with polygon coordinates
+On the next `python backend/load_data.py`, the loader validates every feature before inserting it. It rejects unknown or duplicated zone IDs and non-polygon geometries. Imported records are namespaced as `digital-sky:<Digital Sky ID>` and use the attributable red/yellow rule passages in `data/rules.json`.
 
-The imported feature must retain the Digital Sky zone ID (for example, `DSRZONE0003145`), the airspace class, validity dates, altitude limits, source URL and retrieval date. Do not use browser cookies, bearer tokens or credentials in the repository.
+Other source formats first need a conversion to that GeoJSON shape; do not place arbitrary data under this filename.
+
+The source export should retain:
+
+- the Digital Sky zone ID (for example, `DSRZONE0003145`),
+- airspace class, validity dates and altitude limits,
+- source URL and retrieval date.
+
+Do not use browser cookies, bearer tokens or credentials in the repository.
 
 Until geometry arrives, the metadata may be cited in the UI but must not be used to decide whether a point is inside an official restriction.

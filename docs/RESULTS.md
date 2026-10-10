@@ -9,7 +9,7 @@ Only measured runs are recorded here. Vector and true hybrid numbers remain pend
 - Database: MongoDB Atlas 8.0.34
 - Store modes tested: local JSON and MongoDB
 - Zones: 454
-- Rules: 7 placeholder passages, pending official verification
+- Rules: 9 passages: 7 prototype context rules plus 2 attributable Digital Sky red/yellow airspace rules. The prototype context rules remain pending official verification.
 - Evaluation cases: 32
 - LLM/embedding host: unavailable for this run
 
@@ -47,7 +47,7 @@ Notice text is labelled as third-party data in the prompt, whitespace-normalized
 
 | Suite | Result |
 |---|---:|
-| Local JSON | 75 passed |
-| MongoDB integration | 74 passed, 1 skipped |
+| Local JSON | 130 passed, 7 skipped |
+| MongoDB integration | Not re-run after this change; previously 133 passed, 1 skipped |
 
 The small Atlas tier cannot duplicate the production Search indexes in `skyclear_test`. MongoDB integration tests therefore skip only the autocomplete endpoint test; that pipeline has focused unit coverage and was verified directly against the production `zones_autocomplete` index.

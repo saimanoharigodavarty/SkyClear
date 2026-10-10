@@ -86,3 +86,24 @@ The query used the geospatial index and did not perform a collection scan.
 - Analytics aggregation query plans
 - Larger synthetic dataset measurements
 - Telemetry and zone sharding plan
+
+## Planned scale path
+
+The implementation should not claim a scale number until it is measured. When the
+simulation owner stores a flight route as GeoJSON plus `starts_at` and `ends_at`, add
+a compound time index for the time-window predicate and retain a `2dsphere` index on
+the route geometry. Query candidates by overlap in time, then use `$geoIntersects` for
+the zone/route overlap. This avoids sampling a route every fixed distance.
+
+For a scale check, generate a disposable test database with at least 100,000 telemetry
+documents and 10,000 route records, run `explain("executionStats")` for the geo-plus-
+time and analytics pipelines, and record the exact hardware, index definitions,
+returned count, keys examined, documents examined and elapsed time here. Do not run a
+synthetic load against the shared `skyclear` database.
+
+If live telemetry later requires sharding, shard it by a hashed drone identity with a
+time component in the query/index strategy, so an individual drone's recent track is
+targeted while write load is distributed. Keep slowly changing airspace zones separate;
+if they grow beyond a single shard's practical capacity, use a stable geospatial prefix
+as their shard key. Validate both choices against the real access patterns before
+enabling sharding.

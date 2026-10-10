@@ -118,7 +118,14 @@ def load(verbose=True, search_indexes=("rules", "zones"), embeddings=True):
 
     # zones
     db.zones.delete_many({})
-    db.zones.insert_many([{**f["properties"], "geometry": f["geometry"]} for f in _read("zones.geojson")["features"]])
+    zones = [{**f["properties"], "geometry": f["geometry"]} for f in _read("zones.geojson")["features"]]
+    # Digital Sky geometries are opt-in: metadata alone is never converted into a
+    # polygon.  Once the project owner adds a validated official GeoJSON export,
+    # it is included on the map and in point-in-polygon checks on the next load.
+    from official_airspace import available_official_zone_records
+    official_zones = available_official_zone_records()
+    zones.extend(official_zones)
+    db.zones.insert_many(zones)
     ensure_zone_indexes(db)
 
     # notices: replace seed notices only
@@ -172,7 +179,7 @@ def load(verbose=True, search_indexes=("rules", "zones"), embeddings=True):
     except Exception:
         pass
 
-    log(f"loaded: {db.zones.count_documents({})} zones, {db.rules.count_documents({})} rules, "
+    log(f"loaded: {db.zones.count_documents({})} zones ({len(official_zones)} official Digital Sky), {db.rules.count_documents({})} rules, "
         f"{db.drones.count_documents({'origin': 'seed'})} drones, {db.notices.count_documents({'origin': 'seed'})} sample notices, "
         f"{db.eval_cases.count_documents({})} eval cases")
     return db

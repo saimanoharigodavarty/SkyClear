@@ -34,12 +34,12 @@ def test_lists():
 
 def test_route_through_airport_flags_issue():
     body = {"drone_id": "small-1800", "speed_mps": 15, "datetime": "2026-10-12T10:00:00+05:30",
-            "waypoints": [{"lat": 12.90, "lng": 77.668}, {"lat": 13.00, "lng": 77.668}]}
+            "waypoints": [{"lat": 17.15, "lng": 78.43}, {"lat": 17.32, "lng": 78.43}]}
     r = client.post("/simulate/route", json=body)
     assert r.status_code == 200
     out = r.json()
     assert out["summary"]["worst_verdict"] == "permission_needed"
-    assert out["summary"]["first_issue"]["zones"] == ["HAL Airport"]
+    assert out["summary"]["first_issue"]["zones"] == ["Rajiv Gandhi International Airport"]
     assert out["samples"][0]["verdict"] == "can_fly"
 
 

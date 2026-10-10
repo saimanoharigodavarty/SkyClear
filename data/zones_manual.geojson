@@ -4,37 +4,38 @@
   {
    "type": "Feature",
    "properties": {
-    "zone_id": "Z-002",
-    "name": "Sample Military Area",
-    "zone_type": "military",
+    "zone_id": "Z-S01",
+    "name": "KBR National Park (sample boundary)",
+    "zone_type": "park",
     "rule_ids": [
-     "R-002"
+     "R-003",
+     "R-003B"
     ],
-    "source": "Sample zone, not real (replace with official data)"
+    "source": "Sample boundary, not official (replace with forest department data)"
    },
    "geometry": {
     "type": "Polygon",
     "coordinates": [
      [
       [
-       77.55,
-       13.0
+       78.415,
+       17.42
       ],
       [
-       77.57,
-       13.0
+       78.43,
+       17.42
       ],
       [
-       77.57,
-       13.02
+       78.43,
+       17.435
       ],
       [
-       77.55,
-       13.02
+       78.415,
+       17.435
       ],
       [
-       77.55,
-       13.0
+       78.415,
+       17.42
       ]
      ]
     ]
@@ -43,37 +44,37 @@
   {
    "type": "Feature",
    "properties": {
-    "zone_id": "Z-003",
-    "name": "Sample Park",
-    "zone_type": "park",
+    "zone_id": "Z-S02",
+    "name": "Secretariat area (sample boundary)",
+    "zone_type": "government",
     "rule_ids": [
-     "R-003"
+     "R-005"
     ],
-    "source": "Sample zone, not real (replace with official data)"
+    "source": "Sample boundary, not official (replace with official data)"
    },
    "geometry": {
     "type": "Polygon",
     "coordinates": [
      [
       [
-       77.58,
-       12.92
+       78.46,
+       17.4
       ],
       [
-       77.6,
-       12.92
+       78.485,
+       17.4
       ],
       [
-       77.6,
-       12.94
+       78.485,
+       17.415
       ],
       [
-       77.58,
-       12.94
+       78.46,
+       17.415
       ],
       [
-       77.58,
-       12.92
+       78.46,
+       17.4
       ]
      ]
     ]

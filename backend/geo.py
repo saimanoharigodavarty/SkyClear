@@ -32,3 +32,15 @@ def distance_to_polygon_km(lat, lng, geometry):
     if point_in_polygon(lng, lat, geometry):
         return 0.0
     return min(haversine_km(lat, lng, y, x) for x, y in geometry["coordinates"][0])
+
+
+def circle(lat, lng, radius_km, n=32):
+    """GeoJSON Polygon approximating a circle."""
+    coords = []
+    for i in range(n):
+        a = 2 * math.pi * i / n
+        dlat = (radius_km / 111.32) * math.cos(a)
+        dlng = (radius_km / (111.32 * math.cos(math.radians(lat)))) * math.sin(a)
+        coords.append([round(lng + dlng, 5), round(lat + dlat, 5)])
+    coords.append(coords[0])
+    return {"type": "Polygon", "coordinates": [coords]}

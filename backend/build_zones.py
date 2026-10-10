@@ -9,26 +9,16 @@ Airport zones are circles around the airport reference point. The radius is an a
 import csv
 import io
 import json
-import math
 import sys
 import urllib.request
 
 import config
+from geo import circle
 
 URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"
 RADIUS_KM = {"large_airport": 5.0, "medium_airport": 5.0, "small_airport": 3.0}
+MILITARY = {"VODG", "VOHK"}  # Air Force sites near Hyderabad: Dundigul, Hakimpet
 SOURCE = "OurAirports, circle of {r:g} km around the airport (derived, verify)"
-
-
-def circle(lat, lng, radius_km, n=32):
-    coords = []
-    for i in range(n):
-        a = 2 * math.pi * i / n
-        dlat = (radius_km / 111.32) * math.cos(a)
-        dlng = (radius_km / (111.32 * math.cos(math.radians(lat)))) * math.sin(a)
-        coords.append([round(lng + dlng, 5), round(lat + dlat, 5)])
-    coords.append(coords[0])
-    return {"type": "Polygon", "coordinates": [coords]}
 
 
 def load_rows(path):
@@ -44,14 +34,15 @@ def build(path=None):
     for r in load_rows(path):
         if r["iso_country"] != "IN" or r["type"] not in RADIUS_KM:
             continue
-        if r["type"] == "small_airport" and r["scheduled_service"] != "yes":
+        military = r["ident"] in MILITARY
+        if r["type"] == "small_airport" and r["scheduled_service"] != "yes" and not military:
             continue
         km = RADIUS_KM[r["type"]]
         lat, lng = float(r["latitude_deg"]), float(r["longitude_deg"])
         features.append({
             "type": "Feature",
-            "properties": {"zone_id": f"Z-{r['ident']}", "name": r["name"], "zone_type": "airport",
-                           "rule_ids": ["R-001", "R-001B"], "source": SOURCE.format(r=km)},
+            "properties": {"zone_id": f"Z-{r['ident']}", "name": r["name"], "zone_type": "military" if military else "airport",
+                           "rule_ids": ["R-002"] if military else ["R-001", "R-001B"], "source": SOURCE.format(r=km)},
             "geometry": circle(lat, lng, km),
         })
     manual = json.load(open(config.DATA_DIR / "zones_manual.geojson", encoding="utf-8"))["features"]

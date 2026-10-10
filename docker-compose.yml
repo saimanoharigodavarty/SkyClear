@@ -1,0 +1,11 @@
+# MongoDB with geospatial, text and vector search (Atlas Local, free, runs on your laptop).
+# Start: docker compose up -d      Stop: docker compose down
+services:
+  mongo:
+    image: mongodb/mongodb-atlas-local:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - skyclear-mongo:/data/db
+volumes:
+  skyclear-mongo:

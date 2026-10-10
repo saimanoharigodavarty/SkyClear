@@ -9,7 +9,8 @@ from datetime import datetime
 
 import config
 import runtime
-from geo import distance_to_polygon_km, point_in_polygon
+from embeddings import embed
+from geo import circle, distance_to_polygon_km, point_in_polygon
 
 
 def _load(name):
@@ -53,6 +54,9 @@ class LocalStore:
         """Metadata-filtered rules. MongoStore also ranks them by vector + keyword search using `query`."""
         return [r for r in self.rules if r["zone_type"] in zone_types and drone_class in r["drone_classes"]]
 
+    def active_notices(self):
+        return self.notices + [n for n in runtime.all_("notices") if n["status"] == "active"]
+
     def all_zones_geojson(self):
         return {"type": "FeatureCollection", "features": self.zones}
 
@@ -61,19 +65,84 @@ class LocalStore:
 
 
 class MongoStore(LocalStore):
-    """TODO (data/search owner): override the methods above with MongoDB queries.
-
-    zones_near   -> $geoNear / $geoIntersects on zones.geometry (2dsphere)
-    notices_at   -> $geoIntersects on notices.area plus starts_at/ends_at filter
-    rules_for    -> $vectorSearch on rules.embedding + text search on rules.text, filtered by
-                    zone_type and drone_classes, then merged (hybrid)
-    Until then it falls back to the local JSON behaviour so the app keeps working.
-    """
+    """MongoDB: 2dsphere geo queries, metadata-filtered rules, and vector, text and hybrid rule search."""
 
     def __init__(self):
-        super().__init__()
-        from pymongo import MongoClient
-        self.db = MongoClient(config.MONGO_URI, serverSelectionTimeoutMS=3000)[config.MONGO_DB]
+        from db import get_db
+        self.db = get_db()
+
+    @staticmethod
+    def _clean(doc):
+        doc = dict(doc)
+        doc.pop("_id", None)
+        doc.pop("embedding", None)
+        return doc
+
+    def get_drone(self, drone_id):
+        d = self.db.drones.find_one({"drone_id": drone_id}, {"_id": 0})
+        return d
+
+    def all_drones(self):
+        return list(self.db.drones.find({"owner_id": {"$exists": False}}, {"_id": 0, "origin": 0}))
+
+    def all_zones_geojson(self):
+        feats = []
+        for z in self.db.zones.find({}, {"_id": 0}):
+            geom = z.pop("geometry")
+            feats.append({"type": "Feature", "properties": z, "geometry": geom})
+        return {"type": "FeatureCollection", "features": feats}
+
+    def zones_near(self, lat, lng, radius_km=config.NEARBY_KM):
+        """Mongo finds zones touching a circle around the point (2dsphere index). Distance is refined here."""
+        out = []
+        search_area = circle(lat, lng, radius_km)
+        for z in self.db.zones.find({"geometry": {"$geoIntersects": {"$geometry": search_area}}}, {"_id": 0}):
+            dist = distance_to_polygon_km(lat, lng, z["geometry"])
+            out.append({**z, "inside": dist == 0.0, "distance_km": round(dist, 2)})
+        return sorted(out, key=lambda z: z["distance_km"])
+
+    def notices_at(self, lat, lng, when):
+        point = {"type": "Point", "coordinates": [lng, lat]}
+        out = []
+        for n in self.db.notices.find({"status": "active", "area": {"$geoIntersects": {"$geometry": point}}}, {"_id": 0}):
+            if datetime.fromisoformat(n["starts_at"]) <= when <= datetime.fromisoformat(n["ends_at"]):
+                out.append({**n, "geometry": n["area"]})
+        return out
+
+    def active_notices(self):
+        return list(self.db.notices.find({"status": "active"}, {"_id": 0}))
+
+    def rules_for(self, zone_types, drone_class, query=""):
+        """Every rule that matches the zone type and drone class. The verdict needs all of them, not a top-k."""
+        found = self.db.rules.find({"zone_type": {"$in": list(zone_types)}, "drone_classes": drone_class}, {"_id": 0, "embedding": 0})
+        return list(found)
+
+    def search_rules(self, query, k=5, mode="hybrid"):
+        """Rank rule passages for a natural-language query. mode: vector, text or hybrid (reciprocal rank fusion)."""
+        ranked = {"vector": self._vector(query, k * 3) if mode in ("vector", "hybrid") else [],
+                  "text": self._text(query, k * 3) if mode in ("text", "hybrid") else []}
+        if mode != "hybrid":
+            return ranked[mode][:k]
+        score, byid = {}, {}
+        for lst in ranked.values():
+            for rank, r in enumerate(lst):
+                score[r["rule_id"]] = score.get(r["rule_id"], 0) + 1 / (60 + rank)
+                byid[r["rule_id"]] = r
+        return [{**byid[i], "score": round(s, 5)} for i, s in sorted(score.items(), key=lambda x: -x[1])][:k]
+
+    def _vector(self, query, limit):
+        vec = embed([query], "query")
+        if not vec:
+            return []
+        pipeline = [{"$vectorSearch": {"index": "rules_vector", "path": "embedding", "queryVector": vec[0],
+                                       "numCandidates": 50, "limit": limit}},
+                    {"$project": {"_id": 0, "embedding": 0, "score": {"$meta": "vectorSearchScore"}}}]
+        return list(self.db.rules.aggregate(pipeline))
+
+    def _text(self, query, limit):
+        pipeline = [{"$match": {"$text": {"$search": query}}}, {"$addFields": {"score": {"$meta": "textScore"}}},
+                    {"$sort": {"score": -1}}, {"$limit": limit}, {"$project": {"_id": 0, "embedding": 0}}]
+        return list(self.db.rules.aggregate(pipeline))
 
 
 def get_store():

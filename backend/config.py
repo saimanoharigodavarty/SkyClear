@@ -3,11 +3,26 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def _load_dotenv():
+    """Read KEY=VALUE lines from <repo>/.env into the environment (real env vars win)."""
+    path = ROOT / ".env"
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip())
+
+
+_load_dotenv()
 DATA_DIR = ROOT / "data"
 FRONTEND_DIR = ROOT / "frontend"
 
 USE_MONGO = os.getenv("USE_MONGO", "0") == "1"
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/?directConnection=true")
 MONGO_DB = os.getenv("MONGO_DB", "skyclear")
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")

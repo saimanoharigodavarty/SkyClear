@@ -244,7 +244,7 @@ def publish_notice(body: NoticeIn, user=Depends(require("official"))):
         raise HTTPException(422, "end must be after start")
     notice = runtime.insert("notices", {
         "notice_id": runtime.new_id("RN"), "title": body.title.strip(), "text": body.note.strip(),
-        "status": "active", "starts_at": body.starts_at, "ends_at": body.ends_at,
+        "status": "active", "origin": "official", "starts_at": body.starts_at, "ends_at": body.ends_at,
         "center": {"lat": body.lat, "lng": body.lng}, "radius_km": body.radius_km,
         "area": circle(body.lat, body.lng, body.radius_km),
         "source": f"Published by {user['name']}", "published_by": user["name"], "published_at": runtime.now_iso()})
@@ -274,7 +274,7 @@ def cancel_notice(notice_id: str, user=Depends(require("official"))):
 
 @router.get("/notices")
 def list_notices(user=Depends(current_user)):
-    items = runtime.all_("notices")
+    items = [n for n in runtime.all_("notices") if n.get("origin") == "official"]
     if user["role"] != "official":
         items = [n for n in items if n["status"] == "active"]
     out = []
@@ -289,7 +289,7 @@ def active_notices():
     from pipeline import store
     now = parse_when(None)
     out = []
-    for n in store.notices + [n for n in runtime.all_("notices") if n["status"] == "active"]:
+    for n in store.active_notices():
         if parse_when(n["ends_at"]) >= now:
             out.append({k: n.get(k) for k in ("notice_id", "title", "starts_at", "ends_at", "source")} | {"area": n["area"]})
     return out
@@ -302,6 +302,6 @@ def overview(user=Depends(require("official"))):
         "pending_requests": sum(f["status"] == "requested" for f in flights),
         "approved": sum(f["status"] == "approved" for f in flights),
         "watching": sum(f["status"] == "watching" for f in flights),
-        "active_notices": sum(n["status"] == "active" for n in runtime.all_("notices")),
+        "active_notices": sum(n["status"] == "active" for n in runtime.all_("notices") if n.get("origin") == "official"),
         "pilots": sum(u["role"] == "pilot" for u in runtime.all_("users")),
     }

@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pymongo
+requests
+ollama
+pydantic
+pytest
+httpx

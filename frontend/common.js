@@ -197,7 +197,27 @@ function bindMapSearch(map, onPick) {
   if (!input) return;
   let timer = null, seq = 0;
   const close = () => list.classList.add("hidden");
-  const pick = (lat, lng, zoom) => { map.flyTo([lat, lng], zoom, { duration: 0.8 }); close(); if (onPick) onPick({ lat, lng }); };
+  const shown = L.layerGroup().addTo(map);  // the searched place: its outline when OpenStreetMap has one, else a pin
+  const pick = (lat, lng, zoom, name, geo) => {
+    shown.clearLayers();
+    if (geo && /Polygon/.test(geo.type)) { const g = L.geoJSON(geo, { style: { color: C.accent, weight: 3, dashArray: "8 6", fillColor: C.accent, fillOpacity: 0.12 }, interactive: false }).addTo(shown); map.flyToBounds(g.getBounds().pad(0.4), { duration: 0.8, maxZoom: 17 }); }
+    else map.flyTo([lat, lng], zoom, { duration: 0.8 });
+    L.marker([lat, lng], { icon: pinIcon(), interactive: false, keyboard: false }).bindTooltip(esc(name || "Searched place"), { permanent: true, direction: "top", className: "zlabel", interactive: false }).addTo(shown);
+    close(); if (onPick) onPick({ lat, lng, name });
+  };
+  // Mappls may name a place without giving its coordinates: look the name up in OpenStreetMap, which also gives the campus outline.
+  async function osmLookup(name, address) {
+    const vb = CFG.searchViewbox ? "&viewbox=" + CFG.searchViewbox.join(",") : "";
+    const area = (address || "").split(",")[1] ? address.split(",")[1].trim() : "", first = name.split(" ")[0];
+    // OpenStreetMap often spells a locality as one word ("Aziznagar"), so try a few forms of the same place
+    const tries = [...new Set([area && `${name} ${area}`, area && `${first} ${area.replace(/\s+/g, "")}`, name].filter(Boolean))];
+    for (const q of tries) {
+      const r = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&polygon_geojson=1&countrycodes=" + CFG.countryCode + vb + "&q=" + encodeURIComponent(q));
+      const j = r.ok ? await r.json() : [];
+      if (j[0]) return { lat: Number(j[0].lat), lng: Number(j[0].lon), geo: j[0].geojson };
+    }
+    return null;
+  }
   async function run() {
     const q = input.value.trim(), mine = ++seq;
     if (q.length < 2) return close();
@@ -214,13 +234,17 @@ function bindMapSearch(map, onPick) {
     } catch (e) { /* offline */ }
     if (mine !== seq) return;
     const items = [...zones.map(z => ({ title: z.name, sub: "Restricted zone, " + z.zone_type, lat: z.center.lat, lng: z.center.lng, zoom: 13 })),
-      ...places.map(p => ({ title: p.name, sub: p.provider || "Place", lat: p.lat, lng: p.lng, eloc: p.eloc, zoom: 15 }))];
+      ...places.map(p => ({ title: p.name, address: p.address, sub: p.address || p.provider || "Place", lat: p.lat, lng: p.lng, eloc: p.eloc, zoom: 15, osm: p.eloc ? undefined : 1 }))];
     list.innerHTML = items.length ? items.map((it, i) => `<li data-i="${i}">${esc(it.title)}<small>${esc(it.sub)}</small></li>`).join("") : '<li class="none">Nothing found. Try a zone name or an area in Hyderabad.</li>';
     list.classList.remove("hidden");
     list.querySelectorAll("li[data-i]").forEach(li => li.addEventListener("click", async () => {
       const it = items[Number(li.dataset.i)]; input.value = it.title;
-      if (it.eloc) { try { const detail = await api("/places/" + encodeURIComponent(it.eloc), { auth: false }); pick(detail.lat, detail.lng, it.zoom); } catch (e) { li.querySelector("small").textContent = "Mappls could not provide coordinates for this place."; } }
-      else pick(it.lat, it.lng, it.zoom);
+      if (it.eloc) {
+        let done = false;
+        try { const detail = await api("/places/" + encodeURIComponent(it.eloc), { auth: false }); pick(detail.lat, detail.lng, it.zoom, it.title); done = true; } catch (e) { /* try OpenStreetMap next */ }
+        if (!done) { try { const o = await osmLookup(it.title, it.address); if (o) pick(o.lat, o.lng, it.zoom, it.title, o.geo); else li.querySelector("small").textContent = "No coordinates found for this place."; } catch (e) { li.querySelector("small").textContent = "No coordinates found for this place."; } }
+      } else if (it.osm !== undefined) { const o = await osmLookup(it.title).catch(() => null); pick(it.lat, it.lng, it.zoom, it.title, o && o.geo); }
+      else pick(it.lat, it.lng, it.zoom, it.title);
     }));
   }
   input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 300); });

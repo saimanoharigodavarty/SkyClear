@@ -15,3 +15,72 @@ INFO:     127.0.0.1:63138 - "GET /guard/stream?area=KLH%20campus HTTP/1.1" 200 O
 INFO:     127.0.0.1:63154 - "GET /favicon.ico HTTP/1.1" 404 Not Found
 INFO:     127.0.0.1:63156 - "POST /notices/RN-54AB3E/cancel HTTP/1.1" 200 OK
 INFO:     127.0.0.1:63158 - "DELETE /sim/fleet HTTP/1.1" 200 OK
+[llm] warm-up skipped (ConnectTimeout), the app works without it
+INFO:     127.0.0.1:63179 - "GET /zones/search?q=KL HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63190 - "GET /places/search?q=KLH%20Aziz%20Nagar HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63193 - "GET /mappls/search?q=KLH%20Aziz%20Nagar HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63197 - "GET /places/NM7AJG HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:63222 - "POST /auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63228 - "GET /index.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63228 - "GET /app.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63236 - "GET /pilot.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63235 - "GET /common.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63233 - "GET /config.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63249 - "GET /notices/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63250 - "GET /drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63244 - "GET /examples HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63248 - "GET /zones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63248 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63248 - "GET /official.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63244 - "GET /common.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:63250 - "GET /official.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63248 - "GET /config.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63265 - "GET /live/drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63250 - "GET /notices/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63250 - "GET /events?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJVLUJGMzQ1MCIsInJvbGUiOiJvZmZpY2lhbCIsImFpZCI6bnVsbCwidHlwIjoiYWNjZXNzIiwiaWF0IjoxNzkxNjU4MzQ5LCJleHAiOjE3OTE2NTkyNDksImp0aSI6IjJhNDdlYjM3Y2E4YiJ9.CNO_ciVTJeNL80_loOAFAu49-s23MRJTskeTribxpp8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63265 - "GET /lan HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63263 - "GET /authorities HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63249 - "GET /flights?status=requested HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63244 - "GET /overview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63248 - "GET /zones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63244 - "GET /verification/queue HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63244 - "GET /zones/search?q=KLH%20Aziz%20Nagar HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63248 - "GET /live/drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63244 - "GET /places/search?q=KLH%20Aziz%20Nagar&lat=17.385&lng=78.4867 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63244 - "GET /live/drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63244 - "GET /places/NM7AJG HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:63244 - "GET /live/drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63244 - "GET /live/drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63244 - "GET /live/drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63302 - "POST /auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63310 - "GET /index.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63310 - "GET /app.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63316 - "GET /pilot.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63315 - "GET /common.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63314 - "GET /config.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63335 - "GET /notices/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63336 - "GET /drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63330 - "GET /examples HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63334 - "GET /zones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63334 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63334 - "GET /official.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63330 - "GET /common.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:63336 - "GET /official.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63334 - "GET /config.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63348 - "GET /live/drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63336 - "GET /notices/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63336 - "GET /events?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJVLUJGMzQ1MCIsInJvbGUiOiJvZmZpY2lhbCIsImFpZCI6bnVsbCwidHlwIjoiYWNjZXNzIiwiaWF0IjoxNzkxNjU4MzkxLCJleHAiOjE3OTE2NTkyOTEsImp0aSI6IjE4ODdhNmQyNzZlYSJ9.h1Tk9pwqhEBz5PfIRevC2jY_0HtGLm_ZtLyze836qSU HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63348 - "GET /lan HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63347 - "GET /authorities HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63335 - "GET /flights?status=requested HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63330 - "GET /overview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63334 - "GET /zones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63334 - "GET /verification/queue HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63330 - "GET /live/drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63334 - "GET /zones/search?q=KLH%20Aziz%20Nagar HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63334 - "GET /places/search?q=KLH%20Aziz%20Nagar&lat=17.385&lng=78.4867 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63334 - "GET /live/drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63334 - "GET /places/NM7AJG HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:63334 - "GET /live/drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63334 - "GET /live/drones HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63334 - "GET /live/drones HTTP/1.1" 200 OK

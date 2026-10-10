@@ -126,7 +126,10 @@ function setCentre(ll) {
   $("nGo").disabled = false;
 }
 map.on("click", e => { if (tab === "publish") setCentre(e.latlng); });
-bindMapSearch(map, ll => { if (tab === "publish") setCentre(ll); });
+bindMapSearch(map, ll => {
+  if (tab === "publish") setCentre(ll);
+  if ($("drLat")) { $("drLat").value = ll.lat.toFixed(5); $("drLng").value = ll.lng.toFixed(5); if (ll.name) $("drTitle").value = ll.name.split(",")[0]; }  // a searched place can be used for the drill
+});
 $("nRadius").addEventListener("input", drawPreview);
 $("noticeForm").addEventListener("submit", async e => {
   e.preventDefault();

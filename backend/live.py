@@ -175,6 +175,43 @@ async def inject_vip_scenario(authorization: Optional[str] = Header(default=None
             "affected_flights": notice["affected_flights"], "conflicting_permits": notice["conflicting_permits"]}
 
 
+class DrillIn(BaseModel):
+    lat: float = Field(ge=-90, le=90)
+    lng: float = Field(ge=-180, le=180)
+    radius_m: float = Field(default=120, ge=30, le=2000)
+    title: str = Field(default="Protected area drill", min_length=3, max_length=80)
+    approach_m: float = Field(default=600, ge=150, le=3000)
+    speed_mps: float = Field(default=12, ge=3, le=25)
+
+
+@sim_router.post("/scenarios/intruder")
+async def inject_intruder_scenario(body: DrillIn, authorization: Optional[str] = Header(default=None)):
+    """A drill: declare an area as a restriction (a normal notice) and send one simulated drone toward it from a distance.
+    The drone flies in, so the breach, the officer's feed and the guard alerts all happen through the real path."""
+    user = require_official(authorization)
+    import bridge
+    import math
+    import secrets
+    from simulator.kinematics import DroneKinematics
+    now = datetime.now(timezone.utc)
+    notice = bridge.create_notice(body.title, "Drill: a simulated drone is sent toward this area.", body.lat, body.lng, body.radius_m / 1000,
+                                  now.isoformat(timespec="seconds"), (now + timedelta(hours=2)).isoformat(timespec="seconds"), user["name"], actor=user)
+    bearing = math.radians(secrets.randbelow(360))
+    dlat = lambda m, b: m * math.cos(b) / 111320.0  # noqa: E731
+    dlng = lambda m, b: m * math.sin(b) / (111320.0 * max(0.1, math.cos(math.radians(body.lat))))  # noqa: E731
+    start = (body.lat + dlat(body.approach_m, bearing), body.lng + dlng(body.approach_m, bearing))
+    far = (body.lat - dlat(body.approach_m, bearing), body.lng - dlng(body.approach_m, bearing))
+    drone = DroneKinematics(drone_id="DRILL-" + secrets.token_hex(2).upper(), flight_id="F-" + secrets.token_hex(3).upper(), initial_lat=start[0], initial_lng=start[1],
+                            initial_alt_m=50.0, speed_mps=body.speed_mps, battery_pct=95.0, waypoints=[(body.lat, body.lng, 50.0), (far[0], far[1], 50.0)], owner_id=None, is_approved=False)
+    sim = get_fleet_simulator()
+    with sim._lock:
+        sim.drones.append(drone)
+        sim.is_running = True
+    sim._ensure_task()
+    return {"ok": True, "notice_id": notice["notice_id"], "title": notice["title"], "drone_id": drone.drone_id,
+            "arrives_in_s": round(body.approach_m / body.speed_mps)}
+
+
 def _inside(drone, notice):
     from geo import point_in_polygon
     return point_in_polygon(drone.lng, drone.lat, notice["area"])

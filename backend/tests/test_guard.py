@@ -46,3 +46,18 @@ def test_a_test_signal_reaches_every_listener():
 
 def test_status_is_public():
     assert client.get("/guard/status").json() == {"listeners": 0}
+
+
+def test_the_drill_declares_the_area_and_flies_a_drone_at_it():
+    from simulator.fleet import get_fleet_simulator
+    admin = official()
+    assert client.post("/sim/scenarios/intruder", json={"lat": 17.4, "lng": 78.4}).status_code == 401
+    assert client.post("/sim/scenarios/intruder", headers=auth(pilot("gd2@example.com")), json={"lat": 17.4, "lng": 78.4}).status_code in (401, 403)
+    r = client.post("/sim/scenarios/intruder", headers=auth(admin), json={"lat": 17.4, "lng": 78.4, "title": "Drill campus", "radius_m": 100})
+    assert r.status_code == 200 and r.json()["drone_id"].startswith("DRILL-") and r.json()["arrives_in_s"] > 0
+    assert any(n["title"] == "Drill campus" for n in client.get("/notices", headers=auth(admin)).json())
+    sim = get_fleet_simulator()
+    d = next(d for d in sim.drones if d.drone_id == r.json()["drone_id"])
+    assert 0.004 < abs(d.lat - 17.4) + abs(d.lng - 78.4) < 0.02  # starts a few hundred metres away
+    client.delete("/sim/fleet", headers=auth(admin))
+    client.post(f"/notices/{r.json()['notice_id']}/cancel", headers=auth(admin))

@@ -12,6 +12,10 @@ Path of an alert: the drone enters the notice, the geofence records a breach in 
 2. Officer console, Notices tab: the guard link and a QR code are there. "Sound a test siren now" sets off every listening device and is written to the audit log.
 3. On each device: open the link (or scan the QR), pick the area, tap "Turn alerts on".
 
+## Drill (test it with your own phone)
+
+Officer console, Notices tab, "Drill": type the area name, press "Use my location" (works when the page is opened as localhost on a laptop; otherwise type latitude and longitude), press "Start the drill". The area is declared as a restriction and one simulated drone starts about 600 m away and flies at it, arriving in under a minute. Every device with the guard page open sounds. "End the drill" cancels the restriction and removes the drone.
+
 ## Honest limits
 
 - A web page cannot make a device beep without the person opening it once. The browser blocks sound until a tap, and a closed or locked page cannot receive anything. The page asks for a screen wake lock, so a phone that is kept awake and left open works.

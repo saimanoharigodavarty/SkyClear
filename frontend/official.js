@@ -301,3 +301,25 @@ $("guardTest").addEventListener("click", async () => {
   try { const r = await api("/guard/test", { method: "POST" }); $("guardMsg").textContent = r.listeners ? `Siren sent to ${r.listeners} listening device${r.listeners === 1 ? "" : "s"}.` : "No device is listening yet. Open the link above on a phone and tap Turn alerts on."; }
   catch (e) { $("guardMsg").textContent = e.message; }
 });
+
+/* ---------- drill: declare an area and send a simulated drone toward it ---------- */
+let drillNotice = null;
+$("drHere").addEventListener("click", () => {
+  if (!navigator.geolocation) { $("drMsg").innerHTML = '<div class="msg err">This browser cannot give a location. Type the numbers.</div>'; return; }
+  navigator.geolocation.getCurrentPosition(p => { $("drLat").value = p.coords.latitude.toFixed(5); $("drLng").value = p.coords.longitude.toFixed(5); $("drMsg").innerHTML = `<div class="msg">Location taken, accurate to about ${Math.round(p.coords.accuracy)} m.</div>`; },
+    e => { $("drMsg").innerHTML = `<div class="msg err">Could not read the location (${esc(e.message)}). Open this page as localhost on a laptop, or type the numbers.</div>`; }, { enableHighAccuracy: true, timeout: 15000 });
+});
+$("drGo").addEventListener("click", async () => {
+  try {
+    const r = await api("/sim/scenarios/intruder", { method: "POST", body: { lat: Number($("drLat").value), lng: Number($("drLng").value), radius_m: Number($("drRad").value) || 150, title: $("drTitle").value.trim() || "Protected area drill" } });
+    drillNotice = r.notice_id; drawNotices(layers.notices);
+    $("drMsg").innerHTML = `<div class="msg">Drill started. <b>${esc(r.title)}</b> is declared. The drone ${esc(r.drone_id)} reaches it in about ${esc(r.arrives_in_s)} seconds. Devices with the guard page open will sound.</div>`;
+  } catch (e) { $("drMsg").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+});
+$("drEnd").addEventListener("click", async () => {
+  try {
+    if (drillNotice) await api(`/notices/${drillNotice}/cancel`, { method: "POST" }).catch(() => {});
+    await api("/sim/fleet", { method: "DELETE" }); drillNotice = null; drawNotices(layers.notices);
+    $("drMsg").innerHTML = '<div class="msg">Drill ended. The restriction is cancelled and the test drone is gone.</div>';
+  } catch (e) { $("drMsg").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+});

@@ -86,7 +86,14 @@
         <p class="hint" style="margin-top:0">Publish the area as a notice, then people inside it open this page on their phone or laptop (same Wi-Fi) and tap once. When a drone enters the area, every device that has it open sounds a siren.</p>
         <div class="qr2" id="guardQr"></div><div class="mono small" id="guardUrl" style="word-break:break-all;margin:6px 0"></div>
         <div class="btnrow"><button type="button" id="guardTest" class="inline">Sound a test siren now</button></div>
-        <div class="meta" id="guardMsg"></div></div>
+        <div class="meta" id="guardMsg"></div>
+        <h3 style="margin-top:14px">Drill: send a test drone at an area</h3>
+        <p class="hint" style="margin-top:0">Declares the area as a restriction and flies one simulated drone toward it from about 600 m away. Open the guard link on your phone first.</p>
+        <label for="drTitle">Area name</label><input id="drTitle" value="KLH campus" maxlength="80">
+        <div class="grid2"><div><label for="drLat">Latitude</label><input id="drLat" inputmode="decimal"></div><div><label for="drLng">Longitude</label><input id="drLng" inputmode="decimal"></div></div>
+        <label for="drRad">Radius, metres</label><input id="drRad" type="number" min="30" max="2000" value="150">
+        <div class="btnrow"><button type="button" class="ghost inline" id="drHere">Use my location</button><button type="button" class="inline" id="drGo">Start the drill</button><button type="button" class="danger inline" id="drEnd">End the drill</button></div>
+        <div id="drMsg"></div></div>
       <div id="noticeList"></div>
     </section>
 

@@ -551,3 +551,4 @@ body.guard { min-height: 100vh; background: var(--bg); }
 .galarm .gbig { font-size: clamp(34px, 9vw, 72px); font-weight: 800; line-height: 1.05; }
 .galarm .gsub { font-size: clamp(18px, 4vw, 28px); }
 .galarm button { width: auto; margin-top: 18px; padding: 14px 32px; font-size: 18px; background: var(--on-fill); color: var(--red); border: 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

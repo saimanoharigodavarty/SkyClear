@@ -305,6 +305,23 @@ def cmd_seed_demo(a):
     print(f"Demo data created. Saved in {CREDS}.")
 
 
+def cmd_test_email(a):
+    import otp_delivery
+    dest = a.to.strip()
+    code = secrets.token_hex(3).upper()
+    print(f"Testing SMTP delivery to: {dest}")
+    print(f"Host: {config.SMTP_HOST}:{config.SMTP_PORT}")
+    print(f"From: {config.SMTP_FROM}")
+    print(f"User: {config.SMTP_USER or '(none)'}")
+    print(f"SSL:  {getattr(config, 'SMTP_USE_SSL', False)}")
+    try:
+        otp_delivery.smtp({"name": "Test User"}, dest, code, "register")
+        print(f"Success! Verification code sent to {dest}: {code}")
+    except Exception as e:
+        print(f"Delivery failed: {e}")
+        sys.exit(1)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -318,6 +335,7 @@ def main(argv=None):
     s = sub.add_parser("list-users"); s.set_defaults(fn=cmd_list_users)
     s = sub.add_parser("logins"); s.set_defaults(fn=cmd_logins)
     s = sub.add_parser("set-password"); s.add_argument("--email", required=True); s.add_argument("--password"); s.set_defaults(fn=cmd_set_password)
+    s = sub.add_parser("test-email"); s.add_argument("--to", required=True); s.set_defaults(fn=cmd_test_email)
     s = sub.add_parser("check-llm"); s.set_defaults(fn=cmd_check_llm)
     s = sub.add_parser("has-admin"); s.set_defaults(fn=cmd_has_admin)
     a = p.parse_args(argv)

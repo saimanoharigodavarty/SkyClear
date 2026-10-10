@@ -270,7 +270,7 @@ class FleetSimulator:
             )
             if status == "warning":
                 try:  # a drone about to enter a declared area: the guard devices get a first, softer signal
-                    import guard_api
+                    import backend.guard_api as guard_api
                     guard_api.announce_warning(drone.drone_id, zone_name, active_notices)
                 except Exception:
                     pass

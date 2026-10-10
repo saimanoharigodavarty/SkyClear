@@ -26,9 +26,13 @@ def smtp(user, destination, code, purpose):
     msg["From"], msg["To"], msg["Subject"] = config.SMTP_FROM, destination, f"Your SkyClear code: {code}"
     msg.set_content(_text(code, purpose))
     try:
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10) as s:
-            if config.SMTP_USER:
+        use_ssl = getattr(config, "SMTP_USE_SSL", False) or config.SMTP_PORT == 465
+        timeout = getattr(config, "SMTP_TIMEOUT", 10)
+        client_cls = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
+        with client_cls(config.SMTP_HOST, config.SMTP_PORT, timeout=timeout) as s:
+            if not use_ssl and config.SMTP_USER and hasattr(s, "starttls"):
                 s.starttls()
+            if config.SMTP_USER and hasattr(s, "login"):
                 s.login(config.SMTP_USER, config.SMTP_PASSWORD)
             s.send_message(msg)
     except (OSError, smtplib.SMTPException) as e:

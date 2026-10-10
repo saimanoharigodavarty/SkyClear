@@ -104,6 +104,8 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "1025"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM = os.getenv("SMTP_FROM", "SkyClear <no-reply@skyclear.local>")
+SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "0") == "1" or SMTP_PORT == 465
+SMTP_TIMEOUT = int(os.getenv("SMTP_TIMEOUT", "10"))
 TWILIO_SID = os.getenv("TWILIO_SID", "")
 TWILIO_TOKEN = os.getenv("TWILIO_TOKEN", "")
 TWILIO_FROM = os.getenv("TWILIO_FROM", "")

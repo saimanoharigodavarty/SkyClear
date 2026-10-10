@@ -15,6 +15,11 @@ import db
 import geo
 import pipeline
 import runtime
+try:
+    import guard_api
+    sys.modules.setdefault("backend.guard_api", guard_api)
+except Exception:
+    pass
 
 sys.modules.setdefault("backend.config", config)
 sys.modules.setdefault("backend.db", db)

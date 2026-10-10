@@ -22,11 +22,12 @@
     <!-- sign in -->
     <form id="signinForm">
       <label for="lId">Email or mobile number</label>
-      <input id="lId" required autocomplete="username" placeholder="you@example.com or 98765 43210">
+      <input id="lId" required autocomplete="username" placeholder="Email or 10-digit mobile number">
       <label for="lPass">Password</label>
       <input id="lPass" type="password" required autocomplete="current-password">
       <button type="submit">Sign in</button>
-      <button type="button" class="linkbtn" id="useOtp">Use a one-time code on my phone instead</button>
+      <button type="button" class="linkbtn" id="useOtp" data-pilot-only>Sign in with a one-time code instead</button>
+      <button type="button" class="linkbtn" id="forgot">Forgot your password?</button>
       <div id="signinMsg"></div>
     </form>
 
@@ -34,8 +35,8 @@
     <form id="registerForm" class="hidden">
       <label for="rName">Full name</label><input id="rName" required minlength="2" maxlength="80" autocomplete="name">
       <label for="rEmail">Email</label><input id="rEmail" type="email" required autocomplete="email">
-      <label for="rPhone">Mobile number (India)</label><input id="rPhone" type="tel" required autocomplete="tel" placeholder="98765 43210">
-      <div class="help">We send a one-time code to confirm it. One account per number.</div>
+      <label for="rPhone">Mobile number (India)</label><input id="rPhone" type="tel" required autocomplete="tel" placeholder="10-digit number">
+      <div class="help" id="phoneHelp">One account per number.</div>
       <label for="rPass">Password</label><input id="rPass" type="password" required minlength="8" autocomplete="new-password">
       <div class="help">At least 8 characters.</div>
       <label class="consent"><input id="rConsent" type="checkbox" required><span>I agree to the <a href="terms.html" target="_blank">Terms of Service</a> and the <a href="privacy.html" target="_blank">Privacy Policy</a>, and to SkyClear storing my details to run my account.</span></label>
@@ -57,11 +58,45 @@
 
     <!-- one-time code request (no password) -->
     <form id="otpAskForm" class="hidden">
-      <label for="oId">Mobile number or email of your pilot account</label>
-      <input id="oId" required placeholder="98765 43210">
+      <label for="oId">Email or mobile number of your pilot account</label>
+      <input id="oId" required placeholder="Email or 10-digit mobile number">
       <button type="submit">Send me a code</button>
       <button type="button" class="linkbtn" id="otpAskBack">Back to password sign in</button>
       <div id="otpAskMsg"></div>
+    </form>
+
+    <!-- forgot password -->
+    <form id="forgotForm" class="hidden">
+      <label for="fId">Email or mobile number of your account</label>
+      <input id="fId" required placeholder="Email or 10-digit mobile number">
+      <button type="submit">Send me a code</button>
+      <button type="button" class="linkbtn" data-back>Back to sign in</button>
+      <div id="forgotMsg"></div>
+    </form>
+
+    <!-- reset password with the code -->
+    <form id="resetForm" class="hidden">
+      <p id="resetText" style="margin-top:0">Enter the code and choose a new password.</p>
+      <label for="resetCode">One-time code</label>
+      <input id="resetCode" class="codeinput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required>
+      <div id="resetDev"></div>
+      <label for="resetPass">New password</label>
+      <input id="resetPass" type="password" required minlength="8" autocomplete="new-password">
+      <div class="help">At least 8 characters. You will be signed out everywhere else.</div>
+      <button type="submit">Set the new password</button>
+      <div id="resetMsg"></div>
+    </form>
+
+    <!-- first sign-in of an invited official: choose your own password -->
+    <form id="changeForm" class="hidden">
+      <p style="margin-top:0">You signed in with a temporary password. Choose your own to continue.</p>
+      <label for="curPass">Temporary password</label>
+      <input id="curPass" type="password" required autocomplete="current-password">
+      <label for="newPass">New password</label>
+      <input id="newPass" type="password" required minlength="8" autocomplete="new-password">
+      <div class="help">At least 8 characters.</div>
+      <button type="submit">Save and continue</button>
+      <div id="changeMsg"></div>
     </form>
 
     <!-- officials: authenticator -->
@@ -75,20 +110,11 @@
     </form>
   </div>
 
-  <details class="demo">
-    <summary>Demo accounts for the hackathon</summary>
-    <p class="help" style="margin-top:8px">Click to fill the form, then press Sign in. These exist only in this prototype.</p>
-    <div class="examples">
-      <button type="button" data-demo="asha@example.com|longenough1">Pilot: Asha (verified, has a permit)</button>
-      <button type="button" data-demo="official@skyclear.demo|skyclear-demo">Officer: sees all offices</button>
-      <button type="button" data-demo="police@skyclear.demo|skyclear-demo">Officer: City Police desk</button>
-      <button type="button" data-demo="rgia@skyclear.demo|skyclear-demo">Officer: Airport desk</button>
-    </div>
-    <p class="help">To try registration, use any 10-digit number starting 6 to 9. In demo mode the code is shown on screen. In production it is sent by SMS.</p>
-  </details>
+  
 </main>
 <footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a>Registration on SkyClear is not government registration of your drone or licence.</footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="config.js"></script>
 <script src="common.js"></script>
 <script src="account.js"></script>
 </body>

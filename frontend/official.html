@@ -17,7 +17,7 @@
     <div id="map"></div>
     <div class="mapsearch">
       <label class="sr" for="mapSearch">Search a place or zone</label>
-      <input id="mapSearch" type="search" placeholder="Search a place or zone, for example Begumpet" autocomplete="off">
+      <input id="mapSearch" type="search" placeholder="Search a place or a restricted zone" autocomplete="off">
       <ul id="mapResults" class="results hidden"></ul>
     </div>
     <div class="legend" id="legend"></div>
@@ -28,6 +28,7 @@
       <button data-tab="verify" type="button">Verification<span id="verCount" class="count hidden">0</span></button>
       <button data-tab="publish" type="button">Publish</button>
       <button data-tab="notices" type="button">Notices</button>
+      <button data-tab="team" id="teamTab" class="hidden" type="button">Team</button>
     </nav>
     <section class="pane">
       <div class="explain" id="office"></div>
@@ -66,11 +67,24 @@
     <section class="pane hidden" id="tab-notices" style="padding-top:0">
       <div id="noticeList"></div>
     </section>
+
+    <section class="pane hidden" id="tab-team" style="padding-top:0">
+      <p class="hint" style="margin-top:0">Officials are invited here, they cannot register themselves. You get a temporary password to hand over. They must choose their own at first sign-in.</p>
+      <form id="inviteForm">
+        <label for="iName">Full name</label><input id="iName" required minlength="2" maxlength="80">
+        <label for="iEmail">Email</label><input id="iEmail" type="email" required>
+        <label for="iAuth">Office</label><select id="iAuth"></select>
+        <button type="submit">Invite official</button>
+        <div id="inviteMsg"></div>
+      </form>
+      <div class="section"><h3>Officials</h3><div id="teamList"></div></div>
+    </section>
   </aside>
 </main>
 <footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a>Authority console, prototype. Actions are recorded with your name.</footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="config.js"></script>
 <script src="common.js"></script>
 <script src="official.js"></script>
 </body>

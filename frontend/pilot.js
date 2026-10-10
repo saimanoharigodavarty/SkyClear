@@ -1,5 +1,6 @@
 // Pilot app: check a spot, simulate a flight, manage flights and drones, read alerts.
 header("pilot");
+if (session() && session().user.must_change_password) location.href = "account.html?change=1";
 const { map, layers } = makeMap();
 const VCOLOR = { can_fly: "#1a7f37", permission_needed: "#a15c00", prohibited: "#b3261e", cannot_determine: "#5b6570" };
 let tab = "check", picked = null, marker = null, catalog = [], mine = [], lastCheck = null;
@@ -82,7 +83,7 @@ async function submitDroneVerification(e, droneId) {
 async function refreshMe() { const u = await api("/me"); const s = session(); s.user = u; saved("skyclear.session", s); }
 
 /* ---------- guidance: welcome, steps, examples, drone help ---------- */
-const CLASS_HELP = { nano: "Nano: up to 250 g", micro: "Micro: 250 g to 2 kg", small: "Small: 2 kg to 25 kg", medium: "Medium: 25 kg to 150 kg" };
+const CLASS_HELP = Object.fromEntries(CFG.droneClasses.map(c => [c.name, c.label]));
 function updateDroneHelp() {
   const all = [...mine, ...catalog], d = all.find(x => x.drone_id === $("drone").value);
   $("droneHelp").textContent = d ? `${CLASS_HELP[d.class]}. The rules depend on the weight class.${me() ? "" : " Sign in to use your own registered drones."}` : "";
@@ -96,11 +97,22 @@ function setPick(latlng) {
   $("go").disabled = false; setStep(2);
 }
 function pickAndCheck(lat, lng) { showTab("check"); map.flyTo([lat, lng], 15, { duration: 0.6 }); setPick(L.latLng(lat, lng)); $("go").click(); }
-document.querySelectorAll("[data-ex]").forEach(b => b.addEventListener("click", () => {
-  const [lat, lng] = b.dataset.ex.split(",").map(Number);
-  if (b.textContent.includes("nano")) { const nano = catalog.find(d => d.class === "nano"); if (nano) $("drone").value = nano.drone_id; }
-  pickAndCheck(lat, lng);
-}));
+// Example buttons are built from the real zones in the database (/examples), nothing is typed into the page.
+let exampleRoute = null;
+(async () => {
+  if (CFG.city) $("cityName").textContent = CFG.city;
+  try {
+    const ex = await api("/examples", { auth: false });
+    $("examples").innerHTML = ex.spots.map((s, i) => `<button type="button" data-i="${i}">${esc(s.label)}${s.droneClass ? ", " + esc(s.droneClass) + " drone" : ""}</button>`).join("");
+    $("examples").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      const s = ex.spots[Number(b.dataset.i)];
+      if (s.droneClass) { const d = catalog.find(x => x.class === s.droneClass); if (d) $("drone").value = d.drone_id; updateDroneHelp(); }
+      pickAndCheck(s.lat, s.lng);
+    }));
+    exampleRoute = ex.route;
+    if (ex.route) { $("routeExamples").innerHTML = '<button type="button" id="exRoute">Try an example route through a restricted zone</button>'; $("exRoute").addEventListener("click", loadExampleRoute); }
+  } catch (e) { $("examples").innerHTML = ""; }
+})();
 if (!saved("skyclear.welcome.hidden")) $("welcome").classList.remove("hidden");
 $("hideWelcome").addEventListener("click", () => { saved("skyclear.welcome.hidden", true); $("welcome").classList.add("hidden"); });
 bindMapSearch(map, ll => { if (tab === "check") setPick(L.latLng(ll.lat, ll.lng)); });
@@ -356,8 +368,8 @@ $("when").value = toLocalInput(new Date()); $("simWhen").value = $("when").value
 drawZones(layers); drawNotices(layers.notices); loadDrones();
 if (me()) { refreshMe().catch(() => {}); pollAlerts(); setInterval(() => { pollAlerts(); drawNotices(layers.notices); }, 5000); }
 
-// Example route: south to north across the Rajiv Gandhi Airport zone.
-$("exRoute").addEventListener("click", () => {
-  clearRoute(); map.fitBounds([[17.15, 78.43], [17.32, 78.43]], { padding: [60, 60] });
-  addWaypoint(L.latLng(17.15, 78.43)); addWaypoint(L.latLng(17.32, 78.43));
-});
+function loadExampleRoute() {
+  if (!exampleRoute) return;
+  clearRoute(); map.fitBounds(exampleRoute, { padding: [60, 60] });
+  exampleRoute.forEach(([lat, lng]) => addWaypoint(L.latLng(lat, lng)));
+}

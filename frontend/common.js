@@ -1,7 +1,9 @@
 // Shared helpers for all SkyClear pages.
 // Opened straight from a file (file://)? Talk to the local server instead of failing silently.
 const API_BASE = location.protocol === "file:" ? "http://localhost:8000" : "";
-const HYD = [17.385, 78.4867];
+// Everything about the place (city, map centre, drone classes) comes from the server through config.js. Nothing is typed into the pages.
+const CFG = window.SKYCLEAR || { city: "", center: [20.59, 78.96], zoom: 5, searchViewbox: null, countryCode: "in", droneClasses: [], otpChannel: "email" };
+const HYD = CFG.center;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -118,7 +120,7 @@ function skeleton() { return '<div class="skel big"></div><div class="skel"></di
 function header(active) {
   const s = session();
   $("top").innerHTML = `
-    <a class="brand" href="index.html">SkyClear<small>Hyderabad prototype</small></a>
+    <a class="brand" href="index.html">SkyClear<small>${esc(CFG.city)}</small></a>
     <nav class="nav">
       <a href="index.html" class="${active === "pilot" ? "on" : ""}">Pilot</a>
       <a href="official.html" class="${active === "official" ? "on" : ""}">Authority</a>
@@ -136,9 +138,9 @@ function header(active) {
 /* ---------- map ---------- */
 function circleOf(n) { return L.geoJSON(n.area || n.geometry, { style: { color: NOTICE_COLOR, weight: 2, dashArray: "6 5", fillColor: NOTICE_COLOR, fillOpacity: 0.1 }, interactive: false }); }
 
-// Base map: Hyderabad, calm basemap that follows the theme, satellite toggle, zones grouped by severity, active notices, clickable legend.
+// Base map: centred on the configured city, calm basemap that follows the theme, satellite toggle, zones grouped by severity, active notices, clickable legend.
 function makeMap() {
-  const map = L.map("map", { zoomControl: false, minZoom: 5 }).setView(HYD, 11);
+  const map = L.map("map", { zoomControl: false, minZoom: 5 }).setView(HYD, CFG.zoom);
   L.control.zoom({ position: "topright" }).addTo(map);
   L.control.scale({ metric: true, imperial: false, position: "bottomright" }).addTo(map);
   const tile = { maxNativeZoom: 16, maxZoom: 18, attribution: "Tiles © Esri, map data © OpenStreetMap contributors" };
@@ -162,7 +164,7 @@ function makeMap() {
     const d = L.DomUtil.create("div", "leaflet-bar reset"); const a = L.DomUtil.create("a", "", d);
     a.href = "#"; a.textContent = text; a.title = title;
     L.DomEvent.on(a, "click", e => { L.DomEvent.preventDefault(e); onclick(a); }); return d; } }))().addTo(map);
-  control("Hyderabad", "Back to Hyderabad", () => map.setView(HYD, 11));
+  control(CFG.city || "Reset view", "Back to the start view", () => map.setView(HYD, CFG.zoom));
   control("Satellite", "Switch between map and satellite", a => { satOn = !satOn; a.textContent = satOn ? "Map" : "Satellite"; show(); });
 
   const layers = { red: L.layerGroup().addTo(map), amber: L.layerGroup().addTo(map), notices: L.layerGroup().addTo(map), work: L.layerGroup().addTo(map) };
@@ -193,7 +195,8 @@ function bindMapSearch(map, onPick) {
     let zones = [], places = [];
     try { zones = await api("/zones/search?q=" + encodeURIComponent(q), { auth: false }); } catch (e) { /* offline */ }
     try {
-      const r = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=4&countrycodes=in&viewbox=77.9,17.8,78.9,17.0&q=" + encodeURIComponent(q));
+      const vb = CFG.searchViewbox ? "&viewbox=" + CFG.searchViewbox.join(",") : "";
+      const r = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=4&countrycodes=" + CFG.countryCode + vb + "&q=" + encodeURIComponent(q));
       places = r.ok ? await r.json() : [];
     } catch (e) { /* offline */ }
     if (mine !== seq) return;

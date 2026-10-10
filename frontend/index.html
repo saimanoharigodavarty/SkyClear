@@ -18,7 +18,7 @@
     <div id="map"></div>
     <div class="mapsearch">
       <label class="sr" for="mapSearch">Search a place or zone</label>
-      <input id="mapSearch" type="search" placeholder="Search a place or zone, for example Begumpet" autocomplete="off">
+      <input id="mapSearch" type="search" placeholder="Search a place or a restricted zone" autocomplete="off">
       <ul id="mapResults" class="results hidden"></ul>
     </div>
     <div class="legend" id="legend"></div>
@@ -34,20 +34,14 @@
     <section class="pane" id="tab-check">
       <div id="welcome" class="welcome hidden">
         <h2>Can I fly my drone here?</h2>
-        <p>SkyClear checks a spot against airport, defence and other restricted areas in Hyderabad and answers in plain words, with the rule behind it. If you need permission, it goes to the right officer.</p>
+        <p>SkyClear checks a spot against airport, defence and other restricted areas in <span id="cityName">your area</span> and answers in plain words, with the rule behind it. If you need permission, it goes to the right officer.</p>
         <ol class="steps">
           <li><b>Pick a spot</b> on the map, or search for a place.</li>
           <li><b>Choose your drone and time.</b></li>
           <li><b>Press Check</b> and read the answer.</li>
         </ol>
         <div class="label" style="margin-top:0">Try an example</div>
-        <div class="examples">
-          <button type="button" data-ex="17.4531,78.4676">Begumpet Airport</button>
-          <button type="button" data-ex="17.407,78.472">Secretariat area</button>
-          <button type="button" data-ex="17.627,78.403">Air Force academy</button>
-          <button type="button" data-ex="17.427,78.4225">KBR Park, nano drone</button>
-          <button type="button" data-ex="17.3616,78.4747">Charminar</button>
-        </div>
+        <div class="examples" id="examples"></div>
         <button id="hideWelcome" class="ghost inline" type="button">Got it, hide this</button>
       </div>
 
@@ -68,7 +62,7 @@
     <section class="pane hidden" id="tab-sim">
       <h3 style="font-size:16px;margin-bottom:4px">Plan a route</h3>
       <p class="help" style="margin-top:0">Click the map to add waypoints. SkyClear checks every 100 m of the route, then flies a simulated drone along it so you can see where the trouble is.</p>
-      <div class="examples"><button type="button" id="exRoute">Try an example route through the airport zone</button></div>
+      <div class="examples" id="routeExamples"></div>
       <label for="simDrone">Your drone</label>
       <select id="simDrone"></select>
       <label for="simWhen">When do you want to fly?</label>
@@ -118,6 +112,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="config.js"></script>
 <script src="common.js"></script>
 <script src="pilot.js"></script>
 </body>

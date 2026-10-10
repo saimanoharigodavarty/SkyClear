@@ -1,7 +1,7 @@
 // Sign in, register, one-time codes and the authenticator step for officials.
 header(null);
 const params = new URLSearchParams(location.search);
-const forms = ["signinForm", "registerForm", "otpForm", "otpAskForm", "mfaForm"];
+const forms = ["signinForm", "registerForm", "otpForm", "otpAskForm", "mfaForm", "forgotForm", "resetForm", "changeForm"];
 let otpIdentifier = "", mfaToken = "", tab = params.get("tab") === "register" ? "register" : "signin";
 
 function show(name) {
@@ -9,7 +9,7 @@ function show(name) {
   const top = name === "signinForm" || name === "registerForm";
   $("tabs").classList.toggle("hidden", !top);
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === (name === "registerForm" ? "register" : "signin")));
-  const titles = { signinForm: "Sign in to SkyClear", registerForm: "Create your pilot account", otpForm: "Check your phone", otpAskForm: "Sign in with a code", mfaForm: "One more step" };
+  const titles = { signinForm: "Sign in to SkyClear", registerForm: "Create your pilot account", otpForm: "Check your phone", otpAskForm: "Sign in with a code", mfaForm: "One more step", forgotForm: "Reset your password", resetForm: "Choose a new password", changeForm: "Choose your own password" };
   $("title").textContent = titles[name];
   $("lead").classList.toggle("hidden", !top);
 }
@@ -20,9 +20,11 @@ show(tab === "register" ? "registerForm" : "signinForm");
 const fail = (id, e) => { $(id).innerHTML = `<div class="msg err" role="alert">${esc(e.message)}</div>`; };
 function finish(t) {
   setSession(t);
+  if (t.user.must_change_password) { show("changeForm"); return; }
   const next = params.get("next");
   location.href = next || (t.user.role === "official" ? "official.html" : "index.html");
 }
+const channelWord = CFG.otpChannel === "sms" ? "your mobile number" : "your email";
 function showCode(data, text) {
   otpIdentifier = data.identifier || otpIdentifier;
   $("otpText").textContent = text;
@@ -38,8 +40,8 @@ $("signinForm").addEventListener("submit", async e => {
     if (r.mfa_required || r.mfa_setup_required) return startMfa(r);
     finish(r);
   } catch (err) {
-    if (err.message === "phone_not_verified") {
-      try { const o = await api("/auth/otp/request", { method: "POST", auth: false, body: { identifier: $("lId").value } }); return showCode(o, "Your mobile number is not confirmed yet. We sent you a code."); }
+    if (err.message === "not_verified") {
+      try { const o = await api("/auth/otp/request", { method: "POST", auth: false, body: { identifier: $("lId").value } }); return showCode({ ...o, identifier: $("lId").value }, "Your account is not confirmed yet. We sent you a code."); }
       catch (e2) { return fail("signinMsg", e2); }
     }
     fail("signinMsg", err);
@@ -67,7 +69,7 @@ $("registerForm").addEventListener("submit", async e => {
   e.preventDefault(); $("registerMsg").innerHTML = "";
   try {
     const r = await api("/auth/register", { method: "POST", auth: false, body: { name: $("rName").value, email: $("rEmail").value, phone: $("rPhone").value, password: $("rPass").value } });
-    showCode(r, "We sent a 6-digit code to " + r.identifier + ". Enter it to finish creating your account.");
+    showCode(r, "We sent a 6-digit code to " + r.sent_to + ". Enter it to finish creating your account.");
   } catch (err) { fail("registerMsg", err); }
 });
 
@@ -77,7 +79,7 @@ $("otpForm").addEventListener("submit", async e => {
   catch (err) { fail("otpMsg", err); }
 });
 $("resend").addEventListener("click", async () => {
-  try { const o = await api("/auth/otp/request", { method: "POST", auth: false, body: { identifier: otpIdentifier } }); showCode(o, "We sent a new code to " + otpIdentifier + "."); }
+  try { const o = await api("/auth/otp/request", { method: "POST", auth: false, body: { identifier: otpIdentifier } }); showCode({ ...o, identifier: otpIdentifier }, "If the account exists, we sent a new code to " + channelWord + "."); }
   catch (err) { fail("otpMsg", err); }
 });
 $("otpBack").addEventListener("click", () => show("signinForm"));
@@ -89,10 +91,43 @@ $("otpAskForm").addEventListener("submit", async e => {
   try {
     const o = await api("/auth/otp/request", { method: "POST", auth: false, body: { identifier: $("oId").value } });
     // Same screen whether or not the account exists, so nobody can use this form to find out who has an account.
-    showCode({ ...o, identifier: o.identifier || $("oId").value }, "If a pilot account matches, we sent a 6-digit code to that mobile number.");
+    showCode({ ...o, identifier: $("oId").value }, "If a pilot account matches, we sent a 6-digit code to " + channelWord + ".");
   } catch (err) { fail("otpAskMsg", err); }
 });
 
-document.querySelectorAll("[data-demo]").forEach(b => b.addEventListener("click", () => {
-  const [id, pw] = b.dataset.demo.split("|"); show("signinForm"); $("lId").value = id; $("lPass").value = pw; $("lPass").focus();
-}));
+
+// Forgot password: ask for a code, then set a new password with it.
+$("forgot").addEventListener("click", () => { $("fId").value = $("lId").value; show("forgotForm"); });
+document.querySelectorAll("[data-back]").forEach(b => b.addEventListener("click", () => show("signinForm")));
+let resetId = "";
+$("forgotForm").addEventListener("submit", async e => {
+  e.preventDefault(); resetId = $("fId").value;
+  try {
+    const o = await api("/auth/password/forgot", { method: "POST", auth: false, body: { identifier: resetId } });
+    $("resetText").textContent = "If an account matches, we sent a 6-digit code to " + channelWord + ". Enter it and choose a new password.";
+    $("resetDev").innerHTML = o.dev_code ? `<div class="devcode">Test mode: your code is <b>${esc(o.dev_code)}</b></div>` : "";
+    $("resetCode").value = ""; $("resetPass").value = ""; $("resetMsg").innerHTML = "";
+    show("resetForm"); $("resetCode").focus();
+  } catch (err) { fail("forgotMsg", err); }
+});
+$("resetForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try {
+    await api("/auth/password/reset", { method: "POST", auth: false, body: { identifier: resetId, code: $("resetCode").value, new_password: $("resetPass").value } });
+    show("signinForm"); $("lId").value = resetId; $("lPass").value = "";
+    $("signinMsg").innerHTML = '<div class="msg">Password changed. Sign in with the new one.</div>';
+  } catch (err) { fail("resetMsg", err); }
+});
+
+// An invited official signs in with a temporary password and must choose their own.
+$("changeForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try {
+    const t = await api("/auth/password/change", { method: "POST", body: { current_password: $("curPass").value, new_password: $("newPass").value } });
+    setSession(t); location.href = t.user.role === "official" ? "official.html" : "index.html";
+  } catch (err) { fail("changeMsg", err); }
+});
+if (params.get("change") && session()) show("changeForm");
+
+// Say where codes go, and hide the mobile-only wording when codes are sent by email.
+$("phoneHelp").textContent = (CFG.otpChannel === "sms" ? "We send a one-time code to this number to confirm it. " : "We send a one-time code to your email to confirm your account. ") + "One account per number.";

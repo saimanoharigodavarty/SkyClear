@@ -1,5 +1,6 @@
-# MongoDB with geospatial, text and vector search (Atlas Local, free, runs on your laptop).
+# MongoDB with geospatial, text and vector search (Atlas Local), plus a mail catcher for one-time codes in development.
 # Start: docker compose up -d      Stop: docker compose down
+# Mail catcher inbox: http://localhost:8025 (every email SkyClear sends in development lands here, nothing leaves your laptop)
 services:
   mongo:
     image: mongodb/mongodb-atlas-local:latest
@@ -7,5 +8,10 @@ services:
       - "27017:27017"
     volumes:
       - skyclear-mongo:/data/db
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
 volumes:
   skyclear-mongo:

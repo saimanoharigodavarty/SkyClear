@@ -1,6 +1,7 @@
 // Authority console: review permission requests, publish and cancel notices, see the overview.
 const sess = session();
 if (!sess || sess.user.role !== "official") { location.href = "account.html"; }
+else if (sess.user.must_change_password) { location.href = "account.html?change=1"; }
 header("official");
 const { map, layers } = makeMap();
 let tab = "requests", filter = "requested", centre = null, preview = null;
@@ -9,10 +10,11 @@ const reqLayer = L.layerGroup().addTo(layers.work);
 function showTab(t) {
   tab = t;
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
-  ["requests", "verify", "publish", "notices"].forEach(x => $("tab-" + x).classList.toggle("hidden", x !== t));
+  ["requests", "verify", "publish", "notices", "team"].forEach(x => $("tab-" + x).classList.toggle("hidden", x !== t));
   if (t === "requests") loadRequests();
   if (t === "verify") loadVerification();
   if (t === "notices") loadNotices();
+  if (t === "team") loadTeam();
 }
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
@@ -37,7 +39,7 @@ async function loadRequests() {
     const list = await api("/flights" + (filter === "requested" ? "?status=requested" : ""));
     reqLayer.clearLayers();
     list.forEach(f => L.marker([f.lat, f.lng], { icon: pinIcon(f.status === "requested" ? "pending" : ""), keyboard: false }).bindPopup(`<b class="mono">${esc(f.flight_id)}</b><br>${esc(f.pilot_name)}`).addTo(reqLayer));
-    $("reqList").innerHTML = list.length ? list.map(reqCard).join("") : `<div class="hint">${filter === "requested" ? "No pending requests for your office. A request appears here when a pilot asks for permission in an area you are responsible for. To see one, sign in as asha@example.com in another window and request permission near the Secretariat." : "No flights yet."}</div>`;
+    $("reqList").innerHTML = list.length ? list.map(reqCard).join("") : `<div class="hint">${filter === "requested" ? "No pending requests for your office. A request appears here when a pilot asks for permission in an area you are responsible for." : "No flights yet."}</div>`;
     $("reqList").querySelectorAll("[data-show]").forEach(b => b.addEventListener("click", () => { const [a, o] = b.dataset.show.split(",").map(Number); map.setView([a, o], 14); }));
     $("reqList").querySelectorAll("[data-decide]").forEach(b => b.addEventListener("click", () => decide(b.dataset.id, b.dataset.decide)));
     $("reqList").querySelectorAll("[data-revoke]").forEach(b => b.addEventListener("click", () => revoke(b.dataset.revoke)));
@@ -165,3 +167,22 @@ drawZones(layers); drawNotices(layers.notices); loadStats(); loadRequests();
   } catch (e) { box.textContent = ""; }
 })();
 setInterval(() => { loadStats(); if (tab === "requests") loadRequests(); }, 6000);
+
+/* ---------- team (admin only) ---------- */
+if (!sess.user.authority_id) $("teamTab").classList.remove("hidden");
+async function loadTeam() {
+  try {
+    const [auths, people] = await Promise.all([api("/authorities"), api("/admin/officials")]);
+    $("iAuth").innerHTML = '<option value="">Administrator (sees every office)</option>' + auths.map(a => `<option value="${esc(a.authority_id)}">${esc(a.name)}</option>`).join("");
+    const nameOf = id => (auths.find(a => a.authority_id === id) || {}).name || "Administrator";
+    $("teamList").innerHTML = people.map(u => `<div class="item"><div class="head"><span class="title">${esc(u.name)}</span>${u.mfa_enabled ? '<span class="tag approved">Authenticator on</span>' : ""}</div><div class="meta">${esc(u.email)}</div><div class="meta">${esc(nameOf(u.authority_id))}</div></div>`).join("") || '<div class="hint">No officials yet.</div>';
+  } catch (e) { $("teamList").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+$("inviteForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try {
+    const u = await api("/admin/officials", { method: "POST", body: { name: $("iName").value, email: $("iEmail").value, authority_id: $("iAuth").value || null } });
+    $("inviteMsg").innerHTML = `<div class="msg"><b>${esc(u.email)} is invited.</b> Give them this temporary password now, it is not shown again:<div class="mono" style="font-size:16px;margin-top:6px">${esc(u.temporary_password)}</div></div>`;
+    e.target.reset(); loadTeam();
+  } catch (err) { $("inviteMsg").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+});

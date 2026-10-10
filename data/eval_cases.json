@@ -10,7 +10,8 @@
   "expected_verdict": "permission_needed",
   "expected_rule_ids": [
    "R-001"
-  ]
+  ],
+  "query": "Do I need permission to fly a small drone close to an airport?"
  },
  {
   "case_id": "E-02",
@@ -23,7 +24,8 @@
   "expected_verdict": "prohibited",
   "expected_rule_ids": [
    "R-001B"
-  ]
+  ],
+  "query": "Are heavy medium drones banned from flying at an airport?"
  },
  {
   "case_id": "E-03",
@@ -36,7 +38,8 @@
   "expected_verdict": "prohibited",
   "expected_rule_ids": [
    "R-002"
-  ]
+  ],
+  "query": "Is flying a drone over a military base allowed?"
  },
  {
   "case_id": "E-04",
@@ -49,7 +52,8 @@
   "expected_verdict": "can_fly",
   "expected_rule_ids": [
    "R-003B"
-  ]
+  ],
+  "query": "Can a nano drone fly over a national park?"
  },
  {
   "case_id": "E-05",
@@ -62,7 +66,8 @@
   "expected_verdict": "prohibited",
   "expected_rule_ids": [
    "R-004"
-  ]
+  ],
+  "query": "What if there is a temporary restriction for a VIP movement?"
  },
  {
   "case_id": "E-06",
@@ -97,7 +102,8 @@
   "expected_verdict": "permission_needed",
   "expected_rule_ids": [
    "R-005"
-  ]
+  ],
+  "query": "Do I need approval to fly near sensitive government buildings?"
  },
  {
   "case_id": "E-09",
@@ -109,5 +115,144 @@
   },
   "expected_verdict": "can_fly",
   "expected_rule_ids": []
+ },
+ {
+  "case_id": "E-10",
+  "input": {
+   "lat": 17.245,
+   "lng": 78.43,
+   "drone_id": "nano-200",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "permission_needed",
+  "expected_rule_ids": [
+   "R-001"
+  ],
+  "query": "Do tiny nano drones also need permission at an airport?"
+ },
+ {
+  "case_id": "E-11",
+  "input": {
+   "lat": 17.4531,
+   "lng": 78.4676,
+   "drone_id": "micro-800",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "permission_needed",
+  "expected_rule_ids": [
+   "R-001"
+  ]
+ },
+ {
+  "case_id": "E-12",
+  "input": {
+   "lat": 17.4531,
+   "lng": 78.4676,
+   "drone_id": "medium-20000",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "prohibited",
+  "expected_rule_ids": [
+   "R-001B"
+  ]
+ },
+ {
+  "case_id": "E-13",
+  "input": {
+   "lat": 17.627,
+   "lng": 78.403,
+   "drone_id": "medium-20000",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "prohibited",
+  "expected_rule_ids": [
+   "R-002"
+  ]
+ },
+ {
+  "case_id": "E-14",
+  "input": {
+   "lat": 17.427,
+   "lng": 78.4225,
+   "drone_id": "small-1800",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "permission_needed",
+  "expected_rule_ids": [
+   "R-003"
+  ],
+  "query": "Does a small drone need permission over a protected park?"
+ },
+ {
+  "case_id": "E-15",
+  "input": {
+   "lat": 17.427,
+   "lng": 78.4225,
+   "drone_id": "micro-800",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "can_fly",
+  "expected_rule_ids": [
+   "R-003B"
+  ]
+ },
+ {
+  "case_id": "E-16",
+  "input": {
+   "lat": 17.407,
+   "lng": 78.47,
+   "drone_id": "nano-200",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "permission_needed",
+  "expected_rule_ids": [
+   "R-005"
+  ]
+ },
+ {
+  "case_id": "E-17",
+  "input": {
+   "lat": 17.3616,
+   "lng": 78.4747,
+   "drone_id": "micro-800",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "can_fly",
+  "expected_rule_ids": []
+ },
+ {
+  "case_id": "E-18",
+  "input": {
+   "lat": 17.18,
+   "lng": 78.43,
+   "drone_id": "small-1800",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "can_fly",
+  "expected_rule_ids": []
+ },
+ {
+  "case_id": "E-19",
+  "input": {
+   "lat": 17.445,
+   "lng": 78.385,
+   "drone_id": "micro-800",
+   "datetime": "2026-10-12T15:30:00+05:30"
+  },
+  "expected_verdict": "can_fly",
+  "expected_rule_ids": []
+ },
+ {
+  "case_id": "E-20",
+  "input": {
+   "lat": 17.445,
+   "lng": 78.385,
+   "drone_id": "micro-800",
+   "datetime": "2026-10-12T16:00:00+05:30"
+  },
+  "expected_verdict": "prohibited",
+  "expected_rule_ids": [
+   "R-004"
+  ]
  }
 ]

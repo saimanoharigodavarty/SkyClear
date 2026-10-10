@@ -95,3 +95,22 @@ Bearer token from `/auth/login` or `/auth/register`, sent as `Authorization: Bea
 | GET /notices/active | none | Active restrictions for the map |
 | GET /notifications, POST /notifications/read | pilot | Alerts inbox |
 | GET /overview | official | Counts for the console |
+
+## Permits, routing and verification (built)
+
+| Endpoint | Role | Purpose |
+|---|---|---|
+| GET /authorities | any | Authorities with name, type, office and response time |
+| GET /route-preview?lat=&lng= | pilot | Who would review a permission request here (`routed_to`), or 422 `no_authority_for_area` |
+| POST /flights (kind permission) | pilot | Needs a verified pilot and drone (403 otherwise). Returns `routed_to`, `authority_id` |
+| GET /flights | any | Officials see only their authority's requests. Overdue ones escalate to the parent. Each flight has `overdue` and `permit` |
+| POST /flights/{id}/decision | official | Approve with `alt_max_m` and `conditions` to issue a signed permit, or reject with a reason. 403 if routed elsewhere |
+| POST /flights/{id}/preflight | pilot | Re-checks permit, window, serial, verification, new notices. Returns `cleared`, `reasons`, `cleared_until` |
+| GET /permits/{id} | owner or official | Permit with `status` and `signature_ok` |
+| POST /permits/{id}/revoke | official | Reason required. Alerts the pilot, the next preflight fails |
+| POST /notices | official | Response also has `conflicting_permits` |
+| POST /uploads, GET /uploads/{id} | signed in | JPG, PNG or PDF up to 5 MB. Owner and officials can read |
+| POST /me/verification/pilot, POST /me/drones/{id}/verification | pilot | Send certificate or serial plus documents for review. Duplicate certificate or serial returns 409 |
+| GET /verification/queue, POST /verification/{id}/decision | official | Verify or reject. The badge shows who and when |
+
+Demo officers (password `skyclear-demo`): `official@` sees everything, `police@`, `rgia@`, `begumpet@`, `defence@`, `forest@`, `hq@` (all `skyclear.demo`) see only their office.

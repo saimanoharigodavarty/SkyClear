@@ -53,7 +53,11 @@
     <section class="pane hidden" id="tab-flights">
       <div id="flightsGate"></div>
       <div id="flightsBody" class="hidden">
-        <div class="section" style="margin-top:0"><h3>My drones</h3><div id="myDrones"></div>
+        <div class="section" style="margin-top:0"><h3>Verification</h3>
+          <p class="hint" style="margin-top:0">Permission requests need a verified pilot and a verified drone. "Verified" means an officer checked your documents.</p>
+          <div id="pilotVerify"></div>
+        </div>
+        <div class="section"><h3>My drones</h3><div id="myDrones"></div>
           <form id="droneForm">
             <div class="row2">
               <div><label for="dName">Name</label><input id="dName" required maxlength="60" placeholder="DJI Mavic 3"></div>
@@ -79,6 +83,7 @@
 <footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a>Decision support only, not legal permission. Zones and rules are sample or derived data until verified.</footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="common.js"></script>
 <script src="pilot.js"></script>
 </body>

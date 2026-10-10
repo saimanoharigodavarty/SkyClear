@@ -45,7 +45,7 @@ a { color: var(--accent); }
 
 /* tabs */
 .tabs { display: flex; border-bottom: 1px solid var(--rule-strong); position: sticky; top: 0; background: var(--panel); z-index: 5; }
-.tabs button { flex: 1; margin: 0; padding: 12px 6px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; font: inherit; font-weight: 700; cursor: pointer; width: auto; }
+.tabs button { flex: 1; margin: 0; padding: 12px 4px; white-space: nowrap; font-size: 13px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; font: inherit; font-weight: 700; cursor: pointer; width: auto; }
 .tabs button.on { color: var(--ink); border-bottom-color: var(--ink); }
 .count { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; background: var(--red); color: var(--on-fill); font-size: 11px; font-weight: 800; text-align: center; }
 .pane { padding: 16px; }
@@ -89,7 +89,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .item .title { font-weight: 700; }
 .tag { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 2px 6px; border: 1px solid currentColor; white-space: nowrap; }
 .tag.watching { color: var(--muted); } .tag.requested { color: var(--amber); } .tag.approved { color: var(--green); }
-.tag.rejected, .tag.cancelled { color: var(--red); } .tag.active { color: var(--green); }
+.tag.rejected, .tag.cancelled, .tag.revoked, .tag.expired { color: var(--red); } .tag.active { color: var(--green); }
 .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
 .alert { border: 1px solid var(--rule); padding: 10px 12px; margin-bottom: 8px; }
 .alert.unread { border-color: var(--rule-strong); background: var(--bg); }
@@ -127,7 +127,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .leaflet-bar, .leaflet-control-layers, .leaflet-control-scale-line { box-shadow: none !important; border-radius: 0 !important; }
 .leaflet-bar { border: 1px solid var(--rule-strong) !important; }
 .leaflet-bar a, .leaflet-bar a:first-child, .leaflet-bar a:last-child { border-radius: 0 !important; background: var(--panel); color: var(--ink); border-bottom-color: var(--rule); }
-.leaflet-bar.reset a { width: auto; padding: 0 10px; font: 600 12px/28px var(--sans); text-decoration: none; }
+.leaflet-bar.reset a, .leaflet-bar.basemap a { width: auto; padding: 0 10px; font: 600 12px/28px var(--sans); text-decoration: none; }
 .leaflet-control-scale-line { background: var(--panel); color: var(--ink); border-color: var(--ink); font-size: 11px; }
 .leaflet-control-attribution { background: var(--panel) !important; color: var(--muted) !important; font-size: 10px; }
 .leaflet-popup-content-wrapper { border-radius: 0; box-shadow: none; border: 1px solid var(--rule-strong); background: var(--panel); color: var(--ink); }
@@ -149,3 +149,13 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .authbox { background: var(--panel); border: 1px solid var(--rule-strong); padding: 20px; }
 .authbox h2 { font-size: 16px; margin-bottom: 4px; }
 @media (max-width: 760px) { .authgrid { grid-template-columns: 1fr; } }
+
+/* permit card, verification, file inputs */
+.permit { border: 1px solid var(--rule-strong); padding: 10px 12px; margin-top: 10px; display: grid; grid-template-columns: 1fr 84px; gap: 10px; }
+.permit .qr { width: 84px; height: 84px; background: var(--panel); }
+.permit .qr svg { width: 84px; height: 84px; display: block; }
+.permit .k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.reasons { margin: 6px 0 0; padding-left: 18px; color: var(--red); font-size: 13px; }
+.cleared { padding: 8px 10px; background: var(--green); color: var(--on-fill); font-weight: 700; margin-top: 8px; }
+input[type=file] { padding: 6px; font-size: 12px; }
+.route { border: 1px solid var(--rule); padding: 8px 10px; margin-top: 10px; font-size: 13px; }

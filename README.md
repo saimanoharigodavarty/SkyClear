@@ -111,7 +111,7 @@ cd backend && uvicorn main:app --reload
 python ../scripts/seed_demo.py       # optional: demo pilot, flights and a VIP notice
 ```
 
-Open http://localhost:8000. Without Docker, leave `USE_MONGO=0` and everything runs from the JSON files in data/.
+Open http://localhost:8000. Demo officers use the password `skyclear-demo`, see API.md. Without Docker, leave `USE_MONGO=0` and everything runs from the JSON files in data/.
 
 Ollama runs on another laptop, never required on yours. On the Ollama laptop:
 
@@ -129,8 +129,8 @@ Tests: `python -m pytest backend` (local JSON) and `USE_MONGO=1 python -m pytest
 ## Folder layout
 
 ```
-data/       rules.json, zones.geojson, drones.json, notices.json, eval_cases.json
-backend/    zones_api.py, live.py, analytics.py, config.py, db.py, embeddings.py, geo.py, build_zones.py, sim.py, runtime.py, bridge.py, pipeline.py, search.py, verdict.py, explain.py, main.py, load_data.py, eval.py, tests/
+data/       authorities.json, rules.json, zones.geojson, drones.json, notices.json, eval_cases.json
+backend/    routing.py, permits.py, verification.py, security.py, zones_api.py, live.py, analytics.py, config.py, db.py, embeddings.py, geo.py, build_zones.py, sim.py, runtime.py, bridge.py, pipeline.py, search.py, verdict.py, explain.py, main.py, load_data.py, eval.py, tests/
 frontend/   index.html + pilot.js, official.html + official.js, account.html, common.js, app.css, terms.html, privacy.html
 scripts/    check_design.sh, seed_demo.py
 docker-compose.yml   MongoDB (Atlas Local)
@@ -147,6 +147,7 @@ docker-compose.yml   MongoDB (Atlas Local)
 - [x] Ollama explanation with citation validation, consistency checks and fallback
 - [x] False-safe bugs A1 and A2 fixed
 - [x] 20 eval cases and metrics (verdict accuracy, false-safe rate, citation recall, text vs vector vs hybrid)
+- [x] Authority routing, signed permits with preflight and revoke, document verification with officer queue, satellite toggle
 - [ ] Real rule text verified against the official regulation, real notices source
 - [ ] Run eval against the remote Ollama and record the vector vs hybrid numbers
 - [ ] Demo rehearsal

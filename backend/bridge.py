@@ -79,7 +79,7 @@ class DroneIn(BaseModel):
 
 @router.get("/me/drones")
 def my_drones(user=Depends(require("pilot"))):
-    return [d for d in runtime.all_("drones") if d["owner_id"] == user["user_id"]]
+    return [d for d in runtime.all_("drones") if d.get("owner_id") == user["user_id"]]
 
 
 @router.post("/me/drones")

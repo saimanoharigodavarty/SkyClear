@@ -170,3 +170,11 @@ def test_notice_lists_conflicting_permits():
     n = client.post("/notices", headers=auth(official()), json={"title": "VIP movement conflict", "note": "", "radius_km": 1, "starts_at": w["start"], "ends_at": w["end"], **GOV_SPOT}).json()
     assert flight["flight_id"] in {c["flight_id"] for c in n["conflicting_permits"]}
     client.post(f"/notices/{n['notice_id']}/cancel", headers=auth(official()))
+
+
+def test_my_drones_lists_only_own_drones_not_the_sample_catalog():
+    p = pilot("mine@example.com")
+    assert client.get("/me/drones", headers=auth(p)).json() == []
+    d = client.post("/me/drones", headers=auth(p), json={"name": "My Drone", "weight_g": 400}).json()
+    mine = client.get("/me/drones", headers=auth(p)).json()
+    assert [x["drone_id"] for x in mine] == [d["drone_id"]] and mine[0]["verification"]["status"] == "unverified"

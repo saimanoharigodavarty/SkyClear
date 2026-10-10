@@ -19,7 +19,8 @@
   <aside class="side">
     <nav class="tabs">
       <button data-tab="requests" class="on" type="button">Requests<span id="reqCount" class="count hidden">0</span></button>
-      <button data-tab="publish" type="button">Publish notice</button>
+      <button data-tab="verify" type="button">Verification<span id="verCount" class="count hidden">0</span></button>
+      <button data-tab="publish" type="button">Publish</button>
       <button data-tab="notices" type="button">Notices</button>
     </nav>
     <section class="pane">
@@ -32,6 +33,11 @@
         <button class="ghost inline" id="fAll" type="button">All flights</button>
       </div>
       <div id="reqList"></div>
+    </section>
+
+    <section class="pane hidden" id="tab-verify" style="padding-top:0">
+      <p class="hint" style="margin-top:0">Check the documents against official records, then approve or reject. Your name and the date are recorded on the badge.</p>
+      <div id="verList"></div>
     </section>
 
     <section class="pane hidden" id="tab-publish" style="padding-top:0">

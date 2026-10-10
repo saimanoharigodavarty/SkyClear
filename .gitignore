@@ -6,3 +6,4 @@ __pycache__/
 .DS_Store
 data/runtime.json
 data/runtime.tmp
+data/uploads/

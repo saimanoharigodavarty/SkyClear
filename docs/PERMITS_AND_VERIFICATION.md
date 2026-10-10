@@ -1,5 +1,7 @@
 # Permits, verification and the official map
 
+Built in the prototype: routing to the responsible authority, signed permits, preflight, revoke, conflicting permits when a notice is published, document verification with an officer queue, satellite toggle and the red, yellow, green legend. Not built yet: zone editor and zone versions, permit-aware simulation, OTP login, DigiLocker or regulator checks.
+
 How a pilot gets permission, how we know who the pilot and the drone are, and how the zone map stays in the authority's hands. Read with [ARCHITECTURE.md](../ARCHITECTURE.md) and [contracts 9 to 11](CONTRACTS.md).
 
 ## Zone classes (green, yellow, red)

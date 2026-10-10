@@ -13,14 +13,21 @@ def auth(token):
     return {"Authorization": f"Bearer {token}"}
 
 
+_phone = [9000000000]
+
+
 def pilot(email):
-    r = client.post("/auth/register", json={"name": "Test Pilot", "email": email, "password": "longenough1"})
-    assert r.status_code == 200
-    return r.json()["token"]
+    """Register a pilot and confirm the mobile OTP, like a real user. Returns the access token."""
+    _phone[0] += 1
+    r = client.post("/auth/register", json={"name": "Test Pilot", "email": email, "phone": str(_phone[0]), "password": "longenough1"})
+    assert r.status_code == 200, r.text
+    v = client.post("/auth/otp/verify", json={"identifier": r.json()["identifier"], "code": r.json()["dev_code"]})
+    assert v.status_code == 200, v.text
+    return v.json()["token"]
 
 
 def official():
-    r = client.post("/auth/login", json={"email": config.OFFICIAL_EMAIL, "password": config.OFFICIAL_PASSWORD})
+    r = client.post("/auth/login", json={"identifier": config.OFFICIAL_EMAIL, "password": config.OFFICIAL_PASSWORD})
     assert r.status_code == 200
     return r.json()["token"]
 
@@ -30,7 +37,7 @@ def test_roles_are_enforced():
     assert client.get("/me").status_code == 401
     assert client.post("/notices", headers=auth(p), json={}).status_code in (403, 422)
     assert client.get("/overview", headers=auth(p)).status_code == 403
-    assert client.post("/auth/login", json={"email": "roles@example.com", "password": "wrong-pass"}).status_code == 401
+    assert client.post("/auth/login", json={"identifier": "roles@example.com", "password": "wrong-pass"}).status_code == 401
 
 
 def test_cannot_request_permission_when_prohibited():
@@ -62,7 +69,7 @@ def iso(dt):
 
 
 def officer(email):
-    r = client.post("/auth/login", json={"email": email, "password": config.OFFICIAL_PASSWORD})
+    r = client.post("/auth/login", json={"identifier": email, "password": config.OFFICIAL_PASSWORD})
     assert r.status_code == 200, r.text
     return r.json()["token"]
 

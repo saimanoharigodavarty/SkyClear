@@ -17,7 +17,7 @@ def _mongo():
 
 _lock = threading.RLock()
 _EMPTY = {"users": [], "sessions": {}, "drones": [], "flights": [], "notices": [], "notifications": [],
-          "permits": [], "verifications": [], "files": [], "authorities": []}
+          "permits": [], "verifications": [], "files": [], "authorities": [], "refresh_tokens": [], "otps": []}
 
 
 def _load():
@@ -90,13 +90,23 @@ def mark_read(user_id):
 
 
 def hash_password(password, salt=None):
-    salt = salt or secrets.token_hex(8)
-    h = hashlib.scrypt(password.encode(), salt=salt.encode(), n=2**14, r=8, p=1).hex()
-    return f"{salt}${h}"
+    """argon2id. (`salt` is accepted only for the old scrypt format used by check_password.)"""
+    if salt is not None:
+        h = hashlib.scrypt(password.encode(), salt=salt.encode(), n=2**14, r=8, p=1).hex()
+        return f"{salt}${h}"
+    from argon2 import PasswordHasher
+    return PasswordHasher().hash(password)
 
 
 def check_password(password, stored):
-    salt, _ = stored.split("$", 1)
+    if stored.startswith("$argon2"):
+        from argon2 import PasswordHasher
+        from argon2.exceptions import VerifyMismatchError, InvalidHashError
+        try:
+            return PasswordHasher().verify(stored, password)
+        except (VerifyMismatchError, InvalidHashError):
+            return False
+    salt, _ = stored.split("$", 1)  # older accounts used scrypt
     return secrets.compare_digest(hash_password(password, salt), stored)
 
 

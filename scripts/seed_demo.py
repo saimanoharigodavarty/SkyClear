@@ -1,7 +1,7 @@
 """Fill a running SkyClear server with demo data: a verified pilot with a drone, a permission request, a watched flight, a VIP notice.
 
 Run: python scripts/seed_demo.py [http://localhost:8000]
-Pilot login after seeding: asha@example.com / longenough1.
+Pilot login after seeding: asha@example.com or 9876543210, password longenough1.
 Officers (password skyclear-demo): official@skyclear.demo (sees everything), police@, rgia@, begumpet@, defence@, forest@, hq@ skyclear.demo
 """
 import sys
@@ -25,8 +25,9 @@ def iso(dt):
 
 
 now = datetime.now(timezone.utc)
-pilot = call("POST", "/auth/register", json={"name": "Asha Rao", "email": "asha@example.com", "password": "longenough1"})["token"]
-admin = call("POST", "/auth/login", json={"email": "official@skyclear.demo", "password": "skyclear-demo"})["token"]
+reg = call("POST", "/auth/register", json={"name": "Asha Rao", "email": "asha@example.com", "phone": "9876543210", "password": "longenough1"})
+pilot = call("POST", "/auth/otp/verify", json={"identifier": reg["identifier"], "code": reg["dev_code"]})["token"]
+admin = call("POST", "/auth/login", json={"identifier": "official@skyclear.demo", "password": "skyclear-demo"})["token"]
 drone = call("POST", "/me/drones", pilot, json={"name": "DJI Mavic 3", "weight_g": 895, "uin": "UIN-0042"})
 files = lambda: [call("POST", "/uploads", pilot, files={"file": ("doc.png", PNG, "image/png")})["file_id"]]
 v1 = call("POST", "/me/verification/pilot", pilot, json={"cert_no": "RPC-48213", "file_ids": files()})

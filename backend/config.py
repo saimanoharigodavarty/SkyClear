@@ -50,3 +50,15 @@ PERMIT_RADIUS_KM = 0.3
 PREFLIGHT_VALID_MIN = 15
 PREFLIGHT_EARLY_MIN = 15      # preflight opens this long before the flight window
 UPLOAD_MAX_BYTES = 5 * 1024 * 1024
+
+# Authentication
+JWT_SECRET = os.getenv("JWT_SECRET", "dev-only-change-me-too")
+ACCESS_TTL_MIN = int(os.getenv("ACCESS_TTL_MIN", "15"))
+REFRESH_TTL_DAYS = int(os.getenv("REFRESH_TTL_DAYS", "7"))
+OTP_TTL_MIN = 5
+OTP_MAX_ATTEMPTS = 5
+OTP_DEV_ECHO = os.getenv("OTP_DEV_ECHO", "1") == "1"   # DEV ONLY: return the code in the response so the demo works without SMS
+REQUIRE_OFFICIAL_MFA = os.getenv("REQUIRE_OFFICIAL_MFA", "0") == "1"
+MAX_FAILED_LOGINS = 5
+LOCK_MINUTES = 15
+RATE_LIMITS = os.getenv("RATE_LIMITS", "1") == "1"

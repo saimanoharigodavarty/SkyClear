@@ -14,52 +14,13 @@ import routing
 import runtime
 from geo import circle, point_in_polygon
 from pipeline import evaluate, get_drone, parse_when
-from security import current_user, public_user, require
+from security import current_user, require
 
 router = APIRouter()
 ACTIVE_FLIGHT = ("watching", "requested", "approved")
 
 
 # ---- auth ----
-class Register(BaseModel):
-    name: str = Field(min_length=2, max_length=80)
-    email: str = Field(min_length=5, max_length=120)
-    password: str = Field(min_length=8, max_length=100)
-    pilot_cert: Optional[str] = Field(default=None, max_length=40)
-
-
-class Login(BaseModel):
-    email: str
-    password: str
-
-
-@router.post("/auth/register")
-def register(body: Register):
-    email = body.email.strip().lower()
-    if "@" not in email:
-        raise HTTPException(422, "enter a valid email")
-    if any(u["email"] == email for u in runtime.all_("users")):
-        raise HTTPException(409, "an account with this email already exists")
-    user = runtime.insert("users", {"user_id": runtime.new_id("U"), "role": "pilot", "name": body.name.strip(),
-                                    "email": email, "pilot_cert": body.pilot_cert,
-                                    "password": runtime.hash_password(body.password), "created_at": runtime.now_iso()})
-    return {"token": runtime.create_session(user["user_id"]), "user": public_user(user)}
-
-
-@router.post("/auth/login")
-def login(body: Login):
-    email = body.email.strip().lower()
-    user = next((u for u in runtime.all_("users") if u["email"] == email), None)
-    if user is None or not runtime.check_password(body.password, user["password"]):
-        raise HTTPException(401, "wrong email or password")
-    return {"token": runtime.create_session(user["user_id"]), "user": public_user(user)}
-
-
-@router.get("/me")
-def me(user=Depends(current_user)):
-    return public_user(user)
-
-
 # ---- pilot drones ----
 def drone_class(weight_g):
     if weight_g <= 250:

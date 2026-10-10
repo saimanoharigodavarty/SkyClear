@@ -24,19 +24,31 @@ def decide(lat, lng, drone_class, zones, notices, rules_by_zone_type):
         return "cannot_determine", []
 
     hits = []  # (effect, rule)
+    unknown_zone = False
     for z in zones:
         if not z["inside"]:
             continue
         matching = rules_by_zone_type.get(z["zone_type"], [])
-        if not matching:
-            return "cannot_determine", []  # inside a zone we have no rule for
-        hits.extend((r["effect"], r) for r in matching)
+        if matching:
+            hits.extend((r["effect"], r) for r in matching)
+        else:
+            unknown_zone = True  # inside a zone we have no rule for
     if notices:
-        hits.extend((r["effect"], r) for r in rules_by_zone_type.get("notice", []))
+        notice_rules = rules_by_zone_type.get("notice", [])
+        if not notice_rules:
+            # An active official notice must never be ignored, even with no rule on file for it.
+            notice_rules = [{"rule_id": n.get("notice_id", "NOTICE"), "effect": "prohibited", "zone_type": "notice",
+                             "text": n.get("text") or n.get("title", "Active restriction notice."),
+                             "source": n.get("source", "Official notice")} for n in notices]
+        hits.extend((r["effect"], r) for r in notice_rules)
 
+    worst = max((SEVERITY[e] for e, _ in hits), default=-1)
+    if worst == SEVERITY["prohibited"]:
+        pass  # nothing can be stricter than prohibited
+    elif unknown_zone:
+        return "cannot_determine", []  # an unknown zone could be stricter than what we found
     if not hits:
         return "can_fly", []
 
-    worst = max(SEVERITY[e] for e, _ in hits)
     used = [r for e, r in hits if SEVERITY[e] == worst]
     return EFFECT_TO_VERDICT[[e for e, _ in hits if SEVERITY[e] == worst][0]], used

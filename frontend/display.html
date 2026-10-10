@@ -8,14 +8,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <link rel="stylesheet" href="app.css">
 </head>
 <body class="stage" data-require-auth="1">
 <div id="map" class="stage-map"></div>
+<div id="map3d" class="stage-map hidden"></div>
 
 <div class="hud" id="brandcard"><a class="brand" href="index.html">Sky<b>Clear</b></a><span class="who2" id="whoLine"></span></div>
 <div class="hud idle" id="banner2"><div class="big">Ready</div><div class="sub">Choose a flight to start the demo</div></div>
-<button id="fs" type="button">Full screen</button>
+<div class="hud" id="viewbar"><button id="viewBtn" type="button">2D map</button><button id="camBtn" type="button">Camera: chase</button><button id="fs" type="button">Full screen</button></div>
 
 <div class="hud hidden" id="telepanel">
   <h2>Live flight</h2>
@@ -38,8 +40,11 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="config.js"></script>
 <script src="common.js"></script>
+<script src="view3d.js"></script>
 <script src="display.js"></script>
 </body>
 </html>

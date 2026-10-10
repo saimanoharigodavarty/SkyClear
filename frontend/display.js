@@ -9,6 +9,15 @@ let FID = new URLSearchParams(location.search).get("flight"), info = null, timer
 const trailPts = [], keys = {};
 const live = L.layerGroup().addTo(map);
 $("whoLine").textContent = sess ? sess.user.name + ", " + sess.user.role : "";
+let is3d = saved("display3d") !== false;
+function setView(on) {
+  is3d = on; saved("display3d", on);
+  $("map3d").classList.toggle("hidden", !on); $("map").classList.toggle("hidden", on);
+  $("viewBtn").textContent = on ? "2D map" : "3D view"; $("camBtn").classList.toggle("hidden", !on);
+  if (on) { View3D.init("map3d", [HYD[0], HYD[1]]); View3D.resize(); } else map.invalidateSize();
+}
+$("viewBtn").addEventListener("click", () => setView(!is3d));
+$("camBtn").addEventListener("click", () => View3D.toggleChase());
 $("fs").addEventListener("click", () => document.documentElement.requestFullscreen && document.documentElement.requestFullscreen());
 drawZones(layers); drawNotices(layers.notices);
 window.addEventListener("skyclear:theme", () => { drawZones(layers); drawNotices(layers.notices); });
@@ -62,6 +71,7 @@ async function follow() {
     $("permitLine").textContent = `Permit ${info.permit.permit_id}: stay inside the dashed area, below ${info.permit.alt_max_m} m.`;
   } else $("permitLine").textContent = "No permit needed here. Restricted zones still apply.";
   map.setView([info.lat, info.lng], 17);
+  View3D.reset(); View3D.setPermit(info.permit ? info.permit.area : null, info.permit ? info.permit.alt_max_m : 0); View3D.setChase(true);
   ["telepanel", "eventpanel"].forEach(i => $(i).classList.remove("hidden"));
   $("keyhint").classList.toggle("hidden", !pilot);
   if (pilot) { await showQr(); $("pairpanel").classList.remove("hidden"); }
@@ -108,6 +118,7 @@ async function poll() {
       return;
     }
     const d = s.drone, ll = [d.lat, d.lng];
+    View3D.update(d);
     if (!marker) { marker = L.marker(ll, { icon: DRONE_ICON(d), zIndexOffset: 1000, keyboard: false }).addTo(live); trail = L.polyline([], { color: "#f4f7fa", weight: 3, opacity: 0.85 }).addTo(live); }
     marker.setLatLng(ll); marker.setIcon(DRONE_ICON(d));
     trailPts.push(ll); if (trailPts.length > 600) trailPts.shift(); trail.setLatLngs(trailPts);
@@ -132,4 +143,5 @@ setInterval(() => {
   if (any || sendTimer) { api(`/flights/${FID}/control`, { method: "POST", body: s }).catch(() => {}); sendTimer = any ? 1 : null; }
 }, 100);
 
+setView(is3d);
 if (FID) follow().catch(() => chooser()); else chooser();

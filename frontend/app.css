@@ -413,7 +413,10 @@ body.stage { overflow: hidden; }
 #chooser .item { background: transparent; }
 #endcard { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(460px, 92vw); text-align: center; }
 .keyhint { position: fixed; z-index: 800; left: 50%; bottom: 14px; transform: translateX(-50%); font-size: 12px; color: #e4ebf2; background: rgba(10, 16, 22, .55); padding: 4px 12px; border-radius: var(--r); }
-#fs { position: fixed; z-index: 800; top: 16px; right: 360px; width: auto; margin: 0; padding: 6px 12px; font-size: 12px; background: var(--glass); color: var(--ink); border: 1px solid var(--rule-strong); }
+#viewbar { top: 110px; right: 360px; display: flex; gap: 6px; padding: 6px; }
+#viewbar button { width: auto; margin: 0; padding: 6px 12px; font-size: 12px; background: var(--glass); color: var(--ink); border: 1px solid var(--rule-strong); }
+.stage .maplibregl-canvas { outline: none; }
+.stage .maplibregl-ctrl-attrib { font-size: 10px; }
 
 body.pad { overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; background: var(--bg); }
 .pad .shell { display: flex; flex-direction: column; height: 100dvh; padding: 10px; gap: 8px; }

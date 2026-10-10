@@ -42,7 +42,7 @@ if ! (cd backend && ../.venv/bin/python manage.py has-admin); then
   echo
 fi
 
-(cd backend && ../.venv/bin/uvicorn main:app --port 8000 --reload) &
+(cd backend && ../.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload) &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null' EXIT
 for i in $(seq 1 30); do curl -s localhost:8000/health >/dev/null && break; sleep 1; done
@@ -51,7 +51,9 @@ if [ "$SEED" = "1" ]; then
 fi
 echo
 (cd backend && ../.venv/bin/python manage.py logins) || true
+LAN=$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | cut -d" " -f1)
 echo "SkyClear is running at http://localhost:8000   (guided tour: http://localhost:8000/guide.html)"
+[ -n "$LAN" ] && echo "Phone demo: open http://localhost:8000/display.html on this computer, scan the QR with a phone on the same Wi-Fi (this computer is $LAN)"
 [ "$LOCAL" = "0" ] && echo "Mail catcher for one-time codes: http://localhost:8025"
 command -v open >/dev/null && open http://localhost:8000/guide.html
 wait $SERVER

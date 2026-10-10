@@ -12,6 +12,7 @@ from explain import NEXT_STEPS, explain
 from analytics import router as analytics_router
 from ask import router as ask_router
 from auth import router as auth_router, setup_indexes as auth_indexes
+import bridge
 from bridge import router as bridge_router
 from config_api import router as config_router
 from live import router as live_router, sim_router
@@ -27,6 +28,14 @@ app = FastAPI(title="SkyClear")
 
 
 @app.on_event("startup")
+async def _attach_simulator():
+    """Give the simulator the server's event loop, so a flight launched from any request can start the 1 Hz loop."""
+    import asyncio
+    from simulator.fleet import get_fleet_simulator
+    get_fleet_simulator().attach_loop(asyncio.get_running_loop())
+
+
+@app.on_event("startup")
 def _warm_up_model():
     import llm
     llm.warm_up()  # loads the model on the Ollama laptop in the background (does nothing when USE_LLM=0)
@@ -34,6 +43,9 @@ def _warm_up_model():
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(config_router)
 app.include_router(ask_router)
+from simulator.fleet import get_fleet_simulator as _fleet_sim  # noqa: E402
+_fleet_sim().on_landed = bridge.complete_flight
+_fleet_sim().on_breach = bridge.on_drone_breach
 app.include_router(auth_router)
 app.include_router(bridge_router)
 app.include_router(zones_router)

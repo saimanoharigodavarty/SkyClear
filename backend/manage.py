@@ -6,6 +6,7 @@
   python backend/manage.py seed-demo                                                 a verified demo pilot, a drone, flights and a notice
   python backend/manage.py logins                                                    show the saved logins
   python backend/manage.py set-password --email x@y.z                                set a known password for an account
+  python backend/manage.py prepare-demo                                              get a presentation ready: a demo pilot with two approved flights (phone control demo)
   python backend/manage.py list-users
   python backend/manage.py has-admin                                                 exit code 0 when an admin exists
 
@@ -146,6 +147,88 @@ def cmd_set_password(a):
     print(f"Password set for {user['email']}")
 
 
+def _demo_drone(client, ha, hp, pilot_user):
+    """The demo pilot's drone, created and verified if it does not exist yet."""
+    png = bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6300010000000500010d0a2db40000000049454e44ae426082")
+    up = lambda: [client.post("/uploads", headers=hp, files={"file": ("doc.png", png, "image/png")}).json()["file_id"]]
+    mine = [d for d in client.get("/me/drones", headers=hp).json() if (d.get("verification") or {}).get("status") == "verified"]
+    if mine:
+        return mine[0]
+    drone = client.post("/me/drones", headers=hp, json={"name": "Demo Drone", "weight_g": 895}).json()
+    v2 = client.post(f"/me/drones/{drone['drone_id']}/verification", headers=hp, json={"serial": "DEMO-" + secrets.token_hex(3).upper(), "file_ids": up()}).json()
+    client.post(f"/verification/{v2['verification_id']}/decision", headers=ha, json={"decision": "approved", "comment": "Demo data"})
+    if (pilot_user.get("verification") or {}).get("status") != "verified":
+        v1 = client.post("/me/verification/pilot", headers=hp, json={"cert_no": "DEMO-CERT-" + secrets.token_hex(2).upper(), "file_ids": up()}).json()
+        client.post(f"/verification/{v1['verification_id']}/decision", headers=ha, json={"decision": "approved", "comment": "Demo data"})
+    return drone
+
+
+def _free_spot(zones):
+    """An open spot about 1.5 km outside the nearest military zone and outside every other zone, so flying toward the military zone is a short, dramatic trip."""
+    import math
+    from geo import haversine_km
+    import pipeline
+    mil = [f for f in zones if f["properties"]["zone_type"] == "military"]
+    centre = config.REGION["center"]
+    for f in sorted(mil, key=lambda f: haversine_km(centre[0], centre[1], *[sum(c) / len(c) for c in zip(*[(y, x) for x, y in f["geometry"]["coordinates"][0]])])):
+        ring = f["geometry"]["coordinates"][0]
+        clat, clng = (sum(y for _, y in ring) / len(ring), sum(x for x, _ in ring) / len(ring))
+        radius = max(haversine_km(clat, clng, y, x) for x, y in ring)
+        for bearing in range(180, 180 + 360, 30):
+            d = radius + 1.5
+            lat = clat + (d * math.cos(math.radians(bearing))) / 111.32
+            lng = clng + (d * math.sin(math.radians(bearing))) / (111.32 * math.cos(math.radians(clat)))
+            if not any(z["inside"] for z in pipeline.store.zones_near(lat, lng)):
+                return round(lat, 5), round(lng, 5)
+    return centre[0] + 0.1, centre[1] + 0.1
+
+
+def cmd_prepare_demo(a):
+    """Get ready for a presentation: a verified demo pilot with two flights ready to fly, valid for six hours.
+    1) a permit flight inside a yellow zone (fly out of the dashed area, or climb over the limit, and it breaches)
+    2) a free flight in open air just outside a military zone (fly toward it and the screen warns, then breaches)
+    The demo pilot's password is reset and printed, so you can sign in on the presentation computer."""
+    from fastapi.testclient import TestClient
+    from main import app
+    import auth
+    client = TestClient(app)
+    admin = next((u for u in runtime.all_("users") if u["role"] == "official" and not u.get("authority_id")), None)
+    if admin is None:
+        raise SystemExit("Create an admin first: python backend/manage.py create-admin --email you@example.com --generate")
+    ha = {"Authorization": f"Bearer {auth.access_token(admin)}"}
+    pilot = next((u for u in runtime.all_("users") if u["email"] == a.pilot_email), None)
+    pw = secrets.token_urlsafe(12)
+    if pilot is None:
+        pilot = create_user(a.pilot_email, "Demo Pilot", "pilot", pw, verified=True, phone="+919" + str(secrets.randbelow(10**9)).zfill(9))
+    else:
+        runtime.update("users", "user_id", pilot["user_id"], {"password": runtime.hash_password(pw), "failed_attempts": 0, "locked_until": None, "phone_verified": True})
+        pilot = next(u for u in runtime.all_("users") if u["user_id"] == pilot["user_id"])
+    hp = {"Authorization": f"Bearer {auth.access_token(pilot)}"}
+    drone = _demo_drone(client, ha, hp, pilot)
+    for old in runtime.all_("flights"):  # clear last time's demo flights so the screen shows only fresh ones
+        if old["pilot_id"] == pilot["user_id"] and old.get("purpose", "").startswith("Presentation demo") and old["status"] in ("approved", "watching", "cleared"):
+            runtime.update("flights", "flight_id", old["flight_id"], {"status": "cancelled"})
+    now = datetime.now(timezone.utc)
+    iso = lambda d: d.isoformat(timespec="seconds")
+    zones = client.get("/zones").json()["features"]
+    gov = next((f for f in zones if f["properties"]["zone_type"] == "government"), None)
+    window = {"start": iso(now - timedelta(minutes=1)), "end": iso(now + timedelta(hours=6))}
+    ready = []
+    if gov:
+        ring = gov["geometry"]["coordinates"][0]
+        lat, lng = sum(y for _, y in ring) / len(ring), sum(x for x, _ in ring) / len(ring)
+        f = client.post("/flights", headers=hp, json={"drone_id": drone["drone_id"], "lat": lat, "lng": lng, "kind": "permission", "purpose": "Presentation demo", **window}).json()
+        client.post(f"/flights/{f['flight_id']}/decision", headers=ha, json={"decision": "approved", "alt_max_m": 60, "conditions": ["Stay inside the dashed area", "Keep below 60 m"], "comment": "Demo permit"})
+        ready.append(f"{f['flight_id']}  permit flight in {gov['properties']['name']}")
+    lat, lng = _free_spot(zones)
+    w = client.post("/flights", headers=hp, json={"drone_id": drone["drone_id"], "lat": lat, "lng": lng, "kind": "watch", "purpose": "Presentation demo, free flight", **window}).json()
+    ready.append(f"{w['flight_id']}  free flight in open air near a military zone")
+    _save([f"pilot  {a.pilot_email}  {pw}"])
+    print("Demo ready. Flights approved for the next 6 hours:")
+    print("\n".join("  " + r for r in ready))
+    print(f"\nSign in on the presentation computer as the demo pilot:\n  {a.pilot_email}   {pw}\nThen open http://localhost:8000/display.html")
+
+
 def cmd_list_users(a):
     for u in runtime.all_("users"):
         print(f"{u['role']:9} {u['email']:45} {u.get('authority_id') or '-'}")
@@ -200,6 +283,7 @@ def main(argv=None):
     s.add_argument("--password"); s.add_argument("--generate", action="store_true"); s.set_defaults(fn=cmd_create_admin)
     s = sub.add_parser("seed-officers"); s.add_argument("--domain", default="officers.skyclear.local"); s.set_defaults(fn=cmd_seed_officers)
     s = sub.add_parser("seed-demo"); s.add_argument("--pilot-email", default="demo.pilot@example.com"); s.set_defaults(fn=cmd_seed_demo)
+    s = sub.add_parser("prepare-demo"); s.add_argument("--pilot-email", default="demo.pilot@example.com"); s.set_defaults(fn=cmd_prepare_demo)
     s = sub.add_parser("list-users"); s.set_defaults(fn=cmd_list_users)
     s = sub.add_parser("logins"); s.set_defaults(fn=cmd_logins)
     s = sub.add_parser("set-password"); s.add_argument("--email", required=True); s.add_argument("--password"); s.set_defaults(fn=cmd_set_password)

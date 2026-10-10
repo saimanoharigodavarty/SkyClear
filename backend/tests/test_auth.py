@@ -215,3 +215,40 @@ def test_failed_delivery_gives_a_clean_error(monkeypatch):
 def test_secrets_are_generated_not_written_in_code():
     assert len(config.JWT_SECRET) >= 32 and len(config.PERMIT_SECRET) >= 32 and config.JWT_SECRET != config.PERMIT_SECRET
     assert "dev-only" not in config.JWT_SECRET and "dev-only" not in config.PERMIT_SECRET
+
+
+def test_google_auth_endpoint(monkeypatch):
+    import requests
+
+    monkeypatch.setattr(config, "GOOGLE_CLIENT_ID", "test-google-client-id.apps.googleusercontent.com")
+
+    # 1. Invalid token from Google returns 401
+    class FakeBadResponse:
+        status_code = 400
+        headers = {"content-type": "application/json"}
+        def json(self): return {"error_description": "Bad token"}
+
+    monkeypatch.setattr(requests, "get", lambda *a, **k: FakeBadResponse())
+    r_bad = client.post("/auth/google", json={"credential": "invalid_token_sample"})
+    assert r_bad.status_code == 401
+
+    # 2. Valid token returns tokens and creates/logs in pilot
+    class FakeGoodResponse:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        def json(self):
+            return {
+                "aud": "test-google-client-id.apps.googleusercontent.com",
+                "email": "googlepilot@example.com",
+                "name": "Google Test Pilot",
+                "sub": "google-user-12345"
+            }
+
+    monkeypatch.setattr(requests, "get", lambda *a, **k: FakeGoodResponse())
+    r_ok = client.post("/auth/google", json={"credential": "valid_token_sample"})
+    assert r_ok.status_code == 200
+    data = r_ok.json()
+    assert {"access_token", "refresh_token", "user"} <= set(data)
+    assert data["user"]["email"] == "googlepilot@example.com"
+    assert data["user"]["role"] == "pilot"
+

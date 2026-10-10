@@ -391,6 +391,66 @@ def invite_official(body: NewOfficial, admin=Depends(require_admin)):
     return {**public_user(u), "temporary_password": temp}
 
 
+class GoogleAuthRequest(BaseModel):
+    credential: str = Field(min_length=10)
+
+
+@router.post("/auth/google")
+def google_auth(body: GoogleAuthRequest, request: Request):
+    rate_limit("gauth:" + (request.client.host if request.client else "x"), 20, 60)
+    if not config.GOOGLE_CLIENT_ID:
+        raise HTTPException(500, "Google Authentication is not configured on the server. Set GOOGLE_CLIENT_ID in .env")
+
+    try:
+        import requests
+        resp = requests.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": body.credential},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            err_msg = resp.json().get("error_description", "verification failed") if resp.headers.get("content-type", "").startswith("application/json") else "verification failed"
+            raise HTTPException(401, f"Invalid Google credential: {err_msg}")
+        idinfo = resp.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"Could not contact Google verification: {e}")
+
+    if idinfo.get("aud") != config.GOOGLE_CLIENT_ID:
+        raise HTTPException(401, "Google token audience mismatch")
+
+    email = idinfo.get("email", "").strip().lower()
+    name = idinfo.get("name", "Pilot").strip()
+    google_id = idinfo.get("sub")
+
+    if not email:
+        raise HTTPException(400, "Google account did not provide an email address")
+
+    user = next((u for u in runtime.all_("users") if u.get("email") == email), None)
+    if user is None:
+        user_doc = {
+            "user_id": runtime.new_id("U"),
+            "role": "pilot",
+            "name": name,
+            "email": email,
+            "google_id": google_id,
+            "phone": None,
+            "phone_verified": True,
+            "pilot_cert": None,
+            "password": None,
+            "failed_attempts": 0,
+            "created_at": runtime.now_iso()
+        }
+        runtime.insert("users", user_doc)
+        user = user_doc
+    else:
+        if not user.get("google_id"):
+            runtime.update("users", "user_id", user["user_id"], {"google_id": google_id})
+
+    return issue_tokens(user)
+
+
 def setup_indexes():
     if config.USE_MONGO:
         from db import get_db

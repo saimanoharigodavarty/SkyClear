@@ -13,3 +13,4 @@ data/uploads/
 data/.secrets.json
 data/demo_credentials.txt
 data/.e2e.png
+data/.e2e-shots/

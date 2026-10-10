@@ -135,3 +135,45 @@ $("phoneHelp").textContent = (CFG.otpChannel === "sms" ? "We send a one-time cod
 // Tell a first-time visitor where to start, without showing any secret.
 if (CFG.needsAdmin) $("setupHint").innerHTML = '<div class="msg"><b>First-time setup.</b> No administrator exists yet. Open a terminal in the project folder and run <span class="mono">./run.sh</span>, it asks for the first admin. <a href="guide.html">Guided tour</a></div>';
 else if (CFG.devLogins) $("setupHint").innerHTML = '<div class="msg"><b>Looking for a login?</b> Development logins are generated on this computer. Run <span class="mono">python backend/manage.py logins</span> or open <span class="mono">data/demo_credentials.txt</span>. One-time codes arrive at <a href="http://localhost:8025" target="_blank">localhost:8025</a>. <a href="guide.html">Guided tour</a></div>';
+
+// Google Authentication
+function initGoogleAuth() {
+  const cid = (window.SKYCLEAR && window.SKYCLEAR.googleClientId) || (window.CFG && window.CFG.googleClientId);
+  if (!cid || !window.google) return;
+  const wrap = $("googleAuthWrap");
+  if (wrap) wrap.classList.remove("hidden");
+  try {
+    google.accounts.id.initialize({
+      client_id: cid,
+      callback: handleGoogleCredential,
+    });
+    const theme = document.documentElement.dataset.theme === "dark" ? "filled_black" : "outline";
+    google.accounts.id.renderButton($("g_id_signin"), {
+      type: "standard",
+      theme: theme,
+      size: "large",
+      width: 280,
+      text: "continue_with",
+      shape: "rectangular",
+    });
+  } catch (err) {
+    console.warn("Google identity init error:", err);
+  }
+}
+
+async function handleGoogleCredential(response) {
+  try {
+    const r = await api("/auth/google", {
+      method: "POST",
+      auth: false,
+      body: { credential: response.credential },
+    });
+    finish(r);
+  } catch (err) {
+    fail("signinMsg", err);
+  }
+}
+
+if (window.google) initGoogleAuth();
+else window.addEventListener("load", initGoogleAuth);
+

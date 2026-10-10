@@ -354,3 +354,89 @@ button.danger { background: var(--red); border-color: var(--red); color: var(--o
 .leaflet-container { background: var(--bg); }
 label.consent { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 400; color: var(--ink); }
 label.consent a { font-weight: 600; }
+
+/* ---------- flight lifecycle, live flight bar, live drones ---------- */
+.flow { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 4px; align-items: center; }
+.flow span { padding: 2px 8px; border: 1px solid var(--rule); border-radius: 4px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.flow span.done { color: var(--green); border-color: color-mix(in srgb, var(--green) 50%, var(--rule)); }
+.flow span.on { background: var(--accent); color: var(--on-fill); border-color: var(--accent); }
+.flow span.end { background: var(--red); color: var(--on-fill); border-color: var(--red); }
+.next { margin: 8px 0 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--rule)); background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: var(--r); font-size: 13px; }
+.next b { color: var(--accent); }
+.flightbar { margin: 0; padding: 10px 18px; border-bottom: 1px solid var(--rule); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); font-size: 13px; }
+.flightbar.warn { background: color-mix(in srgb, var(--red) 14%, var(--panel)); }
+.flightbar .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.flightbar button { width: auto; margin: 0; padding: 5px 10px; font-size: 12px; }
+.telemetry { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0; }
+.telemetry div { border: 1px solid var(--rule); border-radius: var(--r); padding: 6px 8px; background: var(--panel); }
+.telemetry .n { font-weight: 800; font-size: 15px; display: block; line-height: 1.1; }
+.telemetry .l { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.drone-pin { width: 22px; height: 22px; }
+.drone-pin i { display: block; width: 18px; height: 20px; margin: 1px 2px; background: var(--accent); clip-path: polygon(50% 0, 100% 100%, 50% 78%, 0 100%); transform-origin: 50% 60%; }
+.drone-pin.warning i { background: var(--amber); }
+.drone-pin.breach i, .drone-pin.returning i { background: var(--red); }
+.air-item { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; }
+.air-item button { width: auto; margin: 0; padding: 5px 10px; font-size: 12px; }
+.breach { padding: 7px 0; border-bottom: 1px solid var(--rule); font-size: 13px; }
+.range { width: 100%; accent-color: var(--accent); padding: 0; }
+.pill-ok { color: var(--green); font-weight: 700; } .pill-warn { color: var(--amber); font-weight: 700; } .pill-bad { color: var(--red); font-weight: 700; }
+
+/* ---------- presentation screen and phone controller ---------- */
+body.stage { overflow: hidden; }
+.stage-map { position: fixed; inset: 0; }
+.stage .leaflet-container { background: #0a1016; }
+.hud { position: fixed; z-index: 800; background: var(--glass); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid color-mix(in srgb, var(--rule-strong) 70%, transparent); border-radius: var(--r-lg); padding: 14px 16px; }
+.hud h2 { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+#brandcard { top: 16px; left: 16px; display: flex; gap: 14px; align-items: center; padding: 10px 16px; }
+#brandcard .brand { font-size: 22px; } #brandcard .who2 { font-size: 13px; color: var(--muted); }
+#banner2 { top: 16px; left: 50%; transform: translateX(-50%); min-width: 380px; text-align: center; padding: 12px 28px; border: 0; color: var(--on-fill); }
+#banner2 .big { font-size: 30px; font-weight: 800; letter-spacing: -.01em; line-height: 1.1; }
+#banner2 .sub { font-size: 14px; opacity: .92; margin-top: 2px; }
+#banner2.ok { background: var(--green); } #banner2.warning { background: var(--amber); } #banner2.breach { background: var(--red); } #banner2.idle { background: var(--grey); }
+#telepanel { top: 16px; right: 16px; width: 330px; }
+#eventpanel { right: 16px; bottom: 16px; width: 330px; max-height: 34vh; overflow-y: auto; }
+#pairpanel { left: 16px; bottom: 16px; width: 270px; text-align: center; }
+#pairpanel .qr2 { width: 190px; height: 190px; margin: 6px auto; background: #f4f7fa; padding: 8px; border-radius: var(--r); }
+#pairpanel .qr2 svg { width: 100%; height: 100%; display: block; }
+.bigtele { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bigtele .n { font-size: 34px; font-weight: 800; line-height: 1; display: block; }
+.bigtele .u { font-size: 12px; color: var(--muted); }
+.bar { height: 8px; background: color-mix(in srgb, var(--rule-strong) 40%, transparent); border-radius: 4px; margin-top: 6px; position: relative; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); }
+.bar i.hot { background: var(--red); }
+.compass { width: 54px; height: 54px; border: 2px solid var(--rule-strong); border-radius: 50%; position: relative; margin-left: auto; }
+.compass i { position: absolute; left: 50%; top: 50%; width: 4px; height: 22px; margin: -22px 0 0 -2px; background: var(--red); transform-origin: 50% 100%; border-radius: 2px; }
+.evt { padding: 5px 0; border-bottom: 1px solid var(--rule); font-size: 13px; display: flex; gap: 8px; }
+.evt time { color: var(--muted); font-family: var(--mono); font-size: 11px; min-width: 56px; padding-top: 1px; }
+.evt.breach b, .evt.recall b { color: var(--red); } .evt.warning b { color: var(--amber); } .evt.clear b { color: var(--green); }
+#chooser { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(560px, 92vw); max-height: 80vh; overflow-y: auto; }
+#chooser .item { background: transparent; }
+#endcard { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(460px, 92vw); text-align: center; }
+.keyhint { position: fixed; z-index: 800; left: 50%; bottom: 14px; transform: translateX(-50%); font-size: 12px; color: #e4ebf2; background: rgba(10, 16, 22, .55); padding: 4px 12px; border-radius: var(--r); }
+#fs { position: fixed; z-index: 800; top: 16px; right: 360px; width: auto; margin: 0; padding: 6px 12px; font-size: 12px; background: var(--glass); color: var(--ink); border: 1px solid var(--rule-strong); }
+
+body.pad { overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; background: var(--bg); }
+.pad .shell { display: flex; flex-direction: column; height: 100dvh; padding: 10px; gap: 8px; }
+.pad .status { border-radius: var(--r-lg); padding: 12px 14px; text-align: center; color: var(--on-fill); }
+.pad .status .big { font-size: 22px; font-weight: 800; line-height: 1.1; }
+.pad .status .sub { font-size: 13px; opacity: .92; }
+.pad .status.ok { background: var(--green); } .pad .status.warning { background: var(--amber); } .pad .status.breach { background: var(--red); } .pad .status.idle { background: var(--grey); }
+.pad .tele { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.pad .tele div { border: 1px solid var(--rule); border-radius: var(--r); padding: 6px; text-align: center; background: var(--panel); }
+.pad .tele .n { font-weight: 800; font-size: 18px; display: block; line-height: 1.1; } .pad .tele .l { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.pad .toast { min-height: 20px; font-size: 13px; text-align: center; color: var(--muted); }
+.pad .sticks { flex: 1; display: flex; justify-content: space-around; align-items: center; gap: 10px; min-height: 0; }
+.pad .stickwrap { text-align: center; }
+.pad .stick { width: min(40vw, 190px); height: min(40vw, 190px); border-radius: 50%; border: 2px solid var(--rule-strong); background: color-mix(in srgb, var(--panel) 80%, transparent); position: relative; touch-action: none; }
+.pad .stick::before, .pad .stick::after { content: ""; position: absolute; background: var(--rule); }
+.pad .stick::before { left: 50%; top: 10%; bottom: 10%; width: 1px; } .pad .stick::after { top: 50%; left: 10%; right: 10%; height: 1px; }
+.pad .knob { position: absolute; width: 44%; height: 44%; border-radius: 50%; background: var(--accent); left: 28%; top: 28%; }
+.pad .stickwrap .cap { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+.pad .actions { display: flex; gap: 8px; }
+.pad .actions button { margin: 0; flex: 1; padding: 14px; font-size: 15px; }
+@media (orientation: landscape) and (max-height: 520px) { .pad .shell { padding: 6px; } .pad .tele { display: none; } .pad .stick { width: min(30vh, 150px); height: min(30vh, 150px); } }
+
+/* the theme tint is for the drawn map only: real satellite photos keep their own colours */
+.sat-on .leaflet-tile-pane { filter: none; }
+/* on the big screen the map buttons sit under the live panel, not on top of it */
+.stage .leaflet-top.leaflet-right { top: 330px; }

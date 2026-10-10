@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>SkyClear, phone controller</title>
+<script>try{var t=localStorage.getItem("skyclear.theme");t=t&&JSON.parse(t);if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="pad">
+<div class="shell">
+  <div class="status idle" id="status"><div class="big">Connecting</div><div class="sub">Linking to the drone</div></div>
+  <div class="tele">
+    <div><span class="n" id="cAlt">0</span><span class="l">m up</span></div>
+    <div><span class="n" id="cSpd">0</span><span class="l">m/s</span></div>
+    <div><span class="n" id="cHdg">0</span><span class="l">heading</span></div>
+    <div><span class="n" id="cBat">0%</span><span class="l">battery</span></div>
+  </div>
+  <div class="toast" id="toast">Left stick: turn and climb. Right stick: move.</div>
+  <div class="sticks">
+    <div class="stickwrap"><div class="stick" id="stickL"><div class="knob"></div></div><div class="cap">Turn and climb</div></div>
+    <div class="stickwrap"><div class="stick" id="stickR"><div class="knob"></div></div><div class="cap">Move</div></div>
+  </div>
+  <div class="actions"><button class="ghost" id="home" type="button">Return home</button><button class="danger" id="land" type="button">Land now</button></div>
+</div>
+<script>
+// Phone controller. The QR code on the big screen carries a short-lived token for one flight, so there is nothing to sign in to.
+const q = new URLSearchParams(location.search), FLIGHT = q.get("flight"), TOKEN = q.get("pair");
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const call = (path, method = "GET", body) => fetch(path, { method, headers: { Authorization: "Bearer " + TOKEN, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+const state = { L: { x: 0, y: 0 }, R: { x: 0, y: 0 }, lastSent: "", last: "idle", airborne: false };
+
+function status(kind, big, sub) { const s = $("status"); s.className = "status " + kind; s.innerHTML = `<div class="big">${esc(big)}</div><div class="sub">${esc(sub || "")}</div>`; }
+
+// A stick: drag inside the ring, the knob follows, the value goes from -1 to 1. Let go and it springs back to the middle.
+function stick(el, key) {
+  const knob = el.querySelector(".knob"); let id = null;
+  const set = (x, y) => { state[key] = { x, y }; knob.style.left = (28 + x * 28) + "%"; knob.style.top = (28 - y * 28) + "%"; };
+  const move = e => {
+    const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, rad = r.width / 2;
+    let x = (e.clientX - cx) / rad, y = -(e.clientY - cy) / rad; const m = Math.hypot(x, y);
+    if (m > 1) { x /= m; y /= m; }
+    set(Math.abs(x) < 0.08 ? 0 : x, Math.abs(y) < 0.08 ? 0 : y);
+  };
+  el.addEventListener("pointerdown", e => { id = e.pointerId; el.setPointerCapture(id); move(e); e.preventDefault(); });
+  el.addEventListener("pointermove", e => { if (e.pointerId === id) move(e); });
+  const end = e => { if (e.pointerId === id) { id = null; set(0, 0); } };
+  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+  return set;
+}
+const setL = stick($("stickL"), "L"), setR = stick($("stickR"), "R");
+
+// Keyboard too, so it can be tried on a computer: W A S D move, Q E turn, R F up and down.
+const keys = {};
+addEventListener("keydown", e => { if (/^[wasdqerf]$/i.test(e.key)) { keys[e.key.toLowerCase()] = true; e.preventDefault(); } });
+addEventListener("keyup", e => { delete keys[e.key.toLowerCase()]; });
+const kv = c => (keys[c] ? 1 : 0);
+
+// About ten times a second the sticks go to the drone. If nothing is touched, one zero goes out and then it stays quiet: the drone hovers.
+setInterval(async () => {
+  if (!state.airborne) return;
+  const kx = { fwd: kv("w") - kv("s"), right: kv("d") - kv("a"), yaw: kv("e") - kv("q"), climb: kv("r") - kv("f") };
+  const s = { fwd: state.R.y || kx.fwd, right: state.R.x || kx.right, yaw: state.L.x || kx.yaw, climb: state.L.y || kx.climb };
+  const key = JSON.stringify(s), idle = Object.values(s).every(v => v === 0);
+  if (idle && state.lastSent === key) return;
+  state.lastSent = key;
+  try { const r = await call(`/flights/${FLIGHT}/control`, "POST", s); if (r.status === 409) toast("The drone is flying itself now."); } catch (e) { toast("Lost the connection, the drone is hovering."); }
+}, 100);
+
+let toastTimer = null;
+function toast(t) { $("toast").textContent = t; clearTimeout(toastTimer); toastTimer = setTimeout(() => { $("toast").textContent = ""; }, 4000); }
+
+async function poll() {
+  try {
+    const r = await call(`/flights/${FLIGHT}/live`);
+    if (r.status === 401 || r.status === 403) return status("idle", "Link expired", "Scan the QR code on the big screen again");
+    const s = await r.json(); state.airborne = s.airborne;
+    if (!s.airborne) { status("idle", "Not flying", "Take off from the big screen, or the flight has ended"); return; }
+    const d = s.drone;
+    $("cAlt").textContent = Math.round(d.alt_m); $("cSpd").textContent = d.speed_mps; $("cHdg").textContent = Math.round(d.heading_deg) + "°"; $("cBat").textContent = Math.round(d.battery_pct) + "%";
+    const kind = d.phase === "returning" ? "breach" : d.status === "ok" ? "ok" : d.status;
+    if (d.phase === "returning") status("breach", "Returning home", "The drone is flying itself, sticks are off");
+    else if (d.status === "breach") status("breach", "BREACH", d.zone || "Inside restricted airspace");
+    else if (d.status === "warning") status("warning", "WARNING", d.zone || "Restricted area ahead");
+    else status("ok", "All clear", "You are flying");
+    if (kind !== state.last && (kind === "breach" || kind === "warning") && navigator.vibrate) navigator.vibrate(kind === "breach" ? [250, 100, 250, 100, 250] : [120]);
+    state.last = kind;
+    const ev = s.events[s.events.length - 1]; if (ev && ev.kind !== "takeoff") $("toast").textContent = ev.text;
+  } catch (e) { status("idle", "Connection lost", "Check the Wi-Fi, retrying"); }
+}
+$("home").addEventListener("click", async () => { const r = await call(`/flights/${FLIGHT}/home`, "POST"); toast(r.ok ? "Returning home" : "Already coming home"); });
+$("land").addEventListener("click", async () => { const r = await call(`/flights/${FLIGHT}/land`, "POST"); toast(r.ok ? "Landed" : "Could not land"); });
+if (!FLIGHT || !TOKEN) status("idle", "No flight", "Open this page by scanning the QR code on the big screen");
+else { poll(); setInterval(poll, 300); }
+try { navigator.wakeLock && navigator.wakeLock.request("screen"); } catch (e) { /* the screen may sleep, fine */ }
+</script>
+</body>
+</html>

@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="app.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <header class="top" id="top"></header>
@@ -20,6 +21,12 @@
   <div class="authtabs" id="tabs"><button type="button" data-t="signin" class="on">Sign in</button><button type="button" data-t="register">Create pilot account</button></div>
 
   <div class="authbox2">
+    <!-- google sign in -->
+    <div id="googleAuthWrap" class="hidden" style="margin-bottom:14px;text-align:center">
+      <div id="g_id_signin" style="display:inline-block"></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px">or sign in with password / one-time code</div>
+    </div>
+
     <!-- sign in -->
     <form id="signinForm">
       <label for="lId">Email or mobile number</label>

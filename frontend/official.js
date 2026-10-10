@@ -10,8 +10,9 @@ const reqLayer = L.layerGroup().addTo(layers.work);
 function showTab(t) {
   tab = t;
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
-  ["requests", "verify", "publish", "notices", "team"].forEach(x => $("tab-" + x).classList.toggle("hidden", x !== t));
+  ["requests", "live", "verify", "publish", "notices", "team"].forEach(x => $("tab-" + x).classList.toggle("hidden", x !== t));
   if (t === "requests") loadRequests();
+  if (t === "live") startLiveView(); else stopLiveView();
   if (t === "verify") loadVerification();
   if (t === "notices") loadNotices();
   if (t === "team") loadTeam();
@@ -43,6 +44,7 @@ async function loadRequests() {
     $("reqList").querySelectorAll("[data-show]").forEach(b => b.addEventListener("click", () => { const [a, o] = b.dataset.show.split(",").map(Number); map.setView([a, o], 14); }));
     $("reqList").querySelectorAll("[data-decide]").forEach(b => b.addEventListener("click", () => decide(b.dataset.id, b.dataset.decide)));
     $("reqList").querySelectorAll("[data-revoke]").forEach(b => b.addEventListener("click", () => revoke(b.dataset.revoke)));
+    $("reqList").querySelectorAll("[data-recall]").forEach(b => b.addEventListener("click", () => doRecall(b.dataset.recall)));
   } catch (e) { $("reqList").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 function reqCard(f) {
@@ -50,6 +52,7 @@ function reqCard(f) {
   return `
       <div class="item" id="r-${esc(f.flight_id)}">
         <div class="head"><span class="title mono">${esc(f.flight_id)}</span><span>${f.overdue ? '<span class="tag rejected">Overdue</span> ' : ""}<span class="tag ${esc(f.status)}">${esc(STATUS_LABEL[f.status] || f.status)}</span></span></div>
+        ${flowHTML(f)}
         <div><b>${esc(f.pilot_name)}</b> <span class="muted">${f.pilot_cert ? "cert " + esc(f.pilot_cert) : "no certificate given"}</span></div>
         <div>${esc(f.drone_name)} <span class="muted">class ${esc(f.drone_class)}${f.uin ? ", reg. " + esc(f.uin) : ""}</span></div>
         <div class="meta">${esc(fmtWhen(f.start))} to ${esc(fmtWhen(f.end))}</div>
@@ -70,6 +73,8 @@ function reqCard(f) {
           <div class="btnrow"><button class="inline" type="button" data-decide="approved" data-id="${esc(f.flight_id)}" style="margin-top:8px">Approve and issue permit</button>
           <button class="danger inline" type="button" data-decide="rejected" data-id="${esc(f.flight_id)}" style="margin-top:8px">Reject</button></div>
           <div id="m-${esc(f.flight_id)}"></div>` : ""}
+        ${f.flight_log ? `<div class="msg">Flight log: ${esc(fmtTime(f.flight_log.launched_at))} to ${esc(fmtTime(f.flight_log.landed_at))}, highest ${esc(f.flight_log.max_alt_m)} m, restricted airspace entered ${esc(f.flight_log.breaches)} time${f.flight_log.breaches === 1 ? "" : "s"}.</div>` : ""}
+        ${f.status === "flying" ? recallBox(f) : ""}
         ${pm && pm.status === "active" ? `
           <label for="rv-${esc(f.flight_id)}">Revoke this permit, reason</label><input id="rv-${esc(f.flight_id)}" maxlength="300" placeholder="e.g. VIP movement over the area">
           <button class="danger inline" type="button" data-revoke="${esc(pm.permit_id)}" data-flight="${esc(f.flight_id)}" style="margin-top:8px">Revoke permit</button><div id="rm-${esc(f.flight_id)}"></div>` : ""}
@@ -188,4 +193,63 @@ $("inviteForm").addEventListener("submit", async e => {
     $("inviteMsg").innerHTML = `<div class="msg"><b>${esc(u.email)} is invited.</b> Give them this temporary password now, it is not shown again:<div class="mono" style="font-size:16px;margin-top:6px">${esc(u.temporary_password)}</div></div>`;
     e.target.reset(); loadTeam();
   } catch (err) { $("inviteMsg").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+});
+
+/* ---------- live airspace ---------- */
+const fmtTime = iso => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const liveLayer = L.layerGroup().addTo(map);
+let liveDrones = [], liveTimer = null;
+const live = createLive(map, liveLayer, drones => { liveDrones = drones; }, 2000);
+live.start();  // officers see the drones on the map in every tab
+
+function recallBox(f) {
+  return `<label for="rc-${esc(f.flight_id)}">Recall this drone, reason</label><input id="rc-${esc(f.flight_id)}" maxlength="300" placeholder="e.g. Emergency vehicle landing nearby">
+    <button class="danger inline" type="button" data-recall="${esc(f.flight_id)}" style="margin-top:8px">Recall drone</button><div id="rcm-${esc(f.flight_id)}"></div>`;
+}
+async function doRecall(id) {
+  const reason = ($("rc-" + id) || {}).value || "";
+  try { await api(`/flights/${id}/recall`, { method: "POST", body: { reason } }); refreshLive(); loadRequests(); }
+  catch (e) { const m = $("rcm-" + id); if (m) m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
+async function refreshLive() {
+  try {
+    const [flights, br] = await Promise.all([api("/flights"), api("/live/breaches?limit=8")]);
+    const airborne = flights.filter(f => ["flying", "recalled"].includes(f.status));
+    const traffic = liveDrones.filter(d => d.kind !== "flight").length;
+    const inAir = Object.fromEntries(liveDrones.map(d => [d.flight_id, d]));
+    const cell = (n, l) => `<td><span class="n">${n}</span><span class="l">${l}</span></td>`;
+    $("liveStats").innerHTML = `<tr>${cell(airborne.length, "Flights in the air")}${cell(traffic, "Traffic drones")}${cell(liveDrones.filter(d => d.status === "breach").length, "In breach now")}</tr>`;
+    $("airList").innerHTML = airborne.length ? airborne.map(f => {
+      const d = inAir[f.flight_id], state = f.status === "recalled" ? '<span class="pill-bad">Recalled, returning</span>' : !d ? "starting" : d.status === "breach" ? '<span class="pill-bad">Inside ' + esc(d.zone || "restricted airspace") + "</span>" : d.status === "warning" ? '<span class="pill-warn">' + esc(d.zone || "Restricted area ahead") + "</span>" : '<span class="pill-ok">All clear</span>';
+      return `<div class="item air-item"><div><b class="mono">${esc(f.flight_id)}</b> ${esc(f.pilot_name)}<div class="meta">${esc(f.drone_name)}${d ? `, ${Math.round(d.alt_m)} m, ${d.speed_mps} m/s, battery ${Math.round(d.battery_pct)}%` : ""}</div><div class="meta">${state}</div></div>
+        <div>${f.status === "flying" ? `<button class="danger" type="button" data-air-recall="${esc(f.flight_id)}">Recall</button>` : ""}<button class="ghost" type="button" data-air-show="${esc(f.flight_id)}" style="margin-top:6px">Show</button></div></div>`;
+    }).join("") : '<div class="hint">No pilot flights in the air. When a pilot takes off after preflight, it appears here at once.</div>';
+    $("airList").querySelectorAll("[data-air-recall]").forEach(b => b.addEventListener("click", async () => {
+      const reason = prompt("Reason for recalling this drone (the pilot is told):");
+      if (reason && reason.trim().length > 2) { try { await api(`/flights/${b.dataset.airRecall}/recall`, { method: "POST", body: { reason } }); refreshLive(); } catch (e) { alert(e.message); } }
+    }));
+    $("airList").querySelectorAll("[data-air-show]").forEach(b => b.addEventListener("click", () => { const d = inAir[b.dataset.airShow]; if (d) map.flyTo([d.lat, d.lng], 16, { duration: 0.6 }); }));
+    $("breachList").innerHTML = br.breaches.length ? br.breaches.map(b => `<div class="breach"><b>${esc(b.name)}</b> <span class="muted">${esc(b.kind)}</span><div class="meta">${esc(b.drone_id)}, flight ${esc(b.flight_id)}, ${esc(fmtTime(b.ts))}</div></div>`).join("") : '<div class="hint">No breaches yet.</div>';
+  } catch (e) { $("airList").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+function startLiveView() { refreshLive(); if (!liveTimer) liveTimer = setInterval(refreshLive, 2500); }
+function stopLiveView() { clearInterval(liveTimer); liveTimer = null; }
+
+$("trafficN").addEventListener("input", () => { $("trafficLabel").textContent = $("trafficN").value; });
+$("trafficGo").addEventListener("click", async () => {
+  try { await api("/sim/fleet", { method: "POST", body: { count: Number($("trafficN").value) || 50, seed: 1, speed_x: 1 } }); $("simMsg").innerHTML = '<div class="msg">Background traffic started.</div>'; refreshLive(); }
+  catch (e) { $("simMsg").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+});
+$("trafficStop").addEventListener("click", async () => {
+  try { await api("/sim/fleet", { method: "DELETE" }); $("simMsg").innerHTML = '<div class="msg">Background traffic stopped. Pilots\' flights keep flying.</div>'; refreshLive(); }
+  catch (e) { $("simMsg").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+});
+$("vipGo").addEventListener("click", async () => {
+  try {
+    const r = await api("/sim/scenarios/vip", { method: "POST" });
+    $("simMsg").innerHTML = `<div class="msg">Restriction <span class="mono">${esc(r.notice_id)}</span> published. ${r.affected_flights} pilot flight${r.affected_flights === 1 ? "" : "s"} alerted, ${r.affected_drones} drone${r.affected_drones === 1 ? "" : "s"} inside it.</div>`
+      + ((r.conflicting_permits || []).length ? `<div class="msg err"><b>${r.conflicting_permits.length} approved permit${r.conflicting_permits.length === 1 ? "" : "s"} conflict.</b> Review in Requests, All flights.</div>` : "");
+    drawNotices(layers.notices); refreshLive();
+  } catch (e) { $("simMsg").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 });

@@ -2,7 +2,7 @@
 
 Track 2: RAG Engine (MongoDB hackathon)
 
-Product spec, accounts, notifications and the loophole list: [PRODUCT.md](PRODUCT.md). Target architecture: [ARCHITECTURE.md](ARCHITECTURE.md). Permits, verification and the official map: [docs/PERMITS_AND_VERIFICATION.md](docs/PERMITS_AND_VERIFICATION.md). Simulation: [docs/SIMULATION.md](docs/SIMULATION.md). Who builds what: [TEAM.md](TEAM.md). Interfaces between streams: [docs/CONTRACTS.md](docs/CONTRACTS.md).
+The whole flow, step by step, with diagrams: [docs/PIPELINE.md](docs/PIPELINE.md). Presentation demo, flying the simulated drone from a phone on a big satellite screen: [docs/PHONE_DEMO.md](docs/PHONE_DEMO.md). Product spec, accounts, notifications and the loophole list: [PRODUCT.md](PRODUCT.md). Target architecture: [ARCHITECTURE.md](ARCHITECTURE.md). Permits, verification and the official map: [docs/PERMITS_AND_VERIFICATION.md](docs/PERMITS_AND_VERIFICATION.md). Simulation: [docs/SIMULATION.md](docs/SIMULATION.md). Who builds what: [TEAM.md](TEAM.md). Interfaces between streams: [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
 ## Problem statement
 
@@ -159,6 +159,7 @@ docker-compose.yml   MongoDB (Atlas Local)
 Done and tested (78 backend tests in two modes, plus a 17-step browser test of the whole loop in `scripts/e2e.py`):
 - [x] Check a spot, route simulation, Ask SkyClear (cited, grounded), zones and notices on a map, satellite, light and dark themes
 - [x] Accounts: one-time codes by email or SMS, password reset, argon2id, JWT with rotating refresh tokens, lockout, authenticator codes for officials, invite-only officials, no built-in accounts or secrets
+- [x] The whole flight pipeline in one flow: request, approve, preflight (Cleared), take off, live drone bound to the permit, breach alerts, recall on revoke, landing and flight log (docs/PIPELINE.md)
 - [x] Pilot flow: register, verify pilot and drone with documents, request permission, routed to the responsible office, signed permit with QR, preflight, alerts
 - [x] Officer flow: own queue per office with escalation, approve with conditions or reject, revoke, verification queue, publish and cancel notices, conflicting permits shown, admin Team tab
 - [x] MongoDB: geo queries on 2dsphere indexes, Atlas Search, vector search, accounts and flights in MongoDB, Docker setup, mail catcher
@@ -168,8 +169,10 @@ Left to build (owner in brackets, details in TEAM.md):
 - [ ] Real data: 300+ real zones from OpenStreetMap, real regulation text with sources, a real source for notices (Manohari)
 - [x] Language model connected (Ollama on a Windows laptop): hybrid search with `$rankFusion`, AI-worded explanations and answers with guards, relevance gate for Ask, `manage.py check-llm`. Real numbers in docs/RESULTS.md
 - [ ] MongoDB showpieces: Atlas Search autocomplete for the zone search, `explain()` proof of index use, analytics aggregations with `$merge`, grow the eval to 30 cases and re-run the keyword vs vector vs hybrid comparison on the real corpus (Manohari, first numbers are in docs/RESULTS.md)
-- [ ] Live simulation: fleet simulator, telemetry in a time series collection, geofence engine with early warning, `/live` feed from change streams, the VIP scenario, route fixes A3 to A6 (Thanvi)
+- [x] Live simulation (Thanvi): fleet simulator, telemetry in a time series collection, geofence engine with early warning, `/live` feed, VIP scenario, route fixes A3 to A6. Nikhil connected it to flights (docs/PIPELINE.md). Still open for Thanvi: feed `/live/stream` from MongoDB change streams, performance at 1000 drones, optional ArduPilot link
 - [ ] Atlas free cluster as the demo database and Atlas Charts on live data, load test numbers, production compose with Nginx, monitoring, demo script, slides and backup video (Suhas)
-- [ ] Live airspace screens and officer simulation controls, analytics dashboard, zone editor (Nikhil, waiting on the feeds above for the first two)
+- [x] Live airspace on both maps, the officer Live tab with simulation controls
+- [x] Phone demo: fly the simulated drone from a phone (QR pairing, two sticks, return home), full-screen satellite follow view, altitude limit, event log (docs/PHONE_DEMO.md)
+- [ ] Analytics dashboard, zone editor (Nikhil, the dashboard waits on Manohari's aggregations)
 - [ ] Alerts through a MongoDB change stream (today they are written when the notice is published), permission decisions in a MongoDB transaction with an audit log, rate limits shared across servers, real SMS (Nikhil)
 - [ ] Future scope: DigiLocker and regulator record checks, real drone telemetry

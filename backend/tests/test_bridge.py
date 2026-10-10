@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 import config
 from main import app
-from tests.support import ADMIN_EMAIL, PASSWORD, officer_email
+from tests.support import ADMIN_EMAIL, PASSWORD, next_phone, officer_email
 
 client = TestClient(app)
 WINDOW = {"start": "2026-10-20T10:00:00+05:30", "end": "2026-10-20T11:00:00+05:30"}
@@ -14,13 +14,9 @@ def auth(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-_phone = [9000000000]
-
-
 def pilot(email):
     """Register a pilot and confirm the mobile OTP, like a real user. Returns the access token."""
-    _phone[0] += 1
-    r = client.post("/auth/register", json={"name": "Test Pilot", "email": email, "phone": str(_phone[0]), "password": "longenough1"})
+    r = client.post("/auth/register", json={"name": "Test Pilot", "email": email, "phone": next_phone(), "password": "longenough1"})
     assert r.status_code == 200, r.text
     v = client.post("/auth/otp/verify", json={"identifier": r.json()["identifier"], "code": r.json()["dev_code"]})
     assert v.status_code == 200, v.text

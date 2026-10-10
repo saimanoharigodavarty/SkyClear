@@ -3,8 +3,8 @@
 cd "$(dirname "$0")/.." || exit 2
 FILES=$(find frontend backend data README.md API.md TEAM.md PRODUCT.md ARCHITECTURE.md docs CLAUDE.md DESIGN_RULES.md -type f \( -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.md' -o -name '*.py' -o -name '*.json' -o -name '*.geojson' \) ! -name CLAUDE.md ! -name DESIGN_RULES.md)
 fail=0
-chk() { # name, pattern
-  out=$(grep -nE "$2" $FILES 2>/dev/null)
+chk() { # name, pattern. Round instruments (joystick, compass) may be circles, so those lines are skipped for the radius check.
+  out=$(grep -nE "$2" $FILES 2>/dev/null | { if [ "$1" = "radius > 12px" ]; then grep -vE '\.stick|\.knob|\.compass'; else cat; fi; })
   if [ -n "$out" ]; then echo "FAIL $1"; echo "$out"; fail=1; fi
 }
 chk "gradient"            'gradient\('

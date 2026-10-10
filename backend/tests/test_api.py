@@ -56,9 +56,9 @@ def test_zones_bbox_returns_only_zones_in_view():
     assert client.get("/zones?bbox=bad").status_code == 422
 
 
-def test_live_and_analytics_stubs_have_the_contract_shape():
+def test_live_and_analytics_have_the_contract_shape():
     assert client.get("/live/drones").json()["drones"] == []
-    assert "zones" in client.get("/analytics/summary").json()
+    assert client.get("/analytics/summary").status_code == 401
 
 
 def test_zone_search_box():

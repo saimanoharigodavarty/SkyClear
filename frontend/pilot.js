@@ -10,7 +10,8 @@ const me = () => (session() || {}).user;
 function showTab(t) {
   tab = t;
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
-  ["check", "sim", "flights", "alerts"].forEach(x => $("tab-" + x).classList.toggle("hidden", x !== t));
+  ["check", "sim", "ask", "flights", "alerts"].forEach(x => $("tab-" + x).classList.toggle("hidden", x !== t));
+  if (t === "ask") updateAskSpot();
   if (t === "flights") loadFlights();
   if (t === "alerts") loadAlerts();
 }
@@ -150,8 +151,10 @@ function renderCheck(r) {
     ${near.length ? `<div class="section"><h3>Nearby</h3><ul class="list">${near.map(zl).join("")}</ul></div>` : ""}
     ${r.citations.length ? `<div class="section"><h3>Rules behind this answer</h3>${r.citations.map(c => `<div class="cite"><span class="id">${esc(c.rule_id)}</span>${esc(c.text)}<div class="small">${esc(c.source)}</div></div>`).join("")}</div>` : ""}
     <div class="section"><h3>Next steps</h3><ul class="list">${r.next_steps.map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>
+    <button type="button" class="ghost inline" id="askAbout" style="margin-top:12px">Ask a question about this spot</button>
     <div class="small" style="margin-top:12px">Data last updated ${esc(r.data_last_updated)}. ${esc(r.disclaimer)}</div>`;
   renderActions(r);
+  $("askAbout").addEventListener("click", () => { showTab("ask"); updateAskSpot(); $("askSpot").checked = true; $("askQ").focus(); });
 }
 
 function renderActions(r) {
@@ -373,3 +376,30 @@ function loadExampleRoute() {
   clearRoute(); map.fitBounds(exampleRoute, { padding: [60, 60] });
   exampleRoute.forEach(([lat, lng]) => addWaypoint(L.latLng(lat, lng)));
 }
+
+/* ---------- ask about the rules ---------- */
+const ASK_EXAMPLES = ["Do I need permission to fly near an airport?", "Can I fly over a military area?", "What are the rules for parks?", "What happens during a VIP movement?"];
+$("askExamples").innerHTML = ASK_EXAMPLES.map(q => `<button type="button">${esc(q)}</button>`).join("");
+$("askExamples").querySelectorAll("button").forEach(b => b.addEventListener("click", () => { $("askQ").value = b.textContent; $("askForm").requestSubmit(); }));
+function updateAskSpot() {
+  const box = $("askSpot");
+  box.disabled = !picked;
+  $("askSpotText").textContent = picked ? `Use the spot I picked on the map (${picked.lat.toFixed(4)}, ${picked.lng.toFixed(4)})` : "Use the spot I picked on the map (pick one in the Check tab first)";
+  if (!picked) box.checked = false;
+}
+$("askForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const body = { question: $("askQ").value };
+  if ($("askSpot").checked && picked) Object.assign(body, { lat: picked.lat, lng: picked.lng, drone_id: $("drone").value, datetime: toISO($("when").value) });
+  const btn = $("askGo"); btn.disabled = true; btn.textContent = "Searching the rules...";
+  $("askResult").innerHTML = skeleton();
+  try {
+    const r = await api("/ask", { method: "POST", auth: false, body });
+    const spot = r.spot ? `<div class="explain" style="margin-top:10px"><b>For your spot:</b> ${esc(VERDICT_LABEL[r.spot.verdict])}${r.spot.zones.length ? ", inside " + esc(r.spot.zones.join(", ")) : ""}. <span class="small">Decided by rules for ${esc(r.spot.drone)}.</span></div>` : "";
+    $("askResult").innerHTML = `
+      <div class="explain" style="background:var(--panel);border-color:var(--rule-strong)">${esc(r.answer)}</div>${spot}
+      ${r.citations.length ? `<div class="section"><h3>The rules behind this answer</h3>${r.citations.map(c => `<div class="cite"><span class="id">${esc(c.rule_id)}</span>${esc(c.text)}<div class="small">${esc(c.source)}</div></div>`).join("")}</div>` : ""}
+      <div class="small">Found with ${esc(r.retrieval)}. ${r.answered_by === "llm" ? "Worded by an AI model from these rules only." : r.answered_by === "extracted" ? "Taken directly from the rules, no AI guessing." : ""} ${esc(r.disclaimer)}</div>`;
+  } catch (err) { $("askResult").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+  finally { btn.disabled = false; btn.textContent = "Ask"; }
+});

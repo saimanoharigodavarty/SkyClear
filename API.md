@@ -118,3 +118,9 @@ Tokens object: `{ access_token, refresh_token, token (same as access_token), exp
 | POST /me/verification/pilot, POST /me/drones/{id}/verification | pilot | Send certificate or serial plus documents for review. Duplicate certificate or serial returns 409 |
 | GET /verification/queue, POST /verification/{id}/decision | official | Verify or reject. The badge shows who and when |
 
+
+## Ask SkyClear (built)
+
+`POST /ask` with `{ "question": "...", "lat", "lng", "drone_id", "datetime" }` (the last four are optional and add a spot). No sign-in needed, rate limited. The answer comes only from the rule passages: MongoDB search finds them (Atlas Search, plus vector search when embeddings exist), and if the LLM is on it words the answer, otherwise the answer is taken straight from the passages. With a spot, the verdict decided by the rule engine is included and the rules that decided it come first, so the answer cannot disagree with `/check`.
+
+Response: `{ answer, citations: [{ rule_id, text, source, score }], spot: { verdict, zones, notices, rule_ids, drone, summary } or null, retrieval, answered_by: "llm" | "extracted" | "none", disclaimer }`. When nothing in the rules matches the question, `answered_by` is `none`, `citations` is empty and the answer says it could not find it. An LLM answer is used only if every citation id is real and it does not contradict the decided verdict.

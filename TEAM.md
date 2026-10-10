@@ -53,6 +53,7 @@ Files: backend/live.py, sim.py, verdict.py, geo.py, backend/tests/test_verdict.p
 Files: frontend/*.
 
 - P0: Rebuild the map on MapLibre GL JS with OpenFreeMap vector tiles. Load zones by viewport (`/zones?bbox=` on every moveend), style them by severity, tidy the labels.
+- P0 (done): Ask SkyClear question box (`POST /ask`, Ask tab), it reads Manohari's `search_rules`, so better retrieval there improves the answers with no change here.
 - P0: Search box on the map using `/zones/search` (contract 8), jump to the zone on select.
 - P0: Satellite basemap toggle (Sentinel-2 cloudless by EOX) and the red, yellow, green legend.
 - P0: Pilot screens for verification and permits (upload, status badges, permit with QR, Preflight button, who will review the request). Officer screens for the verification queue, permission review with approve (altitude cap, conditions), reject, revoke.

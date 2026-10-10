@@ -167,6 +167,7 @@ docker-compose.yml   MongoDB (Atlas Local)
 - [x] 20 eval cases and metrics (verdict accuracy, false-safe rate, citation recall, text vs vector vs hybrid)
 - [x] Authentication: one-time codes by email or SMS, password reset and change, argon2id, JWT with rotating refresh tokens, lockout, authenticator codes for officials, invite-only officials. No built-in accounts or secrets
 - [ ] Future scope: DigiLocker and regulator record checks for identity verification
+- [x] Ask SkyClear: plain questions answered only from the rule passages with citations, refuses when the rules do not cover it
 - [x] Friendlier UI: welcome and examples, step guide, map search, checklist, light and dark theme, run.sh
 - [x] Authority routing, signed permits with preflight and revoke, document verification with officer queue, satellite toggle
 - [ ] Real rule text verified against the official regulation, real notices source

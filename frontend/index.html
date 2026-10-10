@@ -25,9 +25,10 @@
   </div>
   <aside class="side">
     <nav class="tabs">
-      <button data-tab="check" class="on" type="button">Check a spot</button>
-      <button data-tab="sim" type="button">Plan a route</button>
-      <button data-tab="flights" type="button">My flights</button>
+      <button data-tab="check" class="on" type="button">Check</button>
+      <button data-tab="sim" type="button">Route</button>
+      <button data-tab="ask" type="button">Ask</button>
+      <button data-tab="flights" type="button">Flights</button>
       <button data-tab="alerts" type="button">Alerts<span id="alertCount" class="count hidden">0</span></button>
     </nav>
 
@@ -75,6 +76,19 @@
       <div class="btnrow"><button id="run" type="button" disabled>Run simulation</button><button id="clearRoute" class="ghost" type="button">Clear</button></div>
       <div id="live" class="live hidden"></div>
       <div id="simResult" class="section"></div>
+    </section>
+
+    <section class="pane hidden" id="tab-ask">
+      <h3 style="font-size:16px;margin-bottom:4px">Ask about the rules</h3>
+      <p class="help" style="margin-top:0">Ask in plain words. The answer comes only from the rule passages we hold, and the rule is shown so you can check it. If the rules do not cover your question, it says so.</p>
+      <form id="askForm">
+        <label for="askQ">Your question</label>
+        <textarea id="askQ" maxlength="400" required placeholder="For example: Do I need permission to fly near an airport?"></textarea>
+        <label class="consent"><input id="askSpot" type="checkbox" disabled><span id="askSpotText">Use the spot I picked on the map (pick one in the Check tab first)</span></label>
+        <button id="askGo" type="submit">Ask</button>
+      </form>
+      <div class="examples" id="askExamples" style="margin-top:12px"></div>
+      <div id="askResult" class="section"></div>
     </section>
 
     <section class="pane hidden" id="tab-flights">

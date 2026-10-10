@@ -43,7 +43,7 @@ def _start_change_streams():
 def _close_interrupted_flights():
     """The simulator lives in memory, so after a restart no drone is really flying. End those flights instead of leaving them 'flying' forever."""
     for f in runtime.all_("flights"):
-        if f.get("status") == "flying":
+        if f.get("status") in ("flying", "recalled"):  # a recalled drone is still in the air until it lands, so it is also gone after a restart
             runtime.update("flights", "flight_id", f["flight_id"], {"status": "completed", "flight_log": {**(f.get("flight_log") or {}), "interrupted": True, "ended_at": runtime.now_iso()}})
 
 

@@ -376,10 +376,13 @@ function renderAirUI() {
     const state = f.status === "recalled" ? '<span class="pill-bad">Recalled, land now</span>' : !d ? "Starting up..." : d.status === "breach" ? '<span class="pill-bad">Inside restricted airspace</span>'
       : d.status === "warning" ? '<span class="pill-warn">Restricted area ahead</span>' : '<span class="pill-ok">All clear</span>';
     return `<div class="row"><div><b>Your drone is ${f.status === "recalled" ? "returning" : "flying"}</b> ${d ? `${Math.round(d.alt_m)} m, ${d.speed_mps} m/s, battery ${Math.round(d.battery_pct)}%` : ""} ${state}</div>
-      <div class="btnrow"><button class="ghost" type="button" data-follow="${esc(f.flight_id)}">Show</button><button class="danger" type="button" data-land="${esc(f.flight_id)}">Land now</button></div></div>`;
+      <div class="btnrow"><button class="ghost" type="button" data-follow="${esc(f.flight_id)}">Show</button><a class="btn-ghost" href="display.html?flight=${encodeURIComponent(f.flight_id)}" target="_blank" rel="noopener">Watch in 3D</a><button class="danger" type="button" data-land="${esc(f.flight_id)}">Land now</button></div></div>`;
   }).join("");
   bar.querySelectorAll("[data-land]").forEach(b => b.addEventListener("click", () => doLand(b.dataset.land)));
-  bar.querySelectorAll("[data-follow]").forEach(b => b.addEventListener("click", () => { const d = air[b.dataset.follow]; if (d) map.flyTo([d.lat, d.lng], 17, { duration: 0.6 }); }));
+  bar.querySelectorAll("[data-follow]").forEach(b => b.addEventListener("click", () => {
+    const d = air[b.dataset.follow], f = lastFlights.find(x => x.flight_id === b.dataset.follow);  // the drone's position, or where the flight started if it has not reported yet
+    if (d) map.flyTo([d.lat, d.lng], 17, { duration: 0.6 }); else if (f) map.flyTo([f.lat, f.lng], 16, { duration: 0.6 });
+  }));
   flying.forEach(f => { const t = $("tele-" + f.flight_id); if (t && air[f.flight_id]) t.innerHTML = teleHTML(air[f.flight_id]); });
 }
 

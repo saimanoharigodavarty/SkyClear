@@ -166,3 +166,11 @@ def test_flights_left_flying_by_a_restart_are_closed():
     main._close_interrupted_flights()
     f = next(x for x in runtime.all_("flights") if x["flight_id"] == "F-STALE1")
     assert f["status"] == "completed" and f["flight_log"]["interrupted"] is True
+
+
+def test_recalled_flights_left_in_the_air_by_a_restart_are_also_closed():
+    import main
+    import runtime
+    runtime.insert("flights", {"flight_id": "F-STALE2", "status": "recalled", "pilot_id": "U-X"})
+    main._close_interrupted_flights()
+    assert next(x for x in runtime.all_("flights") if x["flight_id"] == "F-STALE2")["status"] == "completed"

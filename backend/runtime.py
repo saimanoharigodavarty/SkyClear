@@ -16,7 +16,8 @@ def _mongo():
     return get_db()
 
 _lock = threading.RLock()
-_EMPTY = {"users": [], "sessions": {}, "drones": [], "flights": [], "notices": [], "notifications": []}
+_EMPTY = {"users": [], "sessions": {}, "drones": [], "flights": [], "notices": [], "notifications": [],
+          "permits": [], "verifications": [], "files": [], "authorities": []}
 
 
 def _load():

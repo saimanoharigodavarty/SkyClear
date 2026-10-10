@@ -42,3 +42,11 @@ RUNTIME_PATH = Path(os.getenv("RUNTIME_PATH", str(DATA_DIR / "runtime.json")))
 OFFICIAL_EMAIL = os.getenv("OFFICIAL_EMAIL", "official@skyclear.demo")
 OFFICIAL_PASSWORD = os.getenv("OFFICIAL_PASSWORD", "skyclear-demo")
 OFFICIAL_NAME = os.getenv("OFFICIAL_NAME", "Hyderabad Airspace Desk")
+
+# Permits and verification
+PERMIT_SECRET = os.getenv("PERMIT_SECRET", "dev-only-change-me")
+REQUIRE_VERIFICATION = os.getenv("REQUIRE_VERIFICATION", "1") == "1"   # verified pilot and drone before a permission request
+PERMIT_RADIUS_KM = 0.3
+PREFLIGHT_VALID_MIN = 15
+PREFLIGHT_EARLY_MIN = 15      # preflight opens this long before the flight window
+UPLOAD_MAX_BYTES = 5 * 1024 * 1024

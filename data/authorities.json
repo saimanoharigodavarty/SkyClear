@@ -1,0 +1,18 @@
+{
+  "note": "SAMPLE data. The real mapping of offices to areas and zones must be confirmed with the authorities.",
+  "zone_authority": {"Z-VOHS": "A-RGIA", "Z-VOHY": "A-BEG"},
+  "authorities": [
+    {"authority_id": "A-HQ", "name": "State Airspace Coordination Cell (sample)", "type": "state", "handles": [], "parent_id": null,
+     "office": {"lat": 17.385, "lng": 78.4867}, "radius_km": 200, "sla_minutes": 240, "officer_email": "hq@skyclear.demo"},
+    {"authority_id": "A-RGIA", "name": "Rajiv Gandhi International Airport, airport desk (sample)", "type": "airport", "handles": ["airport"], "parent_id": "A-HQ",
+     "office": {"lat": 17.2313, "lng": 78.4299}, "radius_km": 12, "sla_minutes": 60, "officer_email": "rgia@skyclear.demo"},
+    {"authority_id": "A-BEG", "name": "Begumpet Airport, airport desk (sample)", "type": "airport", "handles": ["airport"], "parent_id": "A-HQ",
+     "office": {"lat": 17.4531, "lng": 78.4676}, "radius_km": 8, "sla_minutes": 60, "officer_email": "begumpet@skyclear.demo"},
+    {"authority_id": "A-DEF", "name": "Defence Estate Officer, Secunderabad (sample)", "type": "defence", "handles": ["military"], "parent_id": "A-HQ",
+     "office": {"lat": 17.44, "lng": 78.5}, "radius_km": 40, "sla_minutes": 120, "officer_email": "defence@skyclear.demo"},
+    {"authority_id": "A-FOR", "name": "Forest Department, KBR Park (sample)", "type": "forest", "handles": ["park"], "parent_id": "A-HQ",
+     "office": {"lat": 17.4275, "lng": 78.4225}, "radius_km": 25, "sla_minutes": 180, "officer_email": "forest@skyclear.demo"},
+    {"authority_id": "A-POL", "name": "Hyderabad City Police, security wing (sample)", "type": "police", "handles": ["government", "notice"], "parent_id": "A-HQ",
+     "office": {"lat": 17.385, "lng": 78.4867}, "radius_km": 30, "sla_minutes": 30, "officer_email": "police@skyclear.demo"}
+  ]
+}

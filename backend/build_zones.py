@@ -1,4 +1,4 @@
-"""Build data/zones.geojson from OurAirports (India) plus data/zones_manual.geojson.
+"""Build data/zones.geojson from OurAirports, Hyderabad OSM sites and manual fixtures.
 
 Run: python backend/build_zones.py [path/to/airports.csv]
 Without an argument it downloads https://davidmegginson.github.io/ourairports-data/airports.csv.
@@ -45,8 +45,12 @@ def build(path=None):
                            "rule_ids": ["R-002"] if military else ["R-001", "R-001B"], "source": SOURCE.format(r=km)},
             "geometry": circle(lat, lng, km),
         })
+    osm_path = config.DATA_DIR / "zones_osm_hyderabad.geojson"
+    osm = json.load(open(osm_path, encoding="utf-8"))["features"] if osm_path.exists() else []
+    # OurAirports remains the single aerodrome source; OSM supplies the other mapped site categories.
+    osm = [f for f in osm if f["properties"]["zone_type"] != "airport"]
     manual = json.load(open(config.DATA_DIR / "zones_manual.geojson", encoding="utf-8"))["features"]
-    return {"type": "FeatureCollection", "features": features + manual}
+    return {"type": "FeatureCollection", "features": features + osm + manual}
 
 
 if __name__ == "__main__":

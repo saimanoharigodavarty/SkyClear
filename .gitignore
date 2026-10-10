@@ -7,3 +7,4 @@ __pycache__/
 data/runtime.json
 data/runtime.tmp
 docs/OLLAMA_REMOTE_SETUP.private.md
+data/osm_hyderabad_raw.json

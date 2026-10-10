@@ -228,12 +228,12 @@ def login(body: Login, request: Request):
     now = datetime.now(timezone.utc)
     if user and user.get("locked_until") and datetime.fromisoformat(user["locked_until"]) > now:
         raise HTTPException(423, "This account is locked for a few minutes after too many wrong passwords. Try again later.")
-    if user is None or not runtime.check_password(body.password, user["password"]):
+    if user is None or not user.get("password") or not runtime.check_password(body.password, user["password"]):
         if user:
             fails = user.get("failed_attempts", 0) + 1
             lock = (now + timedelta(minutes=config.LOCK_MINUTES)).isoformat(timespec="seconds") if fails >= config.MAX_FAILED_LOGINS else None
             runtime.update("users", "user_id", user["user_id"], {"failed_attempts": 0 if lock else fails, "locked_until": lock})
-        raise HTTPException(401, "Wrong email, mobile number or password")
+        raise HTTPException(401, "Wrong email, mobile number or password. If you signed up with Google, use Continue with Google.")
     runtime.update("users", "user_id", user["user_id"], {"failed_attempts": 0, "locked_until": None})
     if user["role"] == "pilot" and not user.get("phone_verified"):
         raise HTTPException(403, "not_verified")  # the app then asks for a code with /auth/otp/request
@@ -419,9 +419,14 @@ def google_auth(body: GoogleAuthRequest, request: Request):
 
     if idinfo.get("aud") != config.GOOGLE_CLIENT_ID:
         raise HTTPException(401, "Google token audience mismatch")
+    if idinfo.get("iss") not in (None, "accounts.google.com", "https://accounts.google.com"):
+        raise HTTPException(401, "Google token was not issued by Google")
+    # Google only vouches for an email address when email_verified is true. Without that anyone could claim an address they do not own.
+    if str(idinfo.get("email_verified")).lower() != "true":
+        raise HTTPException(401, "Your Google account has not verified this email address")
 
     email = idinfo.get("email", "").strip().lower()
-    name = idinfo.get("name", "Pilot").strip()
+    name = (idinfo.get("name") or "Pilot").strip()[:80] or "Pilot"
     google_id = idinfo.get("sub")
 
     if not email:
@@ -429,24 +434,21 @@ def google_auth(body: GoogleAuthRequest, request: Request):
 
     user = next((u for u in runtime.all_("users") if u.get("email") == email), None)
     if user is None:
-        user_doc = {
-            "user_id": runtime.new_id("U"),
-            "role": "pilot",
-            "name": name,
-            "email": email,
-            "google_id": google_id,
-            "phone": None,
-            "phone_verified": True,
-            "pilot_cert": None,
-            "password": None,
-            "failed_attempts": 0,
-            "created_at": runtime.now_iso()
-        }
-        runtime.insert("users", user_doc)
-        user = user_doc
+        user = runtime.insert("users", {
+            "user_id": runtime.new_id("U"), "role": "pilot", "name": name, "email": email, "google_id": google_id,
+            "phone": None, "phone_verified": True, "pilot_cert": None, "password": None, "failed_attempts": 0, "created_at": runtime.now_iso()})
     else:
-        if not user.get("google_id"):
-            runtime.update("users", "user_id", user["user_id"], {"google_id": google_id})
+        if user["role"] != "pilot":
+            # Officials are invited and sign in with a password (and an authenticator when it is on). Google must never be a way around that.
+            raise HTTPException(403, "Officials sign in with email and password")
+        if user.get("google_id") and user["google_id"] != google_id:
+            raise HTTPException(401, "This email is linked to a different Google account")
+        changes = {"google_id": google_id}
+        if not user.get("phone_verified"):
+            # The account was started with this email but never confirmed. Google has now proven who owns the email, so drop the
+            # password someone else may have set, otherwise they could walk into this account later.
+            changes.update({"phone_verified": True, "password": None, "failed_attempts": 0, "locked_until": None})
+        user = runtime.update("users", "user_id", user["user_id"], changes)
 
     return issue_tokens(user)
 

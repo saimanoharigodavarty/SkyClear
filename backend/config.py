@@ -7,16 +7,28 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def _load_dotenv():
-    """Read KEY=VALUE lines from <repo>/.env into the environment (real env vars win)."""
-    path = ROOT / ".env"
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
+def parse_dotenv(text):
+    """KEY=VALUE lines. A comment may follow a value after whitespace and a hash, and quotes around a value are removed."""
+    import re
+    out = {}
+    for line in text.splitlines():
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)
-            os.environ.setdefault(k.strip(), v.strip())
+            v = re.sub(r"\s+#.*$", "", v).strip()  # on the raw value, so "KEY=   # comment" is an empty value
+            if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+                v = v[1:-1]
+            out[k.strip()] = v
+    return out
+
+
+def _load_dotenv():
+    """Read <repo>/.env into the environment (real environment variables win)."""
+    path = ROOT / ".env"
+    if not path.exists():
+        return
+    for k, v in parse_dotenv(path.read_text(encoding="utf-8")).items():
+        os.environ.setdefault(k, v)
 
 
 _load_dotenv()

@@ -94,3 +94,10 @@ def test_example_buttons_only_use_zones_we_can_answer_for():
     for s in ex["spots"]:  # each example gives a real answer, never "can't determine"
         v = client.post("/check", json={"lat": s["lat"], "lng": s["lng"], "drone_id": "nano-200", "explain": False}).json()["verdict"]
         assert v != "cannot_determine", s
+
+
+def test_env_file_comments_and_quotes_are_not_part_of_the_value():
+    from config import parse_dotenv
+    env = parse_dotenv("# a comment\nGOOGLE_CLIENT_ID=   # optional, see docs\nUSE_LLM=1   # on\nNAME=\"quoted value\"\nURL=http://host:11434/path#frag\n")
+    assert env["GOOGLE_CLIENT_ID"] == "" and env["USE_LLM"] == "1" and env["NAME"] == "quoted value"
+    assert env["URL"] == "http://host:11434/path#frag"  # a hash with no space before it belongs to the value

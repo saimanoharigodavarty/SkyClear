@@ -65,5 +65,7 @@ def mask(destination):
 
 def deliver(user, code, purpose):
     dest = destination_for(user)
+    if not dest:
+        raise DeliveryError("this account has no address to send the code to")
     PROVIDERS[config.OTP_PROVIDER](user, dest, code, purpose)
     return mask(dest)

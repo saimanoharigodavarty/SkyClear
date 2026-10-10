@@ -240,6 +240,8 @@ def test_google_auth_endpoint(monkeypatch):
             return {
                 "aud": "test-google-client-id.apps.googleusercontent.com",
                 "email": "googlepilot@example.com",
+                "email_verified": "true",
+                "iss": "https://accounts.google.com",
                 "name": "Google Test Pilot",
                 "sub": "google-user-12345"
             }
@@ -252,3 +254,66 @@ def test_google_auth_endpoint(monkeypatch):
     assert data["user"]["email"] == "googlepilot@example.com"
     assert data["user"]["role"] == "pilot"
 
+
+
+# ---- Google sign-in: what it must never allow ----
+def _google(monkeypatch, email, verified="true", sub="g-1", aud="test-google-client-id.apps.googleusercontent.com"):
+    import requests
+
+    class Fake:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        def json(self): return {"aud": aud, "iss": "https://accounts.google.com", "email": email, "email_verified": verified, "name": "G User", "sub": sub}
+
+    monkeypatch.setattr(config, "GOOGLE_CLIENT_ID", "test-google-client-id.apps.googleusercontent.com")
+    monkeypatch.setattr(requests, "get", lambda *a, **k: Fake())
+    return client.post("/auth/google", json={"credential": "x" * 20})
+
+
+def test_google_cannot_be_used_to_get_into_an_official_account(monkeypatch):
+    r = _google(monkeypatch, officer_email("A-POL"))
+    assert r.status_code == 403 and "access_token" not in r.json()
+    assert _google(monkeypatch, ADMIN_EMAIL).status_code == 403
+
+
+def test_google_email_must_be_verified_by_google(monkeypatch):
+    r = _google(monkeypatch, "unverified@example.com", verified="false")
+    assert r.status_code == 401
+    assert all(u["email"] != "unverified@example.com" for u in __import__("runtime").all_("users"))  # no account was made
+
+
+def test_google_token_for_another_app_is_refused(monkeypatch):
+    assert _google(monkeypatch, "other@example.com", aud="someone-elses-app.apps.googleusercontent.com").status_code == 401
+
+
+def test_a_google_only_account_gives_a_clean_login_error_not_a_crash(monkeypatch):
+    assert _google(monkeypatch, "goog.only@example.com").status_code == 200
+    r = client.post("/auth/login", json={"identifier": "goog.only@example.com", "password": "anything-at-all-1"})
+    assert r.status_code == 401 and "Google" in r.json()["detail"]
+
+
+def test_google_does_not_inherit_a_password_someone_set_before_the_owner_confirmed(monkeypatch):
+    """An attacker starts an account with a victim's email and a password they know. When the real owner proves the email
+    with Google, the attacker's password must be gone."""
+    email, reg = new_pilot("victim.pilot@example.com")  # registered, never confirmed
+    assert client.post("/auth/login", json={"identifier": email, "password": "longenough1"}).status_code == 403  # not confirmed yet
+    assert _google(monkeypatch, email, sub="real-owner").status_code == 200
+    assert client.post("/auth/login", json={"identifier": email, "password": "longenough1"}).status_code == 401  # attacker's password no longer works
+
+
+def test_an_email_linked_to_one_google_account_rejects_another(monkeypatch):
+    assert _google(monkeypatch, "linked@example.com", sub="first").status_code == 200
+    assert _google(monkeypatch, "linked@example.com", sub="second").status_code == 401
+    assert _google(monkeypatch, "linked@example.com", sub="first").status_code == 200
+
+
+def test_a_google_account_can_still_reset_a_password_by_email_code():
+    import requests  # noqa: F401
+    import runtime
+    u = next(u for u in runtime.all_("users") if u["email"] == "goog.only@example.com")
+    auth._hits.clear()
+    sent = client.post("/auth/password/forgot", json={"identifier": u["email"]}).json()
+    assert sent["sent"] and len(sent["dev_code"]) == 6
+    ok = client.post("/auth/password/reset", json={"identifier": u["email"], "code": sent["dev_code"], "new_password": "now-i-have-one-1"})
+    assert ok.status_code == 200
+    assert client.post("/auth/login", json={"identifier": u["email"], "password": "now-i-have-one-1"}).status_code == 200

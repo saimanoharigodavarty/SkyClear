@@ -99,6 +99,8 @@ def hash_password(password, salt=None):
 
 
 def check_password(password, stored):
+    if not stored:  # an account made with Google has no password
+        return False
     if stored.startswith("$argon2"):
         from argon2 import PasswordHasher
         from argon2.exceptions import VerifyMismatchError, InvalidHashError

@@ -4,6 +4,8 @@
   python backend/manage.py create-admin --email you@example.com --generate           makes one and prints it once
   python backend/manage.py seed-officers                                             one officer per authority, generated passwords
   python backend/manage.py seed-demo                                                 a verified demo pilot, a drone, flights and a notice
+  python backend/manage.py logins                                                    show the saved logins
+  python backend/manage.py set-password --email x@y.z                                set a known password for an account
   python backend/manage.py list-users
   python backend/manage.py has-admin                                                 exit code 0 when an admin exists
 
@@ -23,8 +25,16 @@ CREDS = config.DATA_DIR / "demo_credentials.txt"
 
 
 def _save(lines):
-    existing = CREDS.read_text(encoding="utf-8") if CREDS.exists() else ""
-    CREDS.write_text(existing + "\n".join(lines) + "\n", encoding="utf-8")
+    """Keep data/demo_credentials.txt tidy: one line per account, the newest password wins."""
+    kept = {}
+    if CREDS.exists():
+        for l in CREDS.read_text(encoding="utf-8").splitlines():
+            parts = l.split()
+            if len(parts) >= 3 and "@" in parts[1]:
+                kept[parts[1]] = l
+    for l in lines:
+        kept[l.split()[1]] = l
+    CREDS.write_text("\n".join(kept.values()) + "\n", encoding="utf-8")
     try:
         CREDS.chmod(0o600)
     except OSError:
@@ -84,6 +94,31 @@ def cmd_has_admin(a):
     sys.exit(0 if any(u["role"] == "official" and not u.get("authority_id") for u in runtime.all_("users")) else 1)
 
 
+def cmd_logins(a):
+    """Print the generated logins in a readable table, with what each one is for."""
+    if not CREDS.exists():
+        raise SystemExit("No saved logins yet. Run: python backend/manage.py create-admin --email you@example.com --generate")
+    role_note = {"admin": "sees every office, invites officials, publishes notices", "officer": "reviews requests for one office", "pilot": "a verified pilot with a verified drone"}
+    print(f"\nSkyClear logins (saved in {CREDS})\n")
+    for l in CREDS.read_text(encoding="utf-8").splitlines():
+        p = l.split(None, 3)
+        if len(p) >= 3:
+            print(f"  {p[0]:8} {p[1]:46} {p[2]:20} {role_note.get(p[0], '')}")
+    print("\nSign in at http://localhost:8000/account.html . One-time codes arrive at http://localhost:8025 (the mail catcher).\n")
+
+
+def cmd_set_password(a):
+    """Set a known password for an existing account (for example if you lost it)."""
+    user = next((u for u in runtime.all_("users") if u["email"] == a.email.strip().lower()), None)
+    if user is None:
+        raise SystemExit("No such user. See: python backend/manage.py list-users")
+    pw = a.password or getpass.getpass("New password (at least 10 characters): ")
+    if len(pw) < 10:
+        raise SystemExit("Use at least 10 characters")
+    runtime.update("users", "user_id", user["user_id"], {"password": runtime.hash_password(pw), "failed_attempts": 0, "locked_until": None})
+    print(f"Password set for {user['email']}")
+
+
 def cmd_list_users(a):
     for u in runtime.all_("users"):
         print(f"{u['role']:9} {u['email']:45} {u.get('authority_id') or '-'}")
@@ -139,6 +174,8 @@ def main(argv=None):
     s = sub.add_parser("seed-officers"); s.add_argument("--domain", default="officers.skyclear.local"); s.set_defaults(fn=cmd_seed_officers)
     s = sub.add_parser("seed-demo"); s.add_argument("--pilot-email", default="demo.pilot@example.com"); s.set_defaults(fn=cmd_seed_demo)
     s = sub.add_parser("list-users"); s.set_defaults(fn=cmd_list_users)
+    s = sub.add_parser("logins"); s.set_defaults(fn=cmd_logins)
+    s = sub.add_parser("set-password"); s.add_argument("--email", required=True); s.add_argument("--password"); s.set_defaults(fn=cmd_set_password)
     s = sub.add_parser("has-admin"); s.set_defaults(fn=cmd_has_admin)
     a = p.parse_args(argv)
     routing.setup()

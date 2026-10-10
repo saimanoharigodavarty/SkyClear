@@ -247,7 +247,7 @@ function play(out) {
     $("live").innerHTML = `<div class="verdict ${esc(p.verdict)}"><div class="v">${esc(VERDICT_LABEL[p.verdict])}</div></div>
       <div class="mono">${esc(fmtDur(p.t_s))} / ${(p.dist_m / 1000).toFixed(2)} km</div>
       <div>${p.zones.length ? "Inside: " + esc(p.zones.join(", ")) : "Not inside any known zone"}</div>`;
-    if (i >= s.length - 1) { stopPlayback(); simSummary(out); }
+    if (i >= s.length - 1) stopPlayback();
   }, 100);
 }
 
@@ -259,7 +259,7 @@ $("run").addEventListener("click", async () => {
   try {
     const out = await api("/simulate/route", { method: "POST", auth: false, body: { drone_id: $("simDrone").value, speed_mps: Number($("speed").value) || 10,
       datetime: toISO($("simWhen").value), waypoints: waypoints.map(w => ({ lat: w.lat, lng: w.lng })) } });
-    $("simResult").innerHTML = '<div class="hint">Simulating flight...</div>';
+    simSummary(out);  // the answer is ready now, the flight just plays back
     play(out);
   } catch (e) { $("simResult").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
   finally { btn.disabled = waypoints.length < 2; btn.textContent = "Run simulation"; }

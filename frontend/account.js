@@ -131,3 +131,7 @@ if (params.get("change") && session()) show("changeForm");
 
 // Say where codes go, and hide the mobile-only wording when codes are sent by email.
 $("phoneHelp").textContent = (CFG.otpChannel === "sms" ? "We send a one-time code to this number to confirm it. " : "We send a one-time code to your email to confirm your account. ") + "One account per number.";
+
+// Tell a first-time visitor where to start, without showing any secret.
+if (CFG.needsAdmin) $("setupHint").innerHTML = '<div class="msg"><b>First-time setup.</b> No administrator exists yet. Open a terminal in the project folder and run <span class="mono">./run.sh</span>, it asks for the first admin. <a href="guide.html">Guided tour</a></div>';
+else if (CFG.devLogins) $("setupHint").innerHTML = '<div class="msg"><b>Looking for a login?</b> Development logins are generated on this computer. Run <span class="mono">python backend/manage.py logins</span> or open <span class="mono">data/demo_credentials.txt</span>. One-time codes arrive at <a href="http://localhost:8025" target="_blank">localhost:8025</a>. <a href="guide.html">Guided tour</a></div>';

@@ -156,22 +156,19 @@ docker-compose.yml   MongoDB (Atlas Local)
 
 ## Status
 
-- [x] Folder structure, drones.json, requirements.txt
-- [x] Design rules (CLAUDE.md, DESIGN_RULES.md, scripts/check_design.sh), skeleton loader, Terms and Privacy pages
-- [x] Base: sample data, local search, rule engine, template explanation, API, map page, tests (runs without MongoDB or Ollama)
-- [x] Airport zones for India (derived, 5 km / 3 km circles), simulated drone route check and playback
-- [x] Hyderabad demo data, accounts, permission requests, official notices, pilot alerts, redesigned UI
-- [x] MongoDB: loader, 2dsphere geo queries, text, vector and hybrid rule search, accounts and flights in MongoDB
-- [x] Ollama explanation with citation validation, consistency checks and fallback
-- [x] False-safe bugs A1 and A2 fixed
-- [x] 20 eval cases and metrics (verdict accuracy, false-safe rate, citation recall, text vs vector vs hybrid)
-- [x] Authentication: one-time codes by email or SMS, password reset and change, argon2id, JWT with rotating refresh tokens, lockout, authenticator codes for officials, invite-only officials. No built-in accounts or secrets
-- [ ] Future scope: DigiLocker and regulator record checks for identity verification
-- [x] Ask SkyClear: plain questions answered only from the rule passages with citations, refuses when the rules do not cover it
-- [x] Friendlier UI: welcome and examples, step guide, map search, checklist, light and dark theme, run.sh
-- [x] Authority routing, signed permits with preflight and revoke, document verification with officer queue, satellite toggle
-- [ ] Real rule text verified against the official regulation, real notices source
-- [ ] Run eval against the remote Ollama and record the vector vs hybrid numbers
-- [ ] Demo rehearsal
+Done and tested (78 backend tests in two modes, plus a 17-step browser test of the whole loop in `scripts/e2e.py`):
+- [x] Check a spot, route simulation, Ask SkyClear (cited, grounded), zones and notices on a map, satellite, light and dark themes
+- [x] Accounts: one-time codes by email or SMS, password reset, argon2id, JWT with rotating refresh tokens, lockout, authenticator codes for officials, invite-only officials, no built-in accounts or secrets
+- [x] Pilot flow: register, verify pilot and drone with documents, request permission, routed to the responsible office, signed permit with QR, preflight, alerts
+- [x] Officer flow: own queue per office with escalation, approve with conditions or reject, revoke, verification queue, publish and cancel notices, conflicting permits shown, admin Team tab
+- [x] MongoDB: geo queries on 2dsphere indexes, Atlas Search, vector search, accounts and flights in MongoDB, Docker setup, mail catcher
+- [x] `./run.sh --demo` starts everything and prints the logins, `guide.html` is a guided tour
 
-Who does what: see [TEAM.md](TEAM.md).
+Left to build (owner in brackets, details in TEAM.md):
+- [ ] Real data: 300+ real zones from OpenStreetMap, real regulation text with sources, a real source for notices (Manohari)
+- [ ] MongoDB showpieces: hybrid search with `$rankFusion`, Atlas Search autocomplete for the zone search, `explain()` proof of index use, analytics aggregations with `$merge`, 30 eval cases with recorded vector vs keyword vs hybrid numbers, run against the Ollama laptop (Manohari)
+- [ ] Live simulation: fleet simulator, telemetry in a time series collection, geofence engine with early warning, `/live` feed from change streams, the VIP scenario, route fixes A3 to A6 (Thanvi)
+- [ ] Atlas free cluster as the demo database and Atlas Charts on live data, load test numbers, production compose with Nginx, monitoring, demo script, slides and backup video (Suhas)
+- [ ] Live airspace screens and officer simulation controls, analytics dashboard, zone editor (Nikhil, waiting on the feeds above for the first two)
+- [ ] Alerts through a MongoDB change stream (today they are written when the notice is published), permission decisions in a MongoDB transaction with an audit log, rate limits shared across servers, real SMS (Nikhil)
+- [ ] Future scope: DigiLocker and regulator record checks, real drone telemetry

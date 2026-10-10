@@ -128,7 +128,9 @@ $("noticeForm").addEventListener("submit", async e => {
   try {
     const n = await api("/notices", { method: "POST", body: { title: $("nTitle").value, note: $("nNote").value, lat: centre.lat, lng: centre.lng,
       radius_km: Number($("nRadius").value), starts_at: toISO($("nStart").value), ends_at: toISO($("nEnd").value) } });
-    $("nMsg").innerHTML = `<div class="msg">Published <span class="mono">${esc(n.notice_id)}</span>. ${n.affected_flights} flight${n.affected_flights === 1 ? "" : "s"} overlapped and the pilot${n.affected_flights === 1 ? " was" : "s were"} alerted.</div>`;
+    const conflicts = n.conflicting_permits || [];
+    $("nMsg").innerHTML = `<div class="msg">Published <span class="mono">${esc(n.notice_id)}</span>. ${n.affected_flights} flight${n.affected_flights === 1 ? "" : "s"} overlapped and the pilot${n.affected_flights === 1 ? " was" : "s were"} alerted.</div>`
+      + (conflicts.length ? `<div class="msg err"><b>${conflicts.length} approved permit${conflicts.length === 1 ? "" : "s"} conflict${conflicts.length === 1 ? "s" : ""} with this notice.</b> Review ${conflicts.length === 1 ? "it" : "them"} in Requests, All flights, and revoke if needed.<ul class="reasons">${conflicts.map(c => `<li><span class="mono">${esc(c.permit_id)}</span>, ${esc(c.pilot_name)}</li>`).join("")}</ul></div>` : "");
     drawNotices(layers.notices); loadStats();
   } catch (err) { $("nMsg").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
   finally { $("nGo").disabled = false; }

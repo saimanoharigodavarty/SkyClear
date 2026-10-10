@@ -127,6 +127,7 @@ function header(active) {
     <nav class="nav">
       <a href="index.html" class="${active === "pilot" ? "on" : ""}">Pilot</a>
       <a href="official.html" class="${active === "official" ? "on" : ""}">Authority</a>
+      <a href="guide.html" class="${active === "guide" ? "on" : ""}">Guide</a>
     </nav>
     <div class="who">
       <div class="seg" role="group" aria-label="Theme">${THEMES.map(t => `<button type="button" data-theme="${t}" class="${themeChoice() === t ? "on" : ""}" aria-pressed="${themeChoice() === t}">${{ system: "Auto", light: "Light", dark: "Dark" }[t]}</button>`).join("")}</div>

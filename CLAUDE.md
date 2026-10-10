@@ -23,7 +23,7 @@ Banned:
 5. Drop shadows
 6. 3 feature cards in a row
 7. Emojis
-8. Liquid glass
+8. Liquid glass, except a light blur (12px or less) on panels floating over the map or scrolling content
 9. Em dashes (and en dashes used as dashes). Use commas, colons, periods
 10. Inter, Geist, Space Grotesk fonts
 11. Colored left stripe (border-left accent on cards, quotes, alerts)
@@ -33,7 +33,7 @@ Banned:
 15. "It's not X, it's Y" phrasing
 16. Checkmark bullets
 17. 3 pricing tiers
-18. Soft corner radius (keep corners sharp, 0 to 2px)
+18. Pill shapes and very round corners (use 6px for controls, 10px for panels and cards)
 19. Purple and black palette (and any purple accent)
 20. Radial orbs
 21. Dot grids

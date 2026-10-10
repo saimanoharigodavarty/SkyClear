@@ -3,6 +3,8 @@
   --bg: #f4f2ee; --panel: #faf9f6; --ink: #1b1f24; --muted: #555d66; --rule: #cfcac0; --rule-strong: #1b1f24;
   --accent: #1f4e79; --on-fill: #faf9f6;
   --green: #1a7f37; --amber: #a15c00; --red: #b3261e; --grey: #5b6570;
+  --r: 6px; --r-lg: 10px;
+  --glass: color-mix(in srgb, var(--panel) 78%, transparent);
   --sans: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
@@ -57,11 +59,11 @@ a { color: var(--accent); }
 /* form */
 label, .label { display: block; margin: 14px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
 label:first-child { margin-top: 0; }
-input, select, textarea { width: 100%; padding: 9px 10px; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 0; }
+input, select, textarea { width: 100%; padding: 9px 10px; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: var(--r); }
 textarea { min-height: 64px; resize: vertical; }
 input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-button { font: inherit; font-weight: 700; padding: 10px 14px; border-radius: 0; cursor: pointer; border: 1px solid var(--accent); background: var(--accent); color: var(--on-fill); width: 100%; margin-top: 14px; }
+button { font: inherit; font-weight: 700; padding: 10px 14px; border-radius: var(--r); cursor: pointer; border: 1px solid var(--accent); background: var(--accent); color: var(--on-fill); width: 100%; margin-top: 14px; }
 button.ghost { background: transparent; color: var(--ink); border-color: var(--rule-strong); }
 button.danger { background: var(--red); border-color: var(--red); }
 button.inline { width: auto; margin-top: 0; padding: 6px 10px; font-size: 12px; }
@@ -238,3 +240,29 @@ details.demo .examples { margin-top: 10px; }
   .brand small { display: none; }
   .legend { left: 6px; bottom: 6px; max-width: 220px; padding: 8px 10px; }
 }
+
+/* Normal corners and a light blur on panels that float over the map or over scrolling content. */
+.btn-sm, .btn-ghost, .themebtn, .examples button, button.inline { border-radius: var(--r); }
+.tag, .count { border-radius: 4px; }
+.verdict, .item, .cite, .msg, .welcome, .authbox2, .explain, .route, .live, .permit, .checklist, .stepper, .devcode, .serverdown, .legend, .mapsearch .results, .authtabs { border-radius: var(--r-lg); }
+.stepper, .checklist, .authtabs { overflow: hidden; }
+.authtabs button, .stepper span { border-radius: 0; }
+.msg, .devcode, .route, .explain { border-radius: var(--r); }
+.banner { border-radius: 0; }
+.cleared { border-radius: var(--r); }
+.skel { border-radius: 4px; }
+input[type=file] { border-radius: var(--r); }
+.leaflet-bar, .leaflet-control-layers, .leaflet-control-scale-line { border-radius: var(--r) !important; }
+.leaflet-bar a:first-child { border-top-left-radius: var(--r) !important; border-top-right-radius: var(--r) !important; }
+.leaflet-bar a:last-child { border-bottom-left-radius: var(--r) !important; border-bottom-right-radius: var(--r) !important; }
+.leaflet-bar a { border-radius: 0 !important; }
+.leaflet-bar a:only-child { border-radius: var(--r) !important; }
+.leaflet-popup-content-wrapper { border-radius: var(--r-lg); }
+.leaflet-tooltip.zlabel { border-radius: 4px; }
+.pin { border-radius: 4px; }
+.qrbox { border-radius: var(--r); }
+.legend, .mapsearch input, .mapsearch .results, .leaflet-bar a, .leaflet-control-scale-line, .leaflet-control-attribution { background: var(--panel); background: var(--glass) !important; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-color: color-mix(in srgb, var(--rule-strong) 45%, transparent); }
+.legend, .mapsearch input { border: 1px solid color-mix(in srgb, var(--rule-strong) 45%, transparent); }
+.tabs { background: var(--panel); background: var(--glass); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.leaflet-tooltip.zlabel { background: var(--glass); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.leaflet-popup-content-wrapper { background: var(--glass); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }

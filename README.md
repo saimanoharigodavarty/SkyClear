@@ -131,7 +131,7 @@ python backend/manage.py create-admin --email you@example.com --generate
 cd backend && uvicorn main:app --reload
 ```
 
-Ollama runs on another laptop, never required on yours. On the Ollama laptop:
+Ollama runs on another laptop, never required on yours. Full steps and a connection check are in [docs/OLLAMA.md](docs/OLLAMA.md). On the Ollama laptop:
 
 ```
 OLLAMA_HOST=0.0.0.0 ollama serve
@@ -166,7 +166,8 @@ Done and tested (78 backend tests in two modes, plus a 17-step browser test of t
 
 Left to build (owner in brackets, details in TEAM.md):
 - [ ] Real data: 300+ real zones from OpenStreetMap, real regulation text with sources, a real source for notices (Manohari)
-- [ ] MongoDB showpieces: hybrid search with `$rankFusion`, Atlas Search autocomplete for the zone search, `explain()` proof of index use, analytics aggregations with `$merge`, 30 eval cases with recorded vector vs keyword vs hybrid numbers, run against the Ollama laptop (Manohari)
+- [x] Hybrid search with `$rankFusion` over vector and Atlas Search, Atlas Search index, `manage.py check-llm`, `/health/llm` (needs only the Ollama laptop's address to go live, see docs/OLLAMA.md)
+- [ ] MongoDB showpieces: Atlas Search autocomplete for the zone search, `explain()` proof of index use, analytics aggregations with `$merge`, 30 eval cases with recorded vector vs keyword vs hybrid numbers, run against the Ollama laptop (Manohari)
 - [ ] Live simulation: fleet simulator, telemetry in a time series collection, geofence engine with early warning, `/live` feed from change streams, the VIP scenario, route fixes A3 to A6 (Thanvi)
 - [ ] Atlas free cluster as the demo database and Atlas Charts on live data, load test numbers, production compose with Nginx, monitoring, demo script, slides and backup video (Suhas)
 - [ ] Live airspace screens and officer simulation controls, analytics dashboard, zone editor (Nikhil, waiting on the feeds above for the first two)

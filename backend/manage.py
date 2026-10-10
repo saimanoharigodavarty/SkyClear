@@ -90,6 +90,33 @@ def cmd_seed_officers(a):
         print(f"Saved in {CREDS}. Each officer can change the password after signing in.")
 
 
+def cmd_check_llm(a):
+    """Check the Ollama connection step by step and say what to fix."""
+    import llm
+    import embeddings
+    if not config.USE_LLM:
+        raise SystemExit("USE_LLM is 0 in .env. Set USE_LLM=1 and OLLAMA_URL=http://<ollama-laptop-ip>:11434, then run this again.")
+    print(f"Ollama at {config.OLLAMA_URL}")
+    s = llm.status(force=True)
+    if not s["reachable"]:
+        raise SystemExit(f"  NOT REACHABLE ({s.get('error')}). On the Ollama laptop run:  OLLAMA_HOST=0.0.0.0 ollama serve\n  Same Wi-Fi? Check the IP with:  ipconfig getifaddr en0   and that its firewall allows port 11434.")
+    print("  reachable, models there:", ", ".join(s.get("models", [])) or "none")
+    for label, ready, name in (("language model", s["llm_model_ready"], config.LLM_MODEL), ("embedding model", s["embed_model_ready"], config.EMBED_MODEL)):
+        print(f"  {label} {name}: {'ready' if ready else 'MISSING, run on that laptop: ollama pull ' + name}")
+    if s["embed_model_ready"]:
+        v = embeddings.embed(["can I fly near an airport"], "query")
+        print(f"  embedding test: {'ok, ' + str(len(v[0])) + ' dimensions' if v else 'FAILED'}")
+    if s["llm_model_ready"]:
+        try:
+            import json
+            import ask
+            out = ask._chat('QUESTION: Do I need permission near an airport?\nSPOT FACTS: none\nPASSAGES:\n[R-001] Flying inside an airport zone needs permission from the airport authority.')
+            print("  answer test: ok," , json.loads(out).get("answer", "")[:120])
+        except Exception as e:
+            print(f"  answer test FAILED ({type(e).__name__}: {e})")
+    print("\nNext: python backend/load_data.py   (embeds the rules and builds the vector index), then restart the app.")
+
+
 def cmd_has_admin(a):
     sys.exit(0 if any(u["role"] == "official" and not u.get("authority_id") for u in runtime.all_("users")) else 1)
 
@@ -176,6 +203,7 @@ def main(argv=None):
     s = sub.add_parser("list-users"); s.set_defaults(fn=cmd_list_users)
     s = sub.add_parser("logins"); s.set_defaults(fn=cmd_logins)
     s = sub.add_parser("set-password"); s.add_argument("--email", required=True); s.add_argument("--password"); s.set_defaults(fn=cmd_set_password)
+    s = sub.add_parser("check-llm"); s.set_defaults(fn=cmd_check_llm)
     s = sub.add_parser("has-admin"); s.set_defaults(fn=cmd_has_admin)
     a = p.parse_args(argv)
     routing.setup()

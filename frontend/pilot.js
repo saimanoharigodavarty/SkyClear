@@ -382,7 +382,16 @@ function loadExampleRoute() {
 const ASK_EXAMPLES = ["Do I need permission to fly near an airport?", "Can I fly over a military area?", "What are the rules for parks?", "What happens during a VIP movement?"];
 $("askExamples").innerHTML = ASK_EXAMPLES.map(q => `<button type="button">${esc(q)}</button>`).join("");
 $("askExamples").querySelectorAll("button").forEach(b => b.addEventListener("click", () => { $("askQ").value = b.textContent; $("askForm").requestSubmit(); }));
+async function showLlmState() {
+  try {
+    const s = await api("/health/llm", { auth: false });
+    $("llmState").textContent = !s.enabled ? "AI model is off. Answers are taken straight from the rules."
+      : s.reachable && s.llm_model_ready ? "AI model connected. It words the answer from the rules, nothing else."
+      : "AI model not reachable right now. Answers are taken straight from the rules.";
+  } catch (e) { $("llmState").textContent = ""; }
+}
 function updateAskSpot() {
+  showLlmState();
   const box = $("askSpot");
   box.disabled = !picked;
   $("askSpotText").textContent = picked ? `Use the spot I picked on the map (${picked.lat.toFixed(4)}, ${picked.lng.toFixed(4)})` : "Use the spot I picked on the map (pick one in the Check tab first)";

@@ -155,31 +155,63 @@ class MongoStore(LocalStore):
         return list(found)
 
     def search_rules(self, query, k=5, mode="hybrid"):
-        """Rank rule passages for a natural-language query. mode: vector, text or hybrid (reciprocal rank fusion)."""
-        ranked = {"vector": self._vector(query, k * 3) if mode in ("vector", "hybrid") else [],
-                  "text": self._text(query, k * 3) if mode in ("text", "hybrid") else []}
-        if mode != "hybrid":
-            return ranked[mode][:k]
+        """Rank rule passages for a plain-language question.
+
+        mode "text"   Atlas Search (Lucene) keyword search
+        mode "vector" Atlas Vector Search on the embeddings
+        mode "hybrid" both, merged inside MongoDB with $rankFusion. Falls back to text alone when there are no embeddings,
+                      for example when the Ollama laptop is not reachable.
+        """
+        if mode == "text":
+            return self._text(query, k)
+        vec = embed([query], "query")
+        if not vec:
+            return [] if mode == "vector" else self._text(query, k)
+        if mode == "vector":
+            return self._vector(vec[0], k)
+        return self._hybrid(query, vec[0], k)
+
+    def _search_stage(self, query):
+        return {"$search": {"index": "rules_search", "text": {"query": query, "path": "text"}}}
+
+    def _vector_stage(self, vec, limit):
+        return {"$vectorSearch": {"index": "rules_vector", "path": "embedding", "queryVector": vec, "numCandidates": max(50, limit * 10), "limit": limit}}
+
+    def _vector(self, vec, limit):
+        return list(self.db.rules.aggregate([self._vector_stage(vec, limit),
+                                             {"$project": {"_id": 0, "embedding": 0, "score": {"$meta": "vectorSearchScore"}}}]))
+
+    def _text(self, query, limit):
+        try:
+            return list(self.db.rules.aggregate([self._search_stage(query), {"$limit": limit},
+                                                 {"$project": {"_id": 0, "embedding": 0, "score": {"$meta": "searchScore"}}}]))
+        except Exception as e:  # the search index is still building or missing: use the plain text index
+            print(f"[search] Atlas Search not ready ({type(e).__name__}), using the text index")
+            return list(self.db.rules.aggregate([{"$match": {"$text": {"$search": query}}}, {"$addFields": {"score": {"$meta": "textScore"}}},
+                                                 {"$sort": {"score": -1}}, {"$limit": limit}, {"$project": {"_id": 0, "embedding": 0}}]))
+
+    def _hybrid(self, query, vec, k):
+        """Reciprocal rank fusion of vector and keyword results, done by MongoDB ($rankFusion)."""
+        pipeline = [{"$rankFusion": {"input": {"pipelines": {
+                        "vector": [self._vector_stage(vec, k * 3)],
+                        "text": [self._search_stage(query), {"$limit": k * 3}]}},
+                     "combination": {"weights": {"vector": 1, "text": 1}}}},
+                    {"$limit": k}, {"$project": {"_id": 0, "embedding": 0}}]
+        try:
+            found = list(self.db.rules.aggregate(pipeline))
+        except Exception as e:  # rankFusion unavailable or an index is still building
+            print(f"[search] hybrid search failed ({type(e).__name__}), merging in code instead")
+            return self._merge(self._vector(vec, k * 3), self._text(query, k * 3), k)
+        return found
+
+    @staticmethod
+    def _merge(a, b, k):
         score, byid = {}, {}
-        for lst in ranked.values():
+        for lst in (a, b):
             for rank, r in enumerate(lst):
                 score[r["rule_id"]] = score.get(r["rule_id"], 0) + 1 / (60 + rank)
                 byid[r["rule_id"]] = r
         return [{**byid[i], "score": round(s, 5)} for i, s in sorted(score.items(), key=lambda x: -x[1])][:k]
-
-    def _vector(self, query, limit):
-        vec = embed([query], "query")
-        if not vec:
-            return []
-        pipeline = [{"$vectorSearch": {"index": "rules_vector", "path": "embedding", "queryVector": vec[0],
-                                       "numCandidates": 50, "limit": limit}},
-                    {"$project": {"_id": 0, "embedding": 0, "score": {"$meta": "vectorSearchScore"}}}]
-        return list(self.db.rules.aggregate(pipeline))
-
-    def _text(self, query, limit):
-        pipeline = [{"$match": {"$text": {"$search": query}}}, {"$addFields": {"score": {"$meta": "textScore"}}},
-                    {"$sort": {"score": -1}}, {"$limit": limit}, {"$project": {"_id": 0, "embedding": 0}}]
-        return list(self.db.rules.aggregate(pipeline))
 
 
 def get_store():

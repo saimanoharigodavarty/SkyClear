@@ -1,0 +1,130 @@
+{
+  "source": {
+    "platform": "Digital Sky / Airports Authority of India",
+    "map_url": "https://digitalsky.aai.aero/",
+    "legal_basis": "Drone Rules, 2021 (G.S.R. 589(E), 25 August 2021)",
+    "captured_from": "Digital Sky zone details transcribed by project owner",
+    "captured_on": "2026-10-10"
+  },
+  "geometry_status": "pending_official_coordinates",
+  "geometry_note": "The supplied map screenshot is evidence of displayed zones but does not contain an official coordinate boundary. Do not use these records for point-in-polygon decisions until an official GeoJSON, KML, API response, or equivalent coordinate source is attached.",
+  "zones": [
+    {
+      "digital_sky_zone_id": "DSRZONE0003145",
+      "airspace_class": "red",
+      "zone_detail": "Airspace - Red Zone",
+      "zone_type": "restriction",
+      "starts_at": "2021-09-24T10:14:00Z",
+      "ends_at": "2029-09-24T15:44:00Z",
+      "altitude_agl_ft": {"min": 0, "max": 50000}
+    },
+    {
+      "digital_sky_zone_id": "DSRZONE0003147",
+      "airspace_class": "red",
+      "zone_detail": "Airspace - Red Zone",
+      "zone_type": "restriction",
+      "starts_at": "2021-09-24T10:14:00Z",
+      "ends_at": "2029-09-24T15:44:00Z",
+      "altitude_agl_ft": {"min": 0, "max": 50000}
+    },
+    {
+      "digital_sky_zone_id": "DSRZONE0002563",
+      "airspace_class": "red",
+      "zone_detail": "Airspace - Red Zone",
+      "zone_type": "restriction",
+      "starts_at": "2021-09-24T10:14:00Z",
+      "ends_at": "2029-09-24T15:44:00Z",
+      "altitude_agl_ft": {"min": 0, "max": 50000}
+    },
+    {
+      "digital_sky_zone_id": "DSRZONE0003146",
+      "airspace_class": "red",
+      "zone_detail": "Airspace - Red Zone",
+      "zone_type": "restriction",
+      "starts_at": "2021-09-24T10:14:00Z",
+      "ends_at": "2029-09-24T15:44:00Z",
+      "altitude_agl_ft": {"min": 0, "max": 50000}
+    },
+    {
+      "digital_sky_zone_id": "DSRZONE0003144",
+      "airspace_class": "red",
+      "zone_detail": "Airspace - Red Zone",
+      "zone_type": "restriction",
+      "starts_at": "2021-09-24T10:14:00Z",
+      "ends_at": "2029-09-24T15:44:00Z",
+      "altitude_agl_ft": {"min": 0, "max": 50000}
+    },
+    {
+      "digital_sky_zone_id": "DSRZONE0002598",
+      "airspace_class": "red",
+      "zone_detail": "Airspace - Red Zone",
+      "zone_type": "restriction",
+      "starts_at": "2021-09-24T10:14:00Z",
+      "ends_at": "2029-09-24T15:44:00Z",
+      "altitude_agl_ft": {"min": 0, "max": 50000}
+    },
+    {
+      "digital_sky_zone_id": "DSAR5ZONE00094",
+      "airspace_class": "red",
+      "zone_detail": "Airport Red",
+      "zone_type": "restriction",
+      "starts_at": null,
+      "ends_at": null,
+      "altitude_agl_ft": {"min": 0, "max": 0}
+    },
+    {
+      "digital_sky_zone_id": "DSAY8ZONE000138",
+      "airspace_class": "yellow",
+      "zone_detail": "Airport Yellow (5-8Km)",
+      "zone_type": "restriction",
+      "starts_at": null,
+      "ends_at": null,
+      "altitude_agl_ft": {"min": 0, "max": 0}
+    },
+    {
+      "digital_sky_zone_id": "DSAY12ZONE000138",
+      "airspace_class": "yellow",
+      "zone_detail": "Airport Yellow (8-12Km)",
+      "zone_type": "restriction",
+      "starts_at": null,
+      "ends_at": null,
+      "altitude_agl_ft": {"min": 0, "max": 0}
+    },
+    {
+      "digital_sky_zone_id": "DSRZONE00012624",
+      "airspace_class": "red",
+      "zone_detail": "Airspace - Red Zone",
+      "zone_type": "restriction",
+      "starts_at": "2024-10-07T12:30:00Z",
+      "ends_at": "2027-10-06T12:29:00Z",
+      "altitude_agl_ft": {"min": 0, "max": 99999}
+    },
+    {
+      "digital_sky_zone_id": "DSRZONE0002860",
+      "airspace_class": "red",
+      "zone_detail": "Airspace - Red Zone",
+      "zone_type": "restriction",
+      "starts_at": "2021-09-24T10:14:00Z",
+      "ends_at": "2029-09-24T15:44:00Z",
+      "altitude_agl_ft": {"min": 0, "max": 50000}
+    },
+    {
+      "digital_sky_zone_id": "DSRZONE0002702",
+      "airspace_class": "red",
+      "zone_detail": "Airspace - Red Zone",
+      "zone_type": "restriction",
+      "starts_at": "2021-09-24T10:14:00Z",
+      "ends_at": "2029-09-24T15:44:00Z",
+      "altitude_agl_ft": {"min": 0, "max": 50000}
+    },
+    {
+      "digital_sky_zone_id": "DSRZONE0003163",
+      "airspace_class": "red",
+      "zone_detail": "Airspace - Red Zone",
+      "zone_type": "restriction",
+      "starts_at": "2021-09-24T10:14:00Z",
+      "ends_at": "2029-09-24T15:44:00Z",
+      "altitude_agl_ft": {"min": 0, "max": 50000}
+    }
+  ]
+}

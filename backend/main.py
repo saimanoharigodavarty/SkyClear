@@ -3,25 +3,38 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import config
 from explain import NEXT_STEPS, explain
 from analytics import router as analytics_router
+from ask import router as ask_router
+from auth import router as auth_router, setup_indexes as auth_indexes
 from bridge import router as bridge_router
+from config_api import router as config_router
 from live import router as live_router
+from verification import router as verification_router
 from zones_api import router as zones_router
 from pipeline import evaluate, get_drone, parse_when, store
+import routing
 import runtime
 from sim import sample_route, summarize_route
 
 app = FastAPI(title="SkyClear")
+# Bearer tokens, no cookies, so a page opened from a file can still talk to the API in development.
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.include_router(config_router)
+app.include_router(ask_router)
+app.include_router(auth_router)
 app.include_router(bridge_router)
 app.include_router(zones_router)
 app.include_router(live_router)
 app.include_router(analytics_router)
-runtime.seed_official()
+app.include_router(verification_router)
+routing.setup()
+auth_indexes()
 
 
 class CheckRequest(BaseModel):

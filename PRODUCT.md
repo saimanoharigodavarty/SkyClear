@@ -131,6 +131,20 @@ Severity: High means a wrong or unsafe answer, or harm to a person. Medium means
 | F5 | A single laptop is the server. One failure ends the demo. | Medium | Run locally with the JSON store as the fallback (it already works with no database), record a backup demo |
 | F6 | Demo numbers that are not from real runs. | High | Only quote numbers from eval.py output (already a project rule) |
 
+### G. Permits, verification and zone authority
+
+| # | Loophole | Severity | Mitigation |
+|---|---|---|---|
+| G1 | A forged or edited permit. | High | Permits are signed by the server and verified on every preflight. A client copy proves nothing without the server check |
+| G2 | A permit stays valid after a VIP notice overlaps it. | High | A new notice lists conflicting permits for the officer. Revocation fails the next preflight and alerts the pilot |
+| G3 | The pilot swaps in a different drone after approval. | High | Permit is bound to the drone serial. Telemetry serial mismatch is a breach |
+| G4 | A stolen or fake serial number registered to two pilots. | Medium | One active owner per serial, duplicate document flags, officer review |
+| G5 | Officers approve their own zone edits, or tamper with zones. | High | Maker and checker (a second officer publishes), versioned zones, audit log |
+| G6 | Verification means "an officer checked" and not proof of ownership. | Medium | Say exactly that on the badge. Never show "owner verified" |
+| G7 | Uploaded identity documents leak. | High | GridFS, access limited to owner and officials, no public URLs, delete on request |
+| G8 | Pilots read "green" as safe. | High | Green is never painted as safe. The label is "no restriction found in our data" |
+| G9 | The satellite layer is a licence problem (non-commercial imagery). | Low | Use only for the hackathon, credit the source, replace for any commercial use |
+
 ## Build order for the hackathon
 
 1. Done: A1 and A2 fixed with tests, accounts, authority notices, saved flights with live alerts, MongoDB, Ollama explanation, 20 eval cases.

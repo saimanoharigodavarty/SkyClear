@@ -209,7 +209,15 @@ class MongoStore(LocalStore):
         pipeline = [{"$search": {"index": RULES_SEARCH_INDEX, "text": {"query": query, "path": "text"}}},
                     {"$limit": limit}, {"$project": {"_id": 0, "embedding": 0,
                                                        "score": {"$meta": "searchScore"}}}]
-        return list(self.db.rules.aggregate(pipeline))
+        found = list(self.db.rules.aggregate(pipeline))
+        if found:
+            return found
+        # A small Atlas tier cannot duplicate the production Search index in the isolated test
+        # database. The loader also creates MongoDB's built-in text index, so local/test databases
+        # retain useful retrieval while the production database continues to use Atlas Search.
+        projection = {"_id": 0, "embedding": 0, "score": {"$meta": "textScore"}}
+        return list(self.db.rules.find(
+            {"$text": {"$search": query}}, projection).sort([("score", {"$meta": "textScore"})]).limit(limit))
 
 
 def get_store():

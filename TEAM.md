@@ -14,7 +14,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first (10 minutes), then [docs/CONTRACTS
 |---|---|---|
 | Manohari | Stream 4: MongoDB data and RAG | The core of the hackathon track. Geo, vector and hybrid search, real data, evaluation numbers |
 | Thanvi | Stream 3: Simulation and engine | The most visible technical piece. Live drones, geofencing, route checks |
-| Nikhil | Stream 1: Experience, and Stream 2A: Identity and workflow | Everything the user sees, plus authentication and alerts, which touch every screen |
+| Nikhil | Stream 1: Experience, and Stream 2A: Identity, workflow and the official side | Everything the user sees, plus authentication, permits, verification, routing and alerts |
 | Suhas | Stream 2B: Atlas, charts, load testing and demo material | Self-contained, clear steps. Puts the demo on MongoDB Atlas with live Atlas Charts, and makes the scale claims provable |
 
 ### Stream 4: MongoDB data and RAG (Manohari)
@@ -53,22 +53,32 @@ Files: backend/live.py, sim.py, verdict.py, geo.py, backend/tests/test_verdict.p
 Files: frontend/*.
 
 - P0: Rebuild the map on MapLibre GL JS with OpenFreeMap vector tiles. Load zones by viewport (`/zones?bbox=` on every moveend), style them by severity, tidy the labels.
+- P0 (done): Ask SkyClear question box (`POST /ask`, Ask tab), it reads Manohari's `search_rules`, so better retrieval there improves the answers with no change here.
 - P0: Search box on the map using `/zones/search` (contract 8), jump to the zone on select.
+- P0: Satellite basemap toggle (Sentinel-2 cloudless by EOX) and the red, yellow, green legend.
+- P0: Pilot screens for verification and permits (upload, status badges, permit with QR, Preflight button, who will review the request). Officer screens for the verification queue, permission review with approve (altitude cap, conditions), reject, revoke.
 - P0: Live airspace view for the pilot and the authority: drones moving on the map from `/live/stream`, color by status, breach feed panel.
 - P0: Simulation screen for officials: start and stop a fleet, scale slider, "inject VIP movement" button (contract 4).
 - P0: Auth screens against contract 2 (refresh handling, TOTP step for officials, logout).
+- P1: Zone editor for officers: draw a polygon over the satellite layer, set class and dates, save draft, publish (contract 11).
 - P1: Authority dashboard with the analytics (heatmap layer, plain charts, contract 6). Mobile layout and keyboard accessibility.
 - Done when: a stranger completes the pilot and the authority flow on a phone and a laptop, and the live view stays smooth with 200 drones.
 
-### Stream 2A: Identity and workflow (Nikhil)
+### Stream 2A: Identity, workflow and the official side (Nikhil)
 
-Files: backend/bridge.py, runtime.py, main.py, new backend/security.py.
+Files: backend/bridge.py, runtime.py, main.py, new backend/security.py, routing.py, permits.py, verification.py, data/authorities.json.
 
-- P0: Authentication per contract 2: JWT access and rotating refresh tokens (PyJWT), argon2id (argon2-cffi), roles pilot, official, admin, invite-only officials with TOTP (pyotp), account lockout, rate limits (slowapi), refresh token TTL index and revocation.
+This stream also holds everything added after the first plan, so nobody else's list changed. Specs: docs/PERMITS_AND_VERIFICATION.md.
+
+- P0: Routing (contract 12): each permission request goes to the right authority (zone owner, then jurisdiction polygon, then nearest office), officers see only their queue, overdue requests escalate to the parent, the pilot sees who will review. Authorities data for Hyderabad is sample data, labelled.
+- P0: Permits and preflight (contract 10): approval creates a signed permit with conditions, `/flights/{id}/preflight`, revoke, conflicting permits listed when a notice is published.
+- P0: Verification (contract 9): uploads in GridFS, pilot and drone verification queue for officers, unique serial index, permission requests only from verified pilots with verified drones.
+- P0 (done): Authentication per contract 2: JWT access and rotating refresh tokens, argon2id, phone OTP, roles pilot, official, admin, invite-only officials with TOTP, lockout, rate limits, refresh token TTL index. Remaining: move rate limits to MongoDB for several replicas, real SMS provider.
 - P0: Alerts by change stream: a listener on `notices` and `flights` writes `notifications`. Remove the notification calls from the HTTP handlers.
 - P0: Permission decisions in a MongoDB transaction (flight update, audit entry, notification together). Audit log for every official action.
+- P1: Zone authority data side (contract 11): `class`, `official`, `version` fields, `zone_versions`, maker and checker publish rule, KML and GeoJSON import.
 - P1: Pagination on flight and notice lists. Security headers, CORS policy, input size caps.
-- Done when: a notice published from a second terminal alerts a pilot in 2 seconds with no call from the handler, officials cannot self-register, and a stolen refresh token is rejected after use.
+- Done when: a notice published from a second terminal alerts a pilot in 2 seconds with no call from the handler, officials cannot self-register, a stolen refresh token is rejected after use, and a pilot cannot get cleared for takeoff without an active permit that matches their drone.
 
 ### Stream 2B: Atlas, charts, load testing and demo material (Suhas)
 

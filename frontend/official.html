@@ -4,25 +4,34 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SkyClear, authority</title>
+<script>try{var t=localStorage.getItem("skyclear.theme");t=t&&JSON.parse(t);if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="app.css">
 </head>
-<body>
+<body data-require-auth="1">
 <header class="top" id="top"></header>
 <main class="app">
   <div class="mapwrap">
     <div id="map"></div>
+    <div class="mapsearch">
+      <label class="sr" for="mapSearch">Search a place or zone</label>
+      <input id="mapSearch" type="search" placeholder="Search a place or a restricted zone" autocomplete="off">
+      <ul id="mapResults" class="results hidden"></ul>
+    </div>
     <div class="legend" id="legend"></div>
   </div>
   <aside class="side">
     <nav class="tabs">
       <button data-tab="requests" class="on" type="button">Requests<span id="reqCount" class="count hidden">0</span></button>
-      <button data-tab="publish" type="button">Publish notice</button>
+      <button data-tab="verify" type="button">Verification<span id="verCount" class="count hidden">0</span></button>
+      <button data-tab="publish" type="button">Publish</button>
       <button data-tab="notices" type="button">Notices</button>
+      <button data-tab="team" id="teamTab" class="hidden" type="button">Team</button>
     </nav>
     <section class="pane">
+      <div class="explain" id="office"></div>
       <table class="stats" id="stats"></table>
     </section>
 
@@ -32,6 +41,11 @@
         <button class="ghost inline" id="fAll" type="button">All flights</button>
       </div>
       <div id="reqList"></div>
+    </section>
+
+    <section class="pane hidden" id="tab-verify" style="padding-top:0">
+      <p class="hint" style="margin-top:0">Check the documents against official records, then approve or reject. Your name and the date are recorded on the badge.</p>
+      <div id="verList"></div>
     </section>
 
     <section class="pane hidden" id="tab-publish" style="padding-top:0">
@@ -53,11 +67,24 @@
     <section class="pane hidden" id="tab-notices" style="padding-top:0">
       <div id="noticeList"></div>
     </section>
+
+    <section class="pane hidden" id="tab-team" style="padding-top:0">
+      <p class="hint" style="margin-top:0">Officials are invited here, they cannot register themselves. You get a temporary password to hand over. They must choose their own at first sign-in.</p>
+      <form id="inviteForm">
+        <label for="iName">Full name</label><input id="iName" required minlength="2" maxlength="80">
+        <label for="iEmail">Email</label><input id="iEmail" type="email" required>
+        <label for="iAuth">Office</label><select id="iAuth"></select>
+        <button type="submit">Invite official</button>
+        <div id="inviteMsg"></div>
+      </form>
+      <div class="section"><h3>Officials</h3><div id="teamList"></div></div>
+    </section>
   </aside>
 </main>
 <footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a>Authority console, prototype. Actions are recorded with your name.</footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="config.js"></script>
 <script src="common.js"></script>
 <script src="official.js"></script>
 </body>

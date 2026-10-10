@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SkyClear, pilot</title>
+<title>SkyClear, can I fly here?</title>
+<script>try{var t=localStorage.getItem("skyclear.theme");t=t&&JSON.parse(t);if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -15,51 +16,96 @@
 <main class="app">
   <div class="mapwrap">
     <div id="map"></div>
+    <div class="mapsearch">
+      <label class="sr" for="mapSearch">Search a place or zone</label>
+      <input id="mapSearch" type="search" placeholder="Search a place or a restricted zone" autocomplete="off">
+      <ul id="mapResults" class="results hidden"></ul>
+    </div>
     <div class="legend" id="legend"></div>
   </div>
   <aside class="side">
     <nav class="tabs">
       <button data-tab="check" class="on" type="button">Check</button>
-      <button data-tab="sim" type="button">Simulate</button>
-      <button data-tab="flights" type="button">My flights</button>
+      <button data-tab="sim" type="button">Route</button>
+      <button data-tab="ask" type="button">Ask</button>
+      <button data-tab="flights" type="button">Flights</button>
       <button data-tab="alerts" type="button">Alerts<span id="alertCount" class="count hidden">0</span></button>
     </nav>
 
-    <section class="pane" id="shared">
-      <label for="drone">Drone</label>
-      <select id="drone"></select>
-      <label for="when">Date and time</label>
-      <input id="when" type="datetime-local">
-    </section>
+    <section class="pane" id="tab-check">
+      <div id="welcome" class="welcome hidden">
+        <h2>Can I fly my drone here?</h2>
+        <p>SkyClear checks a spot against airport, defence and other restricted areas in <span id="cityName">your area</span> and answers in plain words, with the rule behind it. If you need permission, it goes to the right officer.</p>
+        <ol class="steps">
+          <li><b>Pick a spot</b> on the map, or search for a place.</li>
+          <li><b>Choose your drone and time.</b></li>
+          <li><b>Press Check</b> and read the answer.</li>
+        </ol>
+        <div class="label" style="margin-top:0">Try an example</div>
+        <div class="examples" id="examples"></div>
+        <button id="hideWelcome" class="ghost inline" type="button">Got it, hide this</button>
+      </div>
 
-    <section class="pane" id="tab-check" style="padding-top:0">
-      <div class="hint" id="picked">Click the map to choose where you want to fly.</div>
+      <div class="stepper" id="stepper"><span class="on" data-s="1">1 Pick a spot</span><span data-s="2">2 Drone and time</span><span data-s="3">3 Answer</span></div>
+
+      <label for="drone">Your drone</label>
+      <select id="drone"></select>
+      <div class="help" id="droneHelp"></div>
+      <label for="when">When do you want to fly?</label>
+      <input id="when" type="datetime-local">
+
+      <div class="hint" id="picked">Step 1: click the map or search a place above.</div>
       <button id="go" type="button" disabled>Check this spot</button>
       <div id="result" class="section"></div>
       <div id="actions"></div>
     </section>
 
-    <section class="pane hidden" id="tab-sim" style="padding-top:0">
+    <section class="pane hidden" id="tab-sim">
+      <h3 style="font-size:16px;margin-bottom:4px">Plan a route</h3>
+      <p class="help" style="margin-top:0">Click the map to add waypoints. SkyClear checks every 100 m of the route, then flies a simulated drone along it so you can see where the trouble is.</p>
+      <div class="examples" id="routeExamples"></div>
+      <label for="simDrone">Your drone</label>
+      <select id="simDrone"></select>
+      <label for="simWhen">When do you want to fly?</label>
+      <input id="simWhen" type="datetime-local">
       <div class="hint" id="wpHint">Click the map to add waypoints, at least 2.</div>
       <div class="row2">
         <div><label for="speed">Drone speed (m/s)</label><input id="speed" type="number" min="1" max="30" value="10"></div>
-        <div><label for="playback">Playback</label><select id="playback"><option value="10">10x</option><option value="30" selected>30x</option><option value="100">100x</option></select></div>
+        <div><label for="playback">Playback</label><select id="playback"><option value="30">30x</option><option value="100" selected>100x</option><option value="300">300x</option></select></div>
       </div>
       <div class="btnrow"><button id="run" type="button" disabled>Run simulation</button><button id="clearRoute" class="ghost" type="button">Clear</button></div>
       <div id="live" class="live hidden"></div>
       <div id="simResult" class="section"></div>
     </section>
 
+    <section class="pane hidden" id="tab-ask">
+      <h3 style="font-size:16px;margin-bottom:4px">Ask about the rules</h3>
+      <p class="help" style="margin-top:0">Ask in plain words. The answer comes only from the rule passages we hold, and the rule is shown so you can check it. If the rules do not cover your question, it says so.</p>
+      <form id="askForm">
+        <label for="askQ">Your question</label>
+        <textarea id="askQ" maxlength="400" required placeholder="For example: Do I need permission to fly near an airport?"></textarea>
+        <label class="consent"><input id="askSpot" type="checkbox" disabled><span id="askSpotText">Use the spot I picked on the map (pick one in the Check tab first)</span></label>
+        <button id="askGo" type="submit">Ask</button>
+      </form>
+      <div class="examples" id="askExamples" style="margin-top:12px"></div>
+      <div id="askResult" class="section"></div>
+    </section>
+
     <section class="pane hidden" id="tab-flights">
       <div id="flightsGate"></div>
       <div id="flightsBody" class="hidden">
-        <div class="section" style="margin-top:0"><h3>My drones</h3><div id="myDrones"></div>
+        <div class="section" style="margin-top:0"><h3>Get ready to fly</h3><div id="checklist"></div></div>
+        <div class="section"><h3>Verification</h3>
+          <p class="hint" style="margin-top:0">Permission requests need a verified pilot and a verified drone. "Verified" means an officer checked your documents.</p>
+          <div id="pilotVerify"></div>
+        </div>
+        <div class="section"><h3>My drones</h3><div id="myDrones"></div>
           <form id="droneForm">
             <div class="row2">
-              <div><label for="dName">Name</label><input id="dName" required maxlength="60" placeholder="DJI Mavic 3"></div>
-              <div><label for="dWeight">Weight (g)</label><input id="dWeight" type="number" min="1" required placeholder="895"></div>
+              <div><label for="dName">Drone name</label><input id="dName" required minlength="2" maxlength="60" placeholder="DJI Mavic 3"></div>
+              <div><label for="dWeight">Weight (grams)</label><input id="dWeight" type="number" min="1" required placeholder="895"></div>
             </div>
-            <label for="dUin">Registration number (optional)</label><input id="dUin" maxlength="40" placeholder="Self-declared, not verified">
+            <label for="dUin">Registration number (optional)</label><input id="dUin" maxlength="40" placeholder="You can add this later">
             <button type="submit" class="ghost">Add drone</button>
           </form>
         </div>
@@ -79,6 +125,8 @@
 <footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a>Decision support only, not legal permission. Zones and rules are sample or derived data until verified.</footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="config.js"></script>
 <script src="common.js"></script>
 <script src="pilot.js"></script>
 </body>

@@ -8,3 +8,7 @@ data/runtime.json
 data/runtime.tmp
 docs/OLLAMA_REMOTE_SETUP.private.md
 data/osm_hyderabad_raw.json
+data/uploads/
+data/.secrets.json
+data/demo_credentials.txt
+data/.e2e.png

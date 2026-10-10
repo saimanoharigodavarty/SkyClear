@@ -2,7 +2,7 @@
 
 Track 2: RAG Engine (MongoDB hackathon)
 
-Product spec, accounts, notifications and the loophole list: [PRODUCT.md](PRODUCT.md). Target architecture: [ARCHITECTURE.md](ARCHITECTURE.md). Who builds what: [TEAM.md](TEAM.md). Interfaces between streams: [docs/CONTRACTS.md](docs/CONTRACTS.md).
+Product spec, accounts, notifications and the loophole list: [PRODUCT.md](PRODUCT.md). Target architecture: [ARCHITECTURE.md](ARCHITECTURE.md). Permits, verification and the official map: [docs/PERMITS_AND_VERIFICATION.md](docs/PERMITS_AND_VERIFICATION.md). Simulation: [docs/SIMULATION.md](docs/SIMULATION.md). Who builds what: [TEAM.md](TEAM.md). Interfaces between streams: [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
 ## Problem statement
 
@@ -101,17 +101,35 @@ Decision support only, not legal permission. Always confirm with the official po
 
 ## Running it
 
+One command (it sets up Python, starts MongoDB and a mail catcher if Docker is running, loads the data, asks you for the first admin, starts the server and opens your browser):
+
+```
+./run.sh            # run the app
+./run.sh --seed     # also create one officer per office and a verified demo pilot with flights
+./run.sh --local    # no Docker: JSON files in data/, one-time codes printed in the terminal
+```
+
+Open http://localhost:8000. Do not open frontend/index.html straight from the folder (it can still talk to http://localhost:8000, but the server must be running). If the server is down the page shows a red bar saying how to start it.
+
+**Nothing is hardcoded.** There are no built-in accounts or passwords:
+- The first administrator is created on first run (`./run.sh` asks for an email and generates a password, shown once). Or by hand: `python backend/manage.py create-admin --email you@example.com --generate`.
+- Officials are invited by the admin (Authority page, Team tab). They get a temporary password and must choose their own at first sign-in. `python backend/manage.py seed-officers` makes one officer per office for development, with generated passwords.
+- `python backend/manage.py seed-demo` adds a verified demo pilot, a drone, flights and a notice. Generated passwords are printed once and saved in `data/demo_credentials.txt` (git-ignored, delete it when done).
+- Secrets (`JWT_SECRET`, `PERMIT_SECRET`) are generated on first start in `data/.secrets.json` (git-ignored), or set them in `.env`.
+- One-time codes go out by real email (SMTP) or SMS (Twilio). In development with Docker they land in the mail catcher at http://localhost:8025. Nothing is shown on screen.
+- The city, map centre, drone classes and the example buttons come from `data/region.json` and the zones in the database through the server (`/config.js`, `/examples`).
+
+By hand, if you prefer:
+
 ```
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
-cp .env.example .env                 # edit: USE_MONGO, OLLAMA_URL, USE_LLM
-docker compose up -d                 # MongoDB with geo, text and vector search (Atlas Local)
+cp .env.example .env                 # edit as needed
+docker compose up -d                 # MongoDB (geo, text, vector search) and the mail catcher
 python backend/load_data.py          # zones, rules, drones, notices, embeddings, indexes
+python backend/manage.py create-admin --email you@example.com --generate
 cd backend && uvicorn main:app --reload
-python ../scripts/seed_demo.py       # optional: demo pilot, flights and a VIP notice
 ```
-
-Open http://localhost:8000. Without Docker, leave `USE_MONGO=0` and everything runs from the JSON files in data/.
 
 Ollama runs on another laptop, never required on yours. On the Ollama laptop:
 
@@ -129,8 +147,8 @@ Tests: `python -m pytest backend` (local JSON) and `USE_MONGO=1 python -m pytest
 ## Folder layout
 
 ```
-data/       rules.json, zones.geojson, drones.json, notices.json, eval_cases.json
-backend/    zones_api.py, live.py, analytics.py, config.py, db.py, embeddings.py, geo.py, build_zones.py, sim.py, runtime.py, bridge.py, pipeline.py, search.py, verdict.py, explain.py, main.py, load_data.py, eval.py, tests/
+data/       authorities.json, rules.json, zones.geojson, drones.json, notices.json, eval_cases.json
+backend/    routing.py, permits.py, verification.py, security.py, zones_api.py, live.py, analytics.py, config.py, db.py, embeddings.py, geo.py, build_zones.py, sim.py, runtime.py, bridge.py, pipeline.py, search.py, verdict.py, explain.py, main.py, load_data.py, eval.py, tests/
 frontend/   index.html + pilot.js, official.html + official.js, account.html, common.js, app.css, terms.html, privacy.html
 scripts/    check_design.sh, seed_demo.py
 docker-compose.yml   MongoDB (Atlas Local)
@@ -138,17 +156,19 @@ docker-compose.yml   MongoDB (Atlas Local)
 
 ## Status
 
-- [x] Folder structure, drones.json, requirements.txt
-- [x] Design rules (CLAUDE.md, DESIGN_RULES.md, scripts/check_design.sh), skeleton loader, Terms and Privacy pages
-- [x] Base: sample data, local search, rule engine, template explanation, API, map page, tests (runs without MongoDB or Ollama)
-- [x] Airport zones for India (derived, 5 km / 3 km circles), simulated drone route check and playback
-- [x] Hyderabad demo data, accounts, permission requests, official notices, pilot alerts, redesigned UI
-- [x] MongoDB: loader, 2dsphere geo queries, text, vector and hybrid rule search, accounts and flights in MongoDB
-- [x] Ollama explanation with citation validation, consistency checks and fallback
-- [x] False-safe bugs A1 and A2 fixed
-- [x] 20 eval cases and metrics (verdict accuracy, false-safe rate, citation recall, text vs vector vs hybrid)
-- [ ] Real rule text verified against the official regulation, real notices source
-- [ ] Run eval against the remote Ollama and record the vector vs hybrid numbers
-- [ ] Demo rehearsal
+Done and tested (78 backend tests in two modes, plus a 17-step browser test of the whole loop in `scripts/e2e.py`):
+- [x] Check a spot, route simulation, Ask SkyClear (cited, grounded), zones and notices on a map, satellite, light and dark themes
+- [x] Accounts: one-time codes by email or SMS, password reset, argon2id, JWT with rotating refresh tokens, lockout, authenticator codes for officials, invite-only officials, no built-in accounts or secrets
+- [x] Pilot flow: register, verify pilot and drone with documents, request permission, routed to the responsible office, signed permit with QR, preflight, alerts
+- [x] Officer flow: own queue per office with escalation, approve with conditions or reject, revoke, verification queue, publish and cancel notices, conflicting permits shown, admin Team tab
+- [x] MongoDB: geo queries on 2dsphere indexes, Atlas Search, vector search, accounts and flights in MongoDB, Docker setup, mail catcher
+- [x] `./run.sh --demo` starts everything and prints the logins, `guide.html` is a guided tour
 
-Who does what: see [TEAM.md](TEAM.md).
+Left to build (owner in brackets, details in TEAM.md):
+- [ ] Real data: 300+ real zones from OpenStreetMap, real regulation text with sources, a real source for notices (Manohari)
+- [ ] MongoDB showpieces: hybrid search with `$rankFusion`, Atlas Search autocomplete for the zone search, `explain()` proof of index use, analytics aggregations with `$merge`, 30 eval cases with recorded vector vs keyword vs hybrid numbers, run against the Ollama laptop (Manohari)
+- [ ] Live simulation: fleet simulator, telemetry in a time series collection, geofence engine with early warning, `/live` feed from change streams, the VIP scenario, route fixes A3 to A6 (Thanvi)
+- [ ] Atlas free cluster as the demo database and Atlas Charts on live data, load test numbers, production compose with Nginx, monitoring, demo script, slides and backup video (Suhas)
+- [ ] Live airspace screens and officer simulation controls, analytics dashboard, zone editor (Nikhil, waiting on the feeds above for the first two)
+- [ ] Alerts through a MongoDB change stream (today they are written when the notice is published), permission decisions in a MongoDB transaction with an audit log, rate limits shared across servers, real SMS (Nikhil)
+- [ ] Future scope: DigiLocker and regulator record checks, real drone telemetry

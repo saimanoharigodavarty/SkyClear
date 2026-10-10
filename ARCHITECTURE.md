@@ -15,7 +15,7 @@ SkyClear is a MongoDB-first airspace platform. The API is thin on purpose: geo s
 | 1 | Geospatial: 2dsphere, `$geoIntersects`, `$geoNear`, `$geoWithin`, GeoJSON polygons and LineStrings | Which zone a spot is in, zones in the map viewport, nearest zones, flight routes, matching flights to notices | Manohari | zones and checks done, viewport done, rest to build |
 | 2 | Atlas Vector Search (`$vectorSearch` with pre-filter) | Rule passages for the explanation | Manohari | built, needs the Ollama laptop |
 | 3 | Atlas Search (Lucene `$search`) | Keyword rule search, autocomplete on zone names for the search box, fuzzy matching | Manohari | verified working locally, to wire in |
-| 4 | Hybrid search with `$rankFusion` (vector plus `$search`, merged inside the database) | Best rule passages for each answer | Manohari | verified working locally, replaces our hand-written merge |
+| 4 | Hybrid search with `$rankFusion` (vector plus `$search`, merged inside the database) | Best rule passages for each answer, and the Ask SkyClear question box (`POST /ask`), cited and grounded | Manohari | verified working locally, replaces our hand-written merge |
 | 5 | Change streams | Alerts when a notice is published, the live feed of positions and breaches | Nikhil, Thanvi | to build |
 | 6 | Time series collections, `$setWindowFields` | Drone telemetry, speed and track smoothing | Thanvi | to build |
 | 7 | Multi-document transactions | Permission decision, audit entry and notification written together | Nikhil | to build |

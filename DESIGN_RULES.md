@@ -2,6 +2,8 @@
 
 Source of truth for the look and the writing of SkyClear. Supplied by the project owner. Every agent and contributor must follow it. [CLAUDE.md](CLAUDE.md) points here so it is loaded each session.
 
+> Decision by the project owner: items 8 and 18 are relaxed from the original list to the wording below. Everything else still applies.
+
 ## Banned (must not appear anywhere)
 
 | # | Item | What it means here |
@@ -13,7 +15,7 @@ Source of truth for the look and the writing of SkyClear. Supplied by the projec
 | 5 | Drop shadows | No `box-shadow`, `text-shadow`, `drop-shadow`. Use 1px borders |
 | 6 | 3 feature cards in a row | No row of three equal cards |
 | 7 | Emojis | None in UI, docs, commits or copy |
-| 8 | Liquid glass | No `backdrop-filter`, no translucent blurred panels |
+| 8 | Liquid glass | Allowed only in a light form on panels that float over the map or over scrolling content (legend, search box, map buttons, sticky tabs): translucent panel, `blur` of 12px or less, a 1px border. No glossy highlights, no refraction, no blur on ordinary cards |
 | 9 | Em dashes | No U+2014. Do not use U+2013 as a dash either |
 | 10 | Inter / Geist / Space Grotesk | Use another face, or the system font stack |
 | 11 | Colored left stripe | No `border-left` accent on cards, quotes, alerts, citations |
@@ -23,7 +25,7 @@ Source of truth for the look and the writing of SkyClear. Supplied by the projec
 | 15 | "It's not X, it's Y" | No contrast-reveal phrasing in any copy |
 | 16 | Checkmark bullets | Plain bullets or numbers only |
 | 17 | 3 pricing tiers | No pricing section. SkyClear is free |
-| 18 | Soft corner radius | `border-radius` of 0 to 2px only |
+| 18 | Soft corner radius | Normal, modest corners: 6px for buttons, inputs and tags, 10px for cards and panels. No pills and no circles for buttons or cards (`border-radius` of 50% or 999px) |
 | 19 | Purple and black | No purple anywhere, no purple-on-black scheme |
 | 20 | Radial orbs | No blurred color blobs |
 | 21 | Dot grids | No dotted background patterns |

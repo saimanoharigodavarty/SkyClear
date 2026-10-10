@@ -127,8 +127,15 @@ def test_fleet_simulator_100_drones_and_scalable():
 
 
 def test_simulation_control_endpoints_contract_4():
+    from tests.support import ADMIN_EMAIL, PASSWORD
+    admin = {"Authorization": "Bearer " + client.post("/auth/login", json={"identifier": ADMIN_EMAIL, "password": PASSWORD}).json()["token"]}
+    # The controls are for officials: a visitor is refused
+    assert client.post("/sim/fleet", json={"count": 5}).status_code == 401
+    assert client.delete("/sim/fleet").status_code == 401
+    assert client.post("/sim/scenarios/vip").status_code == 401
+
     # Start fleet via POST /sim/fleet
-    r = client.post("/sim/fleet", json={"count": 50, "speed_x": 2.0, "seed": 7})
+    r = client.post("/sim/fleet", json={"count": 50, "speed_x": 2.0, "seed": 7}, headers=admin)
     assert r.status_code == 200
     body = r.json()
     assert body["ok"] is True
@@ -142,8 +149,8 @@ def test_simulation_control_endpoints_contract_4():
     assert stat_body["running"] is True
     assert stat_body["drones"] == 50
 
-    # Check GET /live/drones (Contract 3)
-    r_drones = client.get("/live/drones")
+    # Check GET /live/drones (Contract 3): an official sees every drone
+    r_drones = client.get("/live/drones", headers=admin)
     assert r_drones.status_code == 200
     d_body = r_drones.json()
     assert "as_of" in d_body
@@ -151,16 +158,21 @@ def test_simulation_control_endpoints_contract_4():
     d0 = d_body["drones"][0]
     for key in ("drone_id", "flight_id", "lat", "lng", "alt_m", "speed_mps", "heading_deg", "battery_pct", "status"):
         assert key in d0
+    # a visitor sees the background traffic too, with no pilot's flight in it
+    assert len(client.get("/live/drones").json()["drones"]) == 50
 
-    # Trigger VIP scenario: POST /sim/scenarios/vip
-    r_vip = client.post("/sim/scenarios/vip")
+    # Trigger VIP scenario: POST /sim/scenarios/vip. It goes through the normal notice path.
+    r_vip = client.post("/sim/scenarios/vip", headers=admin)
     assert r_vip.status_code == 200
     vip_body = r_vip.json()
     assert vip_body["ok"] is True
     assert "notice_id" in vip_body
+    notice = next(n for n in client.get("/notices", headers=admin).json() if n["notice_id"] == vip_body["notice_id"])
+    assert notice["status"] == "active" and notice["origin"] == "official" and notice["ends_at"] > notice["starts_at"]
+    client.post(f"/notices/{vip_body['notice_id']}/cancel", headers=admin)
 
     # Stop fleet via DELETE /sim/fleet
-    r_del = client.delete("/sim/fleet")
+    r_del = client.delete("/sim/fleet", headers=admin)
     assert r_del.status_code == 200
     del_body = r_del.json()
     assert del_body["ok"] is True

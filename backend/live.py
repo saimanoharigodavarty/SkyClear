@@ -4,7 +4,7 @@ Provides live drone positions (/live/drones), SSE event stream (/live/stream),
 and fleet simulation control endpoints (/sim/fleet, /sim/status, /sim/scenarios/vip).
 """
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sys
@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
 
 import config
 import runtime
+from security import decode_access
 from simulator.fleet import get_fleet_simulator
 
 router = APIRouter(prefix="/live")
@@ -28,18 +29,29 @@ sim_router = APIRouter(prefix="/sim")
 
 
 def get_current_user(authorization: Optional[str] = None, token_param: Optional[str] = None):
-    """Optional auth for live streams and drone filtering."""
+    """Who is asking, from the JWT. None for a visitor. (A browser EventSource cannot send headers, so the stream also takes ?token=.)"""
     token = None
     if authorization and authorization.startswith("Bearer "):
         token = authorization.removeprefix("Bearer ").strip()
     elif token_param:
         token = token_param.strip()
-    if token:
-        try:
-            return runtime.user_for_token(token)
-        except Exception:
-            return None
-    return None
+    if not token:
+        return None
+    try:
+        claims = decode_access(token)
+    except HTTPException:
+        return None
+    return next((u for u in runtime.all_("users") if u["user_id"] == claims["sub"]), None)
+
+
+def require_official(authorization: Optional[str]):
+    """Fleet controls are for officials. A missing, expired or pilot token is refused."""
+    user = get_current_user(authorization)
+    if user is None:
+        raise HTTPException(401, "sign in required")
+    if user.get("role") != "official":
+        raise HTTPException(403, "official access only")
+    return user
 
 
 # ---- Contract 3: Live Airspace ----
@@ -70,10 +82,6 @@ async def live_stream(
     sim = get_fleet_simulator()
     user = get_current_user(authorization, token)
     user_id = user.get("user_id") if user else None
-
-    # Auto-start simulator if not running so live view immediately has active drones
-    if not sim.is_running:
-        sim.start(count=100)
 
     queue = sim.subscribe_events()
 
@@ -125,10 +133,7 @@ class FleetRequest(BaseModel):
 @sim_router.post("/fleet")
 async def start_fleet(req: FleetRequest, authorization: Optional[str] = Header(default=None)):
     """Start or reconfigure simulated fleet (Contract 4)."""
-    user = get_current_user(authorization)
-    if user and user.get("role") not in ("official", "admin"):
-        raise HTTPException(403, "official access only")
-
+    require_official(authorization)
     sim = get_fleet_simulator()
     sim.start(count=req.count, bbox=req.bbox, seed=req.seed, speed_x=req.speed_x or 1.0)
     return {"ok": True, "count": req.count, "running": True}
@@ -137,10 +142,7 @@ async def start_fleet(req: FleetRequest, authorization: Optional[str] = Header(d
 @sim_router.delete("/fleet")
 async def stop_fleet(authorization: Optional[str] = Header(default=None)):
     """Stop and remove simulated drones (Contract 4)."""
-    user = get_current_user(authorization)
-    if user and user.get("role") not in ("official", "admin"):
-        raise HTTPException(403, "official access only")
-
+    require_official(authorization)
     sim = get_fleet_simulator()
     sim.stop()
     return {"ok": True, "running": False}
@@ -155,14 +157,36 @@ async def sim_status():
 
 @sim_router.post("/scenarios/vip")
 async def inject_vip_scenario(authorization: Optional[str] = Header(default=None)):
-    """Publish a notice crossing running drones to produce live breaches (Contract 4)."""
-    user = get_current_user(authorization)
-    if user and user.get("role") not in ("official", "admin"):
-        raise HTTPException(403, "official access only")
+    """Publish a VIP restriction over the drones that are flying now (Contract 4).
 
+    It goes through the normal notice path (the same as an official publishing one), so pilots with flights there are alerted,
+    conflicting permits are listed, and the geofence engine raises breaches on the next tick.
+    """
+    user = require_official(authorization)
+    import bridge
     sim = get_fleet_simulator()
-    if not sim.is_running:
-        sim.start(count=50)
+    if not sim.drones:
+        sim.start(count=30)
+    lat, lng = sim.vip_center()
+    now = datetime.now(timezone.utc)
+    notice = bridge.create_notice("VIP movement (simulated scenario)", "Temporary restriction for an official movement.", lat, lng, 1.5,
+                                  now.isoformat(timespec="seconds"), (now + timedelta(hours=3)).isoformat(timespec="seconds"), user["name"])
+    return {"ok": True, "notice_id": notice["notice_id"], "title": notice["title"], "affected_drones": sum(1 for d in sim.drones if _inside(d, notice)),
+            "affected_flights": notice["affected_flights"], "conflicting_permits": notice["conflicting_permits"]}
 
-    result = sim.inject_vip_scenario()
-    return result
+
+def _inside(drone, notice):
+    from geo import point_in_polygon
+    return point_in_polygon(drone.lng, drone.lat, notice["area"])
+
+
+@router.get("/breaches")
+async def recent_breaches(limit: int = Query(default=20, ge=1, le=100), authorization: Optional[str] = Header(default=None)):
+    """The latest geofence breaches, newest first. Officials only."""
+    require_official(authorization)
+    if config.USE_MONGO:
+        from db import get_db
+        rows = list(get_db().breaches.find({}, {"_id": 0}).sort("ts", -1).limit(limit))
+    else:
+        rows = sorted(runtime.all_("breaches"), key=lambda b: b.get("ts", ""), reverse=True)[:limit]
+    return {"breaches": rows}

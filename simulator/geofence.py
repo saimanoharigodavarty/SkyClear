@@ -41,6 +41,14 @@ def _is_notice_active_at(notice: dict, now: datetime) -> bool:
         return True
 
 
+def _covered_by_permit(drone, now):
+    """A drone may be inside a yellow zone only while its own permit covers where it is and the permit window is open."""
+    if drone.permit_area is not None:
+        in_window = (drone.permit_start is None or drone.permit_start <= now) and (drone.permit_end is None or now <= drone.permit_end)
+        return in_window and point_in_polygon(drone.lng, drone.lat, drone.permit_area)
+    return drone.is_approved  # background traffic that was marked as approved
+
+
 class GeofenceEngine:
     """Evaluates spatial constraints and predicts boundary breaches."""
 
@@ -91,7 +99,7 @@ class GeofenceEngine:
 
             if point_in_polygon(drone.lng, drone.lat, geom):
                 # If flight is approved, it has clearance to fly unless prohibited
-                if drone.is_approved and zone_type not in ("military", "prohibited"):
+                if zone_type not in ("military", "prohibited") and _covered_by_permit(drone, now):
                     continue
 
                 name = props.get("name") or props.get("zone_id", "Restricted Area")
@@ -145,7 +153,7 @@ class GeofenceEngine:
             zone_type = props.get("zone_type", "")
             if zone_type not in ("military", "airport", "government", "prohibited", "restricted"):
                 continue
-            if drone.is_approved and zone_type not in ("military", "prohibited"):
+            if zone_type not in ("military", "prohibited") and _covered_by_permit(drone, now):
                 continue
 
             ts = segment_polygon_intersections(drone.lng, drone.lat, ahead_lng, ahead_lat, geom)

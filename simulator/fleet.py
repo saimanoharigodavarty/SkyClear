@@ -4,7 +4,9 @@ Coordinates kinematics, geofencing, batched telemetry persistence,
 and real-time event streaming for Contract 3 and Contract 4.
 """
 import asyncio
-from datetime import datetime, timezone
+import math
+import threading
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import random
 import secrets
@@ -41,6 +43,10 @@ class FleetSimulator:
         self.actual_tps = 0.0
         self._tick_times = []
         self._recent_telemetry = []
+        self._lock = threading.RLock()
+        self._loop = None            # the server's event loop, set at startup, so any thread can start the simulation
+        self.on_landed = None        # callback(flight_id, reason, stats): a pilot's flight ended
+        self.on_breach = None        # callback(breach, drone): a pilot's drone entered restricted airspace
 
     def _get_db(self):
         if config.USE_MONGO:
@@ -58,54 +64,15 @@ class FleetSimulator:
         if bbox and len(bbox) == 4:
             self.bbox = tuple(bbox)
 
-        # Cancel any existing running loop task
-        if self._task and not self._task.done():
-            self._task.cancel()
-        self._task = None
-
-        # Clear existing drones
-        self.drones = []
-
-        # Load approved flights from runtime/mongo
-        approved_flights = []
-        try:
-            all_flights = runtime.all_("flights")
-            approved_flights = [f for f in all_flights if f.get("status") == "approved"]
-        except Exception:
-            pass
-
+        # A restart replaces the background traffic only. Pilots' flights keep flying.
+        with self._lock:
+            self.drones = [d for d in self.drones if d.kind == "flight"]
         idx = 1
-        # 1. Spawn approved flights on their own routes
-        for flight in approved_flights:
-            lat = flight.get("lat", 17.42)
-            lng = flight.get("lng", 78.45)
-            # Build waypoints around the flight point
-            wpts = [
-                (lat - 0.015, lng - 0.015, 60.0),
-                (lat + 0.015, lng + 0.015, 75.0),
-                (lat + 0.02, lng - 0.01, 55.0),
-            ]
-            drone = DroneKinematics(
-                drone_id=f"SIM-{idx:03d}",
-                flight_id=flight.get("flight_id", f"F-{secrets.token_hex(3).upper()}"),
-                initial_lat=lat,
-                initial_lng=lng,
-                initial_alt_m=60.0,
-                speed_mps=11.0,
-                battery_pct=random.uniform(70.0, 95.0),
-                waypoints=wpts,
-                bbox=self.bbox,
-                owner_id=flight.get("user_id"),
-                is_approved=True,
-            )
-            self.drones.append(drone)
-            idx += 1
-            if len(self.drones) >= count:
-                break
 
-        # 2. Spawn remaining drones for random missions
+        # Background traffic: random missions, so the airspace is busy and the scale is real.
+        traffic_target = count + len(self.drones)
         min_lng, min_lat, max_lng, max_lat = self.bbox
-        while len(self.drones) < count:
+        while len(self.drones) < traffic_target:
             r_lat = random.uniform(min_lat + 0.05, max_lat - 0.05)
             r_lng = random.uniform(min_lng + 0.05, max_lng - 0.05)
             r_alt = random.uniform(40.0, 90.0)
@@ -127,22 +94,103 @@ class FleetSimulator:
 
         self.is_running = True
         self._tick_times = []
+        self._ensure_task()
 
-        # Start asyncio background task if event loop is running
+    def attach_loop(self, loop):
+        """Called once at server startup. Lets flights launched from any thread start the simulation loop."""
+        self._loop = loop
+
+    def _ensure_task(self):
+        """Make sure the 1 Hz loop is running, from the event loop thread or from any other thread."""
+        def go():
+            if self._task is None or self._task.done():
+                self._task = asyncio.get_running_loop().create_task(self._run_loop())
         try:
-            loop = asyncio.get_running_loop()
-            self._task = loop.create_task(self._run_loop())
+            asyncio.get_running_loop()
+            go()
         except RuntimeError:
-            pass
+            if self._loop is not None and self._loop.is_running():
+                self._loop.call_soon_threadsafe(go)
 
     def stop(self):
-        """Stop simulator and remove simulated drones."""
+        """Remove the background traffic. Pilots' flights keep flying, the loop stops only when nothing is left in the air."""
+        with self._lock:
+            self.drones = [d for d in self.drones if d.kind == "flight"]
+            if not self.drones:
+                self._halt()
+
+    def stop_all(self):
+        """Remove every simulated drone, including pilots' flights."""
+        with self._lock:
+            self.drones = []
+            self._halt()
+
+    def _halt(self):
         self.is_running = False
         if self._task and not self._task.done():
             self._task.cancel()
         self._task = None
-        self.drones = []
         self.actual_tps = 0.0
+
+    # ---- a pilot's flight: launch, recall, land ----
+    def launch_flight(self, flight, permit=None, alt_max_m=60.0, laps=2):
+        """Start a simulated drone for one flight. Needs a cleared preflight, which the API checks before calling this.
+
+        The route is a loop of `laps` circles around the flight spot (inside the permit area when there is a permit),
+        then back to the launch point and landing.
+        """
+        lat, lng = flight["lat"], flight["lng"]
+        radius_m = 150.0
+        pts = []
+        for lap in range(laps):
+            for a in range(0, 360, 45):
+                r = math.radians(a)
+                pts.append((lat + (radius_m * math.cos(r)) / 111320.0, lng + (radius_m * math.sin(r)) / (111320.0 * max(0.1, math.cos(math.radians(lat)))),
+                            min(alt_max_m, 55.0)))
+        pts.append((lat, lng, 30.0))
+        area = permit.get("area") if permit else None
+        start = datetime.fromisoformat(permit["starts_at"].replace("Z", "+00:00")) if permit else None
+        end = datetime.fromisoformat(permit["ends_at"].replace("Z", "+00:00")) if permit else None
+        d = DroneKinematics(
+            drone_id=flight.get("drone_id", f"FL-{flight['flight_id']}"), flight_id=flight["flight_id"],
+            initial_lat=lat, initial_lng=lng, initial_alt_m=2.0, speed_mps=10.0, battery_pct=random.uniform(88.0, 100.0),
+            waypoints=pts, bbox=self.bbox, owner_id=flight.get("pilot_id"), kind="flight", one_shot=True,
+            permit_id=permit["permit_id"] if permit else None, permit_area=area,
+            permit_start=start.replace(tzinfo=start.tzinfo or timezone.utc) if start else None,
+            permit_end=end.replace(tzinfo=end.tzinfo or timezone.utc) if end else None)
+        with self._lock:
+            self.drones = [x for x in self.drones if x.flight_id != flight["flight_id"]]  # one drone per flight
+            self.drones.append(d)
+            self.is_running = True
+            self._ensure_task()
+        return d.drone_id
+
+    def get_flight_drone(self, flight_id):
+        return next((d for d in self.drones if d.flight_id == flight_id), None)
+
+    def recall_flight(self, flight_id):
+        """Order a flight's drone home. Returns True if it was in the air."""
+        d = self.get_flight_drone(flight_id)
+        if d is None or d.landed:
+            return False
+        d.recall()
+        return True
+
+    def land_flight(self, flight_id):
+        """Land a flight's drone now, where it is, and remove it. Returns its flight stats, or None if it was not in the air."""
+        d = self.get_flight_drone(flight_id)
+        if d is None or d.landed:
+            return None
+        d.landed, d.landed_reason, d.speed_mps, d.alt_m = True, "completed", 0.0, 0.0
+        now = datetime.now(timezone.utc)
+        stats = {"reason": "completed", "breaches": d.breach_count, "max_alt_m": round(d.max_alt_m, 1), "battery_pct": round(d.battery_pct, 1),
+                 "launched_at": d.launched_at.isoformat(timespec="seconds"), "landed_at": now.isoformat(timespec="seconds")}
+        with self._lock:
+            self.drones = [x for x in self.drones if x is not d]
+            if not self.drones:
+                self._halt()
+        self._dispatch_event("landed", {"flight_id": d.flight_id, "drone_id": d.drone_id, **stats})
+        return stats
 
     def tick(self, dt: float = 1.0):
         """Advance simulation by dt seconds across all drones."""
@@ -163,14 +211,31 @@ class FleetSimulator:
         telemetry_batch = []
         breaches_generated = []
 
-        for drone in self.drones:
+        landed = []
+        with self._lock:
+            airborne = list(self.drones)
+        for drone in airborne:
             drone.step(dt * self.speed_x)
+            if drone.landed:
+                landed.append(drone)
+                continue
             status, zone_name, breach = self.geofence.evaluate_drone(
                 drone, active_zones, active_notices, now_dt=now
             )
             if breach:
-                breaches_generated.append(breach)
-                self.geofence.log_breach(breach)
+                key = (breach["kind"], breach["name"])
+                if drone.last_breach != key:  # one entry into restricted airspace is one event, not one per second
+                    drone.last_breach = key
+                    drone.breach_count += 1
+                    breaches_generated.append(breach)
+                    self.geofence.log_breach(breach)
+                    if drone.kind == "flight" and self.on_breach:
+                        try:
+                            self.on_breach(breach, drone)
+                        except Exception as e:
+                            print(f"[sim] breach callback failed: {e}")
+            else:
+                drone.last_breach = None
 
             # Batch telemetry record (Contract 5)
             rec = drone.telemetry_record(now_dt=now)
@@ -184,6 +249,21 @@ class FleetSimulator:
                 pass
         self._recent_telemetry = telemetry_batch[-100:]
 
+        # 4. Drones that finished their route or came home after a recall have landed
+        if landed:
+            with self._lock:
+                self.drones = [d for d in self.drones if d not in landed]
+            for d in landed:
+                stats = {"reason": d.landed_reason or "completed", "breaches": d.breach_count, "max_alt_m": round(d.max_alt_m, 1),
+                         "battery_pct": round(d.battery_pct, 1), "launched_at": d.launched_at.isoformat(timespec="seconds"),
+                         "landed_at": now.isoformat(timespec="seconds")}
+                self._dispatch_event("landed", {"flight_id": d.flight_id, "drone_id": d.drone_id, **stats})
+                if d.kind == "flight" and self.on_landed:
+                    try:
+                        self.on_landed(d.flight_id, stats["reason"], stats)
+                    except Exception as e:
+                        print(f"[sim] landed callback failed: {e}")
+
         return {
             "telemetry": telemetry_batch,
             "breaches": breaches_generated,
@@ -193,6 +273,9 @@ class FleetSimulator:
     async def _run_loop(self):
         """1 Hz asyncio loop stepping kinematics, geofencing, and telemetry batched write."""
         while self.is_running:
+            if not self.drones:  # nothing in the air: stop ticking until something launches
+                self._halt()
+                break
             t0 = time.monotonic()
             step_res = self.tick(dt=1.0)
             telemetry_batch = step_res["telemetry"]
@@ -262,11 +345,15 @@ class FleetSimulator:
         drones_out = []
 
         is_pilot = bool(user and user.get("role") == "pilot")
+        is_official = bool(user and user.get("role") == "official")
         pilot_id = user.get("user_id") if is_pilot else None
 
-        for d in self.drones:
-            # Contract 3: Pilots only receive their own drones. Officials and guests receive all.
+        for d in list(self.drones):
+            # Contract 3: a pilot sees their own drones, an official sees every drone, a visitor sees background traffic only
+            # (a pilot's position is private).
             if is_pilot and d.owner_id != pilot_id:
+                continue
+            if not is_pilot and not is_official and d.kind == "flight":
                 continue
 
             snap = d.snapshot(as_of_iso=now_iso)
@@ -281,82 +368,13 @@ class FleetSimulator:
 
         return {"as_of": now_iso, "drones": drones_out}
 
-    def inject_vip_scenario(self):
-        """Publish a notice that crosses paths of running drones to demo live breaches (Contract 4)."""
-        now = datetime.now(timezone.utc)
-        now_iso = now.isoformat(timespec="seconds")
-        later_iso = (now.replace(hour=(now.hour + 4) % 24)).isoformat(timespec="seconds")
-
-        # Pick location near active drones or Hyderabad center
-        if self.drones:
-            sample_drones = self.drones[:5]
-            avg_lat = sum(d.lat for d in sample_drones) / len(sample_drones)
-            avg_lng = sum(d.lng for d in sample_drones) / len(sample_drones)
-        else:
-            avg_lat, avg_lng = 17.43, 78.44
-
-        # Create a restricted corridor polygon across active drone paths
-        corridor_notice = {
-            "notice_id": f"RN-VIP-{secrets.token_hex(2).upper()}",
-            "title": "VIP Motorcade Restricted Airspace",
-            "text": "Temporary flight restriction for official dignitary movement.",
-            "starts_at": now_iso,
-            "ends_at": later_iso,
-            "status": "active",
-            "source": "State Police Airspace Notice",
-            "area": {
-                "type": "Polygon",
-                "coordinates": [[
-                    [round(avg_lng - 0.02, 5), round(avg_lat - 0.01, 5)],
-                    [round(avg_lng + 0.02, 5), round(avg_lat - 0.01, 5)],
-                    [round(avg_lng + 0.02, 5), round(avg_lat + 0.01, 5)],
-                    [round(avg_lng - 0.02, 5), round(avg_lat + 0.01, 5)],
-                    [round(avg_lng - 0.02, 5), round(avg_lat - 0.01, 5)],
-                ]]
-            }
-        }
-
-        # Store notice in runtime and Mongo
-        runtime.insert("notices", corridor_notice)
-        db = self._get_db()
-        if db is not None:
-            try:
-                db.notices.insert_one(dict(corridor_notice))
-            except Exception:
-                pass
-
-        # Trigger immediate geofence evaluation on running drones
-        affected = 0
-        for d in self.drones:
-            st, name, breach = self.geofence.evaluate_drone(d, [], [corridor_notice], now_dt=now)
-            if breach or st == "warning":
-                affected += 1
-                if breach:
-                    self.geofence.log_breach(breach)
-                    self._dispatch_event("breach", breach)
-
-                # Generate alert notification for pilot if drone has an owner
-                if d.owner_id:
-                    alert_doc = {
-                        "notification_id": f"NT-{secrets.token_hex(3).upper()}",
-                        "user_id": d.owner_id,
-                        "kind": "notice",
-                        "title": f"Airspace Alert: {corridor_notice['title']}",
-                        "body": f"Your flight {d.flight_id} is affected by an active restriction notice.",
-                        "severity": "high",
-                        "flight_id": d.flight_id,
-                        "read": False,
-                        "created_at": now_iso,
-                    }
-                    runtime.insert("notifications", alert_doc)
-                    self._dispatch_event("alert", alert_doc)
-
-        return {
-            "ok": True,
-            "notice_id": corridor_notice["notice_id"],
-            "title": corridor_notice["title"],
-            "affected_drones": affected,
-        }
+    def vip_center(self):
+        """Where a VIP restriction would cross drones that are flying right now, preferring pilots' flights. Returns (lat, lng)."""
+        flights = [d for d in self.drones if d.kind == "flight"]
+        sample = flights[:3] or self.drones[:5]
+        if sample:
+            return (sum(d.lat for d in sample) / len(sample), sum(d.lng for d in sample) / len(sample))
+        return (17.43, 78.44)
 
 
 _simulator_instance = None

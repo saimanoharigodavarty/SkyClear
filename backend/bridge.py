@@ -17,7 +17,7 @@ from pipeline import evaluate, get_drone, parse_when
 from security import current_user, require
 
 router = APIRouter()
-ACTIVE_FLIGHT = ("watching", "requested", "approved")
+ACTIVE_FLIGHT = ("watching", "requested", "approved", "cleared", "flying")
 
 
 # ---- auth ----
@@ -178,8 +178,98 @@ def preflight(flight_id: str, user=Depends(require("pilot"))):
     if f["pilot_id"] != user["user_id"]:
         raise HTTPException(403, "not your flight")
     result = permits.preflight(f, user)
-    runtime.update("flights", "flight_id", flight_id, {"last_preflight": {k: result[k] for k in ("cleared", "reasons", "checked_at")}})
+    changes = {"last_preflight": {k: result[k] for k in ("cleared", "reasons", "checked_at")}}
+    if result["cleared"] and f["status"] in ("approved", "watching"):
+        changes.update({"status": "cleared", "cleared_until": result["cleared_until"], "before_clearance": f["status"]})
+    elif result["cleared"] and f["status"] == "cleared":
+        changes["cleared_until"] = result["cleared_until"]
+    elif not result["cleared"] and f["status"] == "cleared":
+        changes.update({"status": f.get("before_clearance") or "approved", "cleared_until": None})  # clearance is lost the moment a check fails
+    runtime.update("flights", "flight_id", flight_id, changes)
     return result
+
+
+def _fleet():
+    import sys
+    from pathlib import Path
+    root = str(Path(__file__).resolve().parent.parent)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from simulator.fleet import get_fleet_simulator
+    return get_fleet_simulator()
+
+
+@router.post("/flights/{flight_id}/launch")
+def launch_flight(flight_id: str, user=Depends(require("pilot"))):
+    """Take off (simulated). Only a flight that passes preflight right now can launch."""
+    f = _get_flight(flight_id)
+    if f["pilot_id"] != user["user_id"]:
+        raise HTTPException(403, "not your flight")
+    if f["status"] == "flying":
+        raise HTTPException(409, "this flight is already in the air")
+    if f["status"] != "cleared":
+        raise HTTPException(409, "Run preflight first. Only a cleared flight can take off.")
+    result = permits.preflight(f, user)  # conditions can change between preflight and takeoff, so check again
+    if not result["cleared"]:
+        runtime.update("flights", "flight_id", flight_id, {"status": f.get("before_clearance") or "approved", "cleared_until": None})
+        raise HTTPException(409, "Not cleared to take off: " + "; ".join(result["reasons"]))
+    permit = permits.get_permit(f["permit_id"]) if f.get("permit_id") else None
+    drone_id = _fleet().launch_flight(f, permit, alt_max_m=permit["alt_max_m"] if permit else 60)
+    return {**runtime.update("flights", "flight_id", flight_id, {"status": "flying", "launched_at": runtime.now_iso(), "cleared_until": None, "breaches": 0}), "drone_id": drone_id}
+
+
+@router.post("/flights/{flight_id}/land")
+def land_flight(flight_id: str, user=Depends(require("pilot"))):
+    """Land the drone now."""
+    f = _get_flight(flight_id)
+    if f["pilot_id"] != user["user_id"]:
+        raise HTTPException(403, "not your flight")
+    if f["status"] not in ("flying", "recalled"):
+        raise HTTPException(409, "this flight is not in the air")
+    stats = _fleet().land_flight(flight_id)
+    if stats is None:  # the drone already landed (for example it finished its route)
+        return _get_flight(flight_id)
+    return complete_flight(flight_id, "completed" if f["status"] == "flying" else "recalled", stats)
+
+
+class Recall(BaseModel):
+    reason: str = Field(min_length=3, max_length=300)
+
+
+@router.post("/flights/{flight_id}/recall")
+def recall_flight(flight_id: str, body: Recall, user=Depends(require("official"))):
+    """An officer orders a flying drone home, without touching the permit. The pilot is alerted at once."""
+    f = _get_flight(flight_id)
+    if not routing.visible_to(user, f) and user.get("authority_id") != f.get("authority_id") and user.get("authority_id"):
+        raise HTTPException(403, "this flight belongs to a different authority")
+    if f["status"] != "flying" or not _fleet().recall_flight(flight_id):
+        raise HTTPException(409, "this flight is not in the air")
+    notify(f["pilot_id"], "recall", "Your drone has been recalled", f"{user['name']} ordered your drone home: {body.reason.strip()}. Land now.", severity="high", flight_id=flight_id)
+    return runtime.update("flights", "flight_id", flight_id, {"status": "recalled", "recalled_by": user["name"], "recall_reason": body.reason.strip()})
+
+
+def complete_flight(flight_id, reason, stats):
+    """A flight ended: record the log and tell the pilot. Called when the drone lands, from the API or from the simulator."""
+    f = next((x for x in runtime.all_("flights") if x["flight_id"] == flight_id), None)
+    if f is None:
+        return None
+    status = "completed" if reason == "completed" else "recalled"
+    done = runtime.update("flights", "flight_id", flight_id, {"status": status, "landed_at": stats["landed_at"], "flight_log": stats, "breaches": stats.get("breaches", 0)})
+    n = stats.get("breaches", 0)
+    notify(f["pilot_id"], "landed", "Flight ended" if status == "completed" else "Drone back home after a recall",
+           f"Flight {flight_id} ended. " + (f"Your drone entered restricted airspace {n} time{'s' if n != 1 else ''}." if n else "No restricted airspace was entered."),
+           severity="high" if n else "info", flight_id=flight_id)
+    return done
+
+
+def on_drone_breach(breach, drone):
+    """A pilot's drone entered restricted airspace: tell the pilot now, and keep the count on the flight."""
+    f = next((x for x in runtime.all_("flights") if x["flight_id"] == drone.flight_id), None)
+    if f is None:
+        return
+    runtime.update("flights", "flight_id", f["flight_id"], {"breaches": drone.breach_count})
+    notify(f["pilot_id"], "breach", "Your drone entered restricted airspace", f"Your drone is inside {breach['name']}. Return or land now.",
+           severity="high", flight_id=f["flight_id"])
 
 
 @router.get("/permits/{permit_id}")
@@ -207,8 +297,10 @@ def revoke_permit(permit_id: str, body: Revoke, user=Depends(require("official")
     if p["status"] != "active":
         raise HTTPException(409, "permit is not active")
     p = runtime.update("permits", "permit_id", permit_id, {"status": "revoked", "revoked_by": user["name"], "revoked_reason": body.reason.strip(), "revoked_at": runtime.now_iso()})
-    runtime.update("flights", "flight_id", f["flight_id"], {"status": "revoked"})
-    notify(f["pilot_id"], "permit", f"Permit {permit_id} revoked", f"{user['name']} revoked your permit: {body.reason.strip()}. You are not cleared to fly.",
+    flying = f["status"] == "flying" and _fleet().recall_flight(f["flight_id"])
+    runtime.update("flights", "flight_id", f["flight_id"], {"status": "recalled" if flying else "revoked", "cleared_until": None})
+    notify(f["pilot_id"], "permit", f"Permit {permit_id} revoked",
+           f"{user['name']} revoked your permit: {body.reason.strip()}. " + ("Your drone has been ordered home. Land now." if flying else "You are not cleared to fly."),
            severity="high", flight_id=f["flight_id"])
     return permits.view(p)
 
@@ -263,22 +355,28 @@ def _window(n):
     return f"{s.astimezone().strftime('%d %b %H:%M')} to {e.astimezone().strftime('%H:%M')}"
 
 
-@router.post("/notices")
-def publish_notice(body: NoticeIn, user=Depends(require("official"))):
-    if parse_when(body.ends_at) <= parse_when(body.starts_at):
-        raise HTTPException(422, "end must be after start")
+def create_notice(title, note, lat, lng, radius_km, starts_at, ends_at, published_by):
+    """Publish a restriction: store it, alert the pilots whose flights it touches, and list the permits it conflicts with.
+    Used by the officer's form and by the simulation's VIP scenario, so both follow exactly the same path."""
     notice = runtime.insert("notices", {
-        "notice_id": runtime.new_id("RN"), "title": body.title.strip(), "text": body.note.strip(),
-        "status": "active", "origin": "official", "starts_at": body.starts_at, "ends_at": body.ends_at,
-        "center": {"lat": body.lat, "lng": body.lng}, "radius_km": body.radius_km,
-        "area": circle(body.lat, body.lng, body.radius_km),
-        "source": f"Published by {user['name']}", "published_by": user["name"], "published_at": runtime.now_iso()})
+        "notice_id": runtime.new_id("RN"), "title": title.strip(), "text": note.strip(),
+        "status": "active", "origin": "official", "starts_at": starts_at, "ends_at": ends_at,
+        "center": {"lat": lat, "lng": lng}, "radius_km": radius_km,
+        "area": circle(lat, lng, radius_km),
+        "source": f"Published by {published_by}", "published_by": published_by, "published_at": runtime.now_iso()})
     hit = _affected(notice)
     for f in hit:
         notify(f["pilot_id"], "notice", f"Restriction: {notice['title']}",
                f"A restriction overlaps your flight {f['flight_id']} ({_window(notice)}). Do not fly in this area during this time unless the authority says otherwise.",
                severity="high", flight_id=f["flight_id"])
     return {**notice, "affected_flights": len(hit), "conflicting_permits": permits.conflicting_permits(notice)}
+
+
+@router.post("/notices")
+def publish_notice(body: NoticeIn, user=Depends(require("official"))):
+    if parse_when(body.ends_at) <= parse_when(body.starts_at):
+        raise HTTPException(422, "end must be after start")
+    return create_notice(body.title, body.note, body.lat, body.lng, body.radius_km, body.starts_at, body.ends_at, user["name"])
 
 
 @router.post("/notices/{notice_id}/cancel")

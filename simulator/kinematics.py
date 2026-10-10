@@ -44,7 +44,28 @@ class DroneKinematics:
         bbox: tuple = None,
         owner_id: str = None,
         is_approved: bool = False,
+        kind: str = "traffic",
+        permit_id: str = None,
+        permit_area: dict = None,
+        permit_start: datetime = None,
+        permit_end: datetime = None,
+        one_shot: bool = False,
     ):
+        # kind "flight" is a pilot's real (simulated) flight tied to a permit, "traffic" is background fleet traffic.
+        self.kind = kind
+        self.permit_id = permit_id
+        self.permit_area = permit_area      # GeoJSON polygon the permit covers
+        self.permit_start = permit_start
+        self.permit_end = permit_end
+        self.one_shot = one_shot            # fly the route once, return and land (a pilot's flight)
+        self.launch_pos = (initial_lat, initial_lng)
+        self.recalled = False
+        self.landed = False
+        self.landed_reason = None
+        self.last_breach = None             # (kind, name) of the breach already reported, so one entry is one event
+        self.breach_count = 0
+        self.max_alt_m = initial_alt_m
+        self.launched_at = datetime.now(timezone.utc)
         self.drone_id = drone_id
         self.flight_id = flight_id
         self.owner_id = owner_id
@@ -93,7 +114,18 @@ class DroneKinematics:
         self.waypoint_idx = 0
 
     def step(self, dt: float, wind_mps: float = 2.0, wind_heading_deg: float = 90.0):
+        """Advance dt seconds. A long step (fast playback) is split into steps of at most one second, otherwise a drone
+        moves further than the waypoint arrival radius in one step, flies past it and never lands."""
+        n = max(1, math.ceil(dt))
+        for _ in range(n):
+            if self.landed:
+                break
+            self._step(dt / n, wind_mps, wind_heading_deg)
+
+    def _step(self, dt: float, wind_mps: float = 2.0, wind_heading_deg: float = 90.0):
         """Update kinematics over dt seconds with wind drift, turn limits, and battery drain."""
+        if self.landed:
+            return
         if not self.waypoints:
             self._generate_random_waypoints(3)
 
@@ -106,6 +138,13 @@ class DroneKinematics:
         if dist_m < 25.0:
             self.waypoint_idx += 1
             if self.waypoint_idx >= len(self.waypoints):
+                if self.one_shot:
+                    # The route is done (or the drone is back after a recall): land here.
+                    self.landed = True
+                    self.landed_reason = "recalled" if self.recalled else "completed"
+                    self.speed_mps = 0.0
+                    self.alt_m = 0.0
+                    return
                 if self.is_approved:
                     # Patrol back and forth or loop
                     self.waypoints.reverse()
@@ -173,9 +212,18 @@ class DroneKinematics:
         # Battery drain proportional to speed and time
         drain = (self.drain_rate_per_sec * (1.0 + (self.speed_mps / 15.0))) * dt
         self.battery_pct = max(0.0, self.battery_pct - drain)
+        self.max_alt_m = max(self.max_alt_m, self.alt_m)
 
         # Update reported position with sensor noise once per step
         self.reported_lat, self.reported_lng = self.get_reported_position()
+
+    def recall(self):
+        """Order the drone home: fly straight back to where it launched, then land."""
+        self.recalled = True
+        self.one_shot = True
+        self.waypoints = [(self.launch_pos[0], self.launch_pos[1], 40.0)]
+        self.waypoint_idx = 0
+        self.target_speed_mps = max(self.target_speed_mps, 14.0)
 
     def get_reported_position(self):
         """Return (lat, lng) with realistic GPS sensor noise added."""
@@ -199,6 +247,7 @@ class DroneKinematics:
             "battery_pct": round(self.battery_pct, 1),
             "status": self.status,
             "zone": self.zone,
+            "phase": "returning" if self.recalled else "flying",
             "ts": ts,
         }
 

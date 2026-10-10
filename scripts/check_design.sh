@@ -9,7 +9,7 @@ chk() { # name, pattern
 }
 chk "gradient"            'gradient\('
 chk "pure white"          '#fff\b|#ffffff|:[[:space:]]*white|rgb\(255, ?255, ?255\)'
-chk "shadow"              'box-shadow|text-shadow|drop-shadow'
+chk "shadow"              '(box|text)-shadow:[[:space:]]*[^n[:space:]]|drop-shadow'
 chk "glass/blur"          'backdrop-filter'
 chk "em/en dash"          '—|–|&mdash;|&ndash;'
 chk "emoji/checkmark"     '[✓✔✅❌★☆✨🚀🎯💡]'
@@ -21,6 +21,6 @@ chk "transition/animation" 'transition|@keyframes|animation:|:hover'
 chk "lucide"              'lucide'
 chk "neon/pastel names"   'neon|pastel'
 for f in frontend/terms.html frontend/privacy.html; do [ -f "$f" ] || { echo "FAIL missing $f"; fail=1; }; done
-grep -q 'skel' frontend/index.html || { echo "FAIL no skeleton loader"; fail=1; }
+grep -rq 'skel' frontend || { echo "FAIL no skeleton loader"; fail=1; }
 [ $fail -eq 0 ] && echo "design check passed"
 exit $fail

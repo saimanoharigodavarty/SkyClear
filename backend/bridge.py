@@ -283,6 +283,18 @@ def list_notices(user=Depends(current_user)):
     return out
 
 
+@router.get("/notices/active")
+def active_notices():
+    """Active restrictions for the map. Prototype: public. See PRODUCT.md C6 about sensitivity."""
+    from pipeline import store
+    now = parse_when(None)
+    out = []
+    for n in store.notices + [n for n in runtime.all_("notices") if n["status"] == "active"]:
+        if parse_when(n["ends_at"]) >= now:
+            out.append({k: n.get(k) for k in ("notice_id", "title", "starts_at", "ends_at", "source")} | {"area": n["area"]})
+    return out
+
+
 @router.get("/overview")
 def overview(user=Depends(require("official"))):
     flights = runtime.all_("flights")

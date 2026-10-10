@@ -4,15 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Terms of Service - SkyClear</title>
-<style>
-  :root { --bg: #f4f2ee; --text: #1b1f24; --accent: #1f4e79; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #14171a; --text: #e8eaed; --accent: #6fa3d6; } }
-  body { margin: 0 auto; max-width: 680px; padding: 24px 16px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); line-height: 1.55; }
-  a { color: var(--accent); }
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="app.css">
 </head>
 <body>
-<p><a href="index.html">Back to SkyClear</a></p>
+<header class="top" id="top"></header>
+<main class="doc" style="flex:1">
+
 <h1>Terms of Service</h1>
 <p>Last updated: 2026-10-10. This is a hackathon prototype.</p>
 <h2>What SkyClear is</h2>
@@ -27,5 +26,9 @@
 <p>The service is provided as is, without warranty of any kind. To the extent the law allows, the authors are not liable for fines, loss, damage or injury that result from using it.</p>
 <h2>Changes</h2>
 <p>These terms may change. The date above shows the latest version.</p>
+</main>
+<footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a></footer>
+<script src="common.js"></script>
+<script>header(null);</script>
 </body>
 </html>

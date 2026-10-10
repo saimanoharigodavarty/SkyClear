@@ -4,26 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Privacy Policy - SkyClear</title>
-<style>
-  :root { --bg: #f4f2ee; --text: #1b1f24; --accent: #1f4e79; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #14171a; --text: #e8eaed; --accent: #6fa3d6; } }
-  body { margin: 0 auto; max-width: 680px; padding: 24px 16px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); line-height: 1.55; }
-  a { color: var(--accent); }
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="app.css">
 </head>
 <body>
-<p><a href="index.html">Back to SkyClear</a></p>
+<header class="top" id="top"></header>
+<main class="doc" style="flex:1">
+
 <h1>Privacy Policy</h1>
 <p>Last updated: 2026-10-10. This is a hackathon prototype.</p>
 <h2>What we receive</h2>
-<p>When you press Check, the page sends the location you clicked, the drone you chose and the date and time to the SkyClear backend. Nothing else is collected. There are no accounts, no cookies set by SkyClear and no advertising or analytics.</p>
+<p>When you press Check, the page sends the location you clicked, the drone you chose and the date and time to the SkyClear backend. Checking needs no account. If you register as a pilot we also keep your name, email, a hashed password, the drones you add, your saved flights and permission requests, and the alerts sent to you. Officials see the name, certificate and drone details you give when you request permission. There are no advertising or analytics trackers. Your sign-in token is kept in your browser's local storage.</p>
 <h2>How it is used</h2>
 <p>The request is used only to compute and explain the answer. The location and time are passed to a language model running on the project's own server (Ollama) and are not sent to third-party AI services.</p>
 <h2>Third parties</h2>
-<p>The map loads tiles from OpenStreetMap and scripts and styles from unpkg.com. Those services can see your IP address as with any web request. See their own policies.</p>
+<p>The map loads tiles from OpenStreetMap and scripts and styles from unpkg.com, and fonts from Google Fonts. Those services can see your IP address as with any web request. See their own policies.</p>
 <h2>Storage</h2>
 <p>Requests are not stored beyond ordinary server logs kept for debugging during the event.</p>
 <h2>Contact</h2>
 <p>Questions about this policy go to the project team at the hackathon.</p>
+</main>
+<footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a></footer>
+<script src="common.js"></script>
+<script>header(null);</script>
 </body>
 </html>

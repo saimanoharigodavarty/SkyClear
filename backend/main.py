@@ -34,6 +34,8 @@ app = FastAPI(title="SkyClear")
 @app.on_event("startup")
 def _start_change_streams():
     import events
+    import push
+    push.start()  # guard alerts are also sent as Web Push to subscribed browsers
     events.start_watchers()  # MongoDB change streams feed the live event channel (does nothing without MongoDB)
 
 

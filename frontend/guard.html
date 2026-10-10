@@ -19,6 +19,8 @@
   <button id="gOn" type="button">Turn alerts on</button>
   <div class="gstatus idle" id="gStatus">Alerts are off. Tap the button once, the browser needs a tap before it may play sound.</div>
   <button class="ghost" id="gTest" type="button" disabled>Play a test siren on this device</button>
+  <button class="ghost hidden" id="gPush" type="button">Also notify me when this page is closed</button>
+  <p class="small hidden" id="gPushNote"></p>
   <p class="small" id="gNote">Same Wi-Fi as the SkyClear server. The screen stays awake while alerts are on. Nothing identifying the pilot is sent to this page.</p>
 </main>
 <div id="gAlarm" class="galarm hidden" role="alertdialog" aria-live="assertive">

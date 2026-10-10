@@ -11,3 +11,4 @@ PyJWT
 argon2-cffi
 pyotp
 google-auth
+pywebpush

@@ -63,7 +63,7 @@ Logins are in `data/demo_credentials.txt` (not in git). Do not read passwords ou
 | Question | Answer |
 |---|---|
 | Is the drone real? | The drone in the demo is simulated. A real tracker can post positions to `POST /ingest/position` with its own key, and then everything after is the same (geofence, breach in MongoDB, officer feed, guard siren). That path is tested with a script, not with a real receiver. |
-| Does every phone on the Wi-Fi beep? | No. A browser needs one tap to allow sound and cannot receive anything when closed. People open the guard page once. A phone app or Web Push is the next step. |
+| Does every phone on the Wi-Fi beep? | No. A browser needs one tap to allow sound. With the page open it sounds. With the page closed, Web Push notifications are built, and browsers allow them on localhost or an https address only, so on the laptop they work, on a phone over plain http they do not. |
 | Can someone fake an alert? | The alert is made only from a breach recorded by the server. A test siren needs an official login and is audited. Tracker positions need a tracker key, which can be revoked. A leaked key can report false positions. |
 | Does the guard page leak who is flying? | No. Only the area name, the kind and the time are sent. |
 | Is the regulation text real? | No, seven marked sample passages. Retrieval numbers need the real corpus. |

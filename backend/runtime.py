@@ -20,7 +20,7 @@ def _mongo():
 _lock = threading.RLock()
 _EMPTY = {"users": [], "sessions": {}, "drones": [], "flights": [], "notices": [], "notifications": [],
           "permits": [], "verifications": [], "files": [], "authorities": [], "refresh_tokens": [], "otps": [],
-          "breaches": [], "audit_log": [], "trackers": []}
+          "breaches": [], "audit_log": [], "trackers": [], "push_subscriptions": []}
 _tls = threading.local()  # the MongoDB session of the transaction this thread is inside, if any
 
 

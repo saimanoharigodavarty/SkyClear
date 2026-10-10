@@ -53,3 +53,30 @@ $("gOn").addEventListener("click", async () => {
 $("gArea").addEventListener("change", () => { if (on) connect(); });
 $("gTest").addEventListener("click", () => alarm({ area: $("gArea").value || "this device", kind: "test", ts: new Date().toISOString() }));
 document.addEventListener("visibilitychange", async () => { if (on && document.visibilityState === "visible" && navigator.wakeLock) { try { wake = await navigator.wakeLock.request("screen"); } catch (e) { /* ignore */ } } });
+
+
+/* ---------- push notifications: they reach this device with the page closed. Needs https, or localhost. ---------- */
+const pushOk = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const b64ToBytes = b => { const p = "=".repeat((4 - b.length % 4) % 4), raw = atob((b + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(raw, c => c.charCodeAt(0)); };
+if (pushOk) {
+  $("gPush").classList.remove("hidden");
+  navigator.serviceWorker.getRegistration("/").then(r => r && r.pushManager.getSubscription()).then(sub => { if (sub) $("gPush").textContent = "Stop notifications when this page is closed"; }).catch(() => {});
+}
+$("gPush").addEventListener("click", async () => {
+  const note = $("gPushNote"); note.classList.remove("hidden");
+  if (!window.isSecureContext) { note.textContent = "Notifications need a secure address. This page is on plain http, which browsers refuse for push. It works on localhost, or behind an https link. The siren while the page is open still works."; return; }
+  try {
+    const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" }); await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) {
+      await api("/guard/push-unsubscribe", { method: "POST", auth: false, body: { endpoint: existing.endpoint, keys: {} } }).catch(() => {}); await existing.unsubscribe();
+      $("gPush").textContent = "Also notify me when this page is closed"; note.textContent = "Notifications are off."; return;
+    }
+    if ((await Notification.requestPermission()) !== "granted") { note.textContent = "Notifications are blocked for this site. Allow them in the browser settings."; return; }
+    const { key } = await api("/guard/push-key", { auth: false });
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+    const j = sub.toJSON();
+    await api("/guard/push-subscribe", { method: "POST", auth: false, body: { endpoint: j.endpoint, keys: j.keys, area: $("gArea").value || null } });
+    $("gPush").textContent = "Stop notifications when this page is closed"; note.textContent = "Done. An alert now shows as a notification even when this page is closed.";
+  } catch (e) { note.textContent = "Could not turn notifications on: " + e.message; }
+});

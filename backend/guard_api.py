@@ -13,6 +13,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
 import events
 import runtime
@@ -110,6 +111,38 @@ def guard_test(area: Optional[str] = None, user=Depends(require("official"))):
     events.emit("guard_test", "insert", {"area": area or "Test alert", "ts": runtime.now_iso()})
     runtime.audit(user, "guard_test", area or "all areas", "Siren test")
     return {"ok": True, "listeners": _open}
+
+
+class PushSub(BaseModel):
+    endpoint: str = Field(max_length=600)
+    keys: dict
+    area: Optional[str] = Field(default=None, max_length=120)
+
+
+@router.get("/guard/push-key")
+def guard_push_key():
+    """The public key the browser needs to subscribe. Public by design."""
+    import push
+    return {"key": push.public_key()}
+
+
+@router.post("/guard/push-subscribe")
+def guard_push_subscribe(body: PushSub, request: Request):
+    import push
+    from auth import rate_limit
+    rate_limit("push:" + (request.client.host if request.client else "x"), 20, 60)
+    try:
+        push.save_subscription({"endpoint": body.endpoint, "keys": body.keys}, body.area)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    return {"ok": True}
+
+
+@router.post("/guard/push-unsubscribe")
+def guard_push_unsubscribe(body: PushSub):
+    import push
+    push.remove_subscription(body.endpoint)
+    return {"ok": True}
 
 
 @router.get("/guard/status")

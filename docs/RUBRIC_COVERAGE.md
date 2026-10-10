@@ -24,7 +24,7 @@ Status is as of the last commit. "Gap" means not done, said plainly.
 | Change streams | `events.py`, `events_api.py`, pushed to browsers |
 | Multi-document transactions | `runtime.atomic()`: decisions, revocations, recalls, notices, verification, invites |
 | Append-only audit log | `runtime.audit()`, `GET /audit` (admin only) |
-| Guard alerts (public siren stream from a change stream) | `guard_api.py`, `frontend/guard.html`, `docs/GUARD_ALERTS.md` |
+| Guard alerts (public siren stream from a change stream, Web Push with a server key) | `guard_api.py`, `push.py`, `frontend/guard.html`, `frontend/sw.js`, `docs/GUARD_ALERTS.md` |
 
 Tests prove the transaction rollback and the change stream on a real MongoDB (`USE_MONGO=1 pytest`).
 Gap: no Atlas Charts dashboard, no sharding or replica-set write concern discussion beyond `docs/SCALING.md`.

@@ -260,3 +260,51 @@ function qrSvg(text) {
   return q.createSvgTag({ cellSize: 3, margin: 0, scalable: true });
 }
 const verifyBadge = v => { const s = (v && v.status) || "unverified"; return `<span class="tag ${esc(s === "verified" ? "approved" : s === "rejected" ? "rejected" : s === "pending" ? "requested" : "watching")}">${esc(STATUS_LABEL[s] || s)}</span>`; };
+
+/* ---------- flight lifecycle ---------- */
+const FLOW_PERMISSION = ["Requested", "Approved", "Cleared", "Flying", "Landed"];
+const FLOW_WATCH = ["Planned", "Cleared", "Flying", "Landed"];
+const FLOW_AT = { permission: { requested: 0, approved: 1, cleared: 2, flying: 3, completed: 4 }, watch: { watching: 0, cleared: 1, flying: 2, completed: 3 } };
+const FLOW_END = { rejected: "Rejected", cancelled: "Cancelled", revoked: "Permit revoked", recalled: "Recalled" };
+// The stages a flight goes through, with where this one is now. A flight that ended early shows why in red.
+function flowHTML(f) {
+  const kind = f.kind === "permission" ? "permission" : "watch", names = kind === "permission" ? FLOW_PERMISSION : FLOW_WATCH;
+  const at = FLOW_AT[kind][f.status], ended = FLOW_END[f.status];
+  const stage = at !== undefined ? at : (f.status === "recalled" ? names.length - 2 : f.launched_at ? names.length - 2 : f.permit_id || f.status === "revoked" ? 1 : 0);
+  const chips = names.map((n, i) => `<span class="${ended ? (i < stage ? "done" : i === stage && f.status === "recalled" ? "done" : "") : i < stage ? "done" : i === stage ? "on" : ""}">${esc(n)}</span>`).join("");
+  return `<div class="flow">${chips}${ended ? `<span class="end">${esc(ended)}</span>` : ""}</div>`;
+}
+
+/* ---------- live drones on the map ---------- */
+function droneIcon(d) {
+  const cls = d.phase === "returning" ? "returning" : d.status;
+  return L.divIcon({ className: "", html: `<div class="drone-pin ${cls}"><i style="transform:rotate(${Math.round(d.heading_deg)}deg)"></i></div>`, iconSize: [22, 22], iconAnchor: [11, 12] });
+}
+// Polls /live/drones and keeps one marker per flight. A pilot sees their own drone, an officer sees every drone, a visitor sees background traffic.
+function createLive(map, layer, onData, everyMs = 2000) {
+  const markers = new Map();
+  let timer = null;
+  async function tick() {
+    try {
+      const out = await api("/live/drones");
+      const seen = new Set();
+      out.drones.forEach(d => {
+        const key = d.flight_id; seen.add(key);
+        const ll = [d.lat, d.lng];
+        const flight = d.kind === "flight";
+        let m = markers.get(key);
+        if (!m) {
+          m = flight ? L.marker(ll, { icon: droneIcon(d), keyboard: false, zIndexOffset: 1000 }) : L.circleMarker(ll, { radius: 3.5, weight: 1, color: C.grey, fillColor: C.grey, fillOpacity: 0.7 });
+          m.addTo(layer); markers.set(key, m);
+        }
+        m.setLatLng(ll);
+        if (flight) m.setIcon(droneIcon(d));
+        else m.setStyle({ color: d.status === "breach" ? C.red : d.status === "warning" ? C.amber : C.grey, fillColor: d.status === "breach" ? C.red : d.status === "warning" ? C.amber : C.grey });
+        m.bindTooltip(`${esc(d.drone_id)}, ${Math.round(d.alt_m)} m, ${d.speed_mps} m/s${d.zone ? ", " + esc(d.zone) : ""}`, { direction: "top", className: "zlabel", sticky: true });
+      });
+      markers.forEach((m, k) => { if (!seen.has(k)) { layer.removeLayer(m); markers.delete(k); } });
+      if (onData) onData(out.drones);
+    } catch (e) { /* server busy, the next tick tries again */ }
+  }
+  return { start() { if (!timer) { tick(); timer = setInterval(tick, everyMs); } }, stop() { clearInterval(timer); timer = null; }, tick, markers };
+}

@@ -11,6 +11,7 @@ from playwright.sync_api import sync_playwright
 BASE = os.getenv("BASE_URL", "http://localhost:8000"); B = BASE; MP = os.getenv("MAILPIT_URL", "http://localhost:8025")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PNG = os.path.join(ROOT, "data", ".e2e.png")
+SHOTS = os.path.join(ROOT, "data", ".e2e-shots"); os.makedirs(SHOTS, exist_ok=True)
 open(PNG, "wb").write(bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6300010000000500010d0a2db40000000049454e44ae426082"))
 rows=[l.split() for l in open(os.path.join(ROOT, "data", "demo_credentials.txt")).read().splitlines() if l.strip()]
 cred={}
@@ -75,28 +76,47 @@ with sync_playwright() as p:
     pg.select_option("#drone",mine[0]); pg.click("#go"); pg.wait_for_selector("#fAsk"); pg.wait_for_timeout(1200)
     step("pilot: sees which office will review the request", "Reviewed by" in pg.inner_text("#routeInfo"))
     pg.fill("#fPurpose","End to end test"); pg.click("#fAsk"); pg.wait_for_selector("#fMsg .msg"); step("pilot: permission request sent and routed", "Reviewed by" in pg.inner_text("#fMsg"))
-    pg.screenshot(path="z1_request.png")
+    pg.screenshot(path=SHOTS+"/z1_request.png")
     # 5 the right officer approves
     o=page(); signin(o,*POLICE,"official.html"); o.wait_for_selector("#reqList .item"); step("officer: sees the request in their own queue", "Flow Tester" in o.inner_text("#reqList"))
     o.fill("#reqList textarea","Daylight only\nStay 50 m from the building"); o.click("#reqList [data-decide=approved] >> nth=0"); o.wait_for_timeout(1500)
-    o.screenshot(path="z2_officer.png")
-    # 6 pilot sees the permit and passes preflight
+    o.screenshot(path=SHOTS+"/z2_officer.png")
+    # 6 pilot sees the permit, passes preflight, and the flight moves to "Cleared"
     pg.click("[data-tab=flights]"); pg.wait_for_selector(".permit"); step("pilot: permit with QR appears", pg.query_selector(".permit svg") is not None)
-    pg.click("[data-pre] >> nth=0"); pg.wait_for_selector("#flightList .cleared, #flightList .reasons", timeout=15000); step("pilot: preflight cleared", pg.query_selector("#flightList .cleared") is not None)
-    pg.screenshot(path="z3_cleared.png")
-    # 7 admin publishes a restriction over the flight
-    flight=json.loads(urllib.request.urlopen(urllib.request.Request(B+"/flights",headers={"Authorization":"Bearer "+json.loads(pg.evaluate("localStorage.getItem('skyclear.session')"))["access_token"]})).read())[0]
-    a.click("[data-tab=publish]"); a.evaluate(f"setCentre({{lat:{flight['lat']},lng:{flight['lng']}}})"); a.fill("#nTitle","Flow test VIP movement"); a.click("#nGo"); a.wait_for_selector("#nMsg .msg")
+    step("pilot: the flight shows its lifecycle", "Approved" in pg.inner_text("#flightList .flow"))
+    pg.click("[data-pre] >> nth=0"); pg.wait_for_selector("[data-launch]", timeout=20000); step("pilot: preflight cleared and Take off is offered", "Cleared" in pg.inner_text("#flightList .next") or pg.query_selector("[data-launch]") is not None)
+    pg.screenshot(path=SHOTS+"/z3_cleared.png")
+    # 7 pilot takes off: the drone is in the air and the bar shows it
+    pg.click("[data-launch] >> nth=0"); pg.wait_for_selector("#flightBar:not(.hidden)", timeout=20000); pg.wait_for_timeout(3500)
+    step("pilot: took off, the flight bar shows the drone", "flying" in pg.inner_text("#flightBar").lower())
+    step("pilot: live numbers are on the flight card", pg.query_selector("#flightList .telemetry .n") is not None)
+    pg.screenshot(path=SHOTS+"/z4_flying.png")
+    tok = json.loads(pg.evaluate("localStorage.getItem('skyclear.session')"))["access_token"]
+    mine = json.loads(urllib.request.urlopen(urllib.request.Request(B+"/live/drones", headers={"Authorization": "Bearer "+tok})).read())["drones"]
+    step("pilot: sees their own drone on the live feed", len(mine) == 1 and mine[0]["kind"] == "flight")
+    # 8 the officer sees it in the air
+    a.click("[data-tab=live]"); a.wait_for_selector("#airList .item", timeout=20000); step("admin: sees the flight in the air on the Live tab", "Flow Tester" in a.inner_text("#airList"))
+    a.screenshot(path=SHOTS+"/z5_live.png")
+    # 9 admin publishes a restriction over the flight: pilot is alerted and the drone is told it is inside
+    flight = json.loads(urllib.request.urlopen(urllib.request.Request(B+"/flights", headers={"Authorization": "Bearer "+tok})).read())[0]
+    a.click("[data-tab=publish]"); a.evaluate(f"setCentre({{lat:{flight['lat']},lng:{flight['lng']}}})"); a.fill("#nTitle","Flow test VIP movement"); a.fill("#nRadius","1"); a.click("#nGo"); a.wait_for_selector("#nMsg .msg")
     msg=a.inner_text("#nMsg"); step("admin: notice published and alerted the pilot's flight", "alerted" in msg); step("admin: notice lists the conflicting permit", "conflict" in msg)
-    a.screenshot(path="z4_publish.png")
-    # 8 pilot gets the alert and preflight now fails
-    pg.reload(); pg.wait_for_selector("#banner:not(.hidden)", timeout=15000); step("pilot: red alert banner appears", "Flow test VIP movement" in pg.inner_text("#bannerText"))
-    pg.click("[data-tab=flights]"); pg.wait_for_selector(".permit"); pg.click("[data-pre] >> nth=0"); pg.wait_for_selector("#flightList .reasons", timeout=15000)
-    step("pilot: preflight now refuses and says why", "prohibited" in pg.inner_text("#flightList .reasons").lower())
-    pg.screenshot(path="z5_blocked.png")
-    # 9 officer revokes
+    pg.wait_for_selector("#banner:not(.hidden)", timeout=20000); step("pilot: red alert banner appears", "Flow test VIP movement" in pg.inner_text("#bannerText") or "restricted airspace" in pg.inner_text("#bannerText").lower())
+    pg.click("[data-tab=alerts]"); pg.wait_for_timeout(1500)
+    for _ in range(12):
+        if "entered restricted airspace" in pg.inner_text("#alertList"): break
+        pg.click("[data-tab=check]"); pg.wait_for_timeout(2500); pg.click("[data-tab=alerts]"); pg.wait_for_timeout(1500)
+    step("pilot: told the drone is inside the restricted airspace", "entered restricted airspace" in pg.inner_text("#alertList"))
+    pg.screenshot(path=SHOTS+"/z6_breach.png")
+    # 10 the officer recalls the drone by revoking the permit: it flies home and lands
     o.click("#fAll"); o.wait_for_selector("[data-revoke]"); o.fill("[id^=rv-]","Superseded by the VIP movement"); o.click("[data-revoke]"); o.wait_for_timeout(1500)
     step("officer: revoked the permit", "Revoked" in o.inner_text("#reqList"))
+    pg.click("[data-tab=flights]"); pg.wait_for_timeout(3500)
+    step("pilot: the flight bar says the drone was recalled", "recalled" in pg.inner_text("#flightBar").lower() or "returning" in pg.inner_text("#flightBar").lower())
+    pg.click("[data-land] >> nth=0"); pg.wait_for_selector("#flightList .msg:has-text('Flight log')", timeout=20000)
+    step("pilot: landed, and the flight log shows the breach", "restricted airspace entered 1 time" in pg.inner_text("#flightList") or "restricted airspace entered" in pg.inner_text("#flightList"))
+    step("pilot: the lifecycle ends as Recalled", "Recalled" in pg.inner_text("#flightList .flow"))
+    pg.screenshot(path=SHOTS+"/z7_landed.png")
     cleanup()
     print("\nconsole errors:", [e for e in errs if "404" not in e and "nominatim" not in e.lower()][:5])
     b.close()

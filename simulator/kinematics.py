@@ -248,6 +248,7 @@ class DroneKinematics:
             "status": self.status,
             "zone": self.zone,
             "phase": "returning" if self.recalled else "flying",
+            "kind": self.kind,
             "ts": ts,
         }
 

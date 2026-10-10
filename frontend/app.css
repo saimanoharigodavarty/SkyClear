@@ -354,3 +354,29 @@ button.danger { background: var(--red); border-color: var(--red); color: var(--o
 .leaflet-container { background: var(--bg); }
 label.consent { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 400; color: var(--ink); }
 label.consent a { font-weight: 600; }
+
+/* ---------- flight lifecycle, live flight bar, live drones ---------- */
+.flow { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 4px; align-items: center; }
+.flow span { padding: 2px 8px; border: 1px solid var(--rule); border-radius: 4px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.flow span.done { color: var(--green); border-color: color-mix(in srgb, var(--green) 50%, var(--rule)); }
+.flow span.on { background: var(--accent); color: var(--on-fill); border-color: var(--accent); }
+.flow span.end { background: var(--red); color: var(--on-fill); border-color: var(--red); }
+.next { margin: 8px 0 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--rule)); background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: var(--r); font-size: 13px; }
+.next b { color: var(--accent); }
+.flightbar { margin: 0; padding: 10px 18px; border-bottom: 1px solid var(--rule); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); font-size: 13px; }
+.flightbar.warn { background: color-mix(in srgb, var(--red) 14%, var(--panel)); }
+.flightbar .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.flightbar button { width: auto; margin: 0; padding: 5px 10px; font-size: 12px; }
+.telemetry { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0; }
+.telemetry div { border: 1px solid var(--rule); border-radius: var(--r); padding: 6px 8px; background: var(--panel); }
+.telemetry .n { font-weight: 800; font-size: 15px; display: block; line-height: 1.1; }
+.telemetry .l { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.drone-pin { width: 22px; height: 22px; }
+.drone-pin i { display: block; width: 18px; height: 20px; margin: 1px 2px; background: var(--accent); clip-path: polygon(50% 0, 100% 100%, 50% 78%, 0 100%); transform-origin: 50% 60%; }
+.drone-pin.warning i { background: var(--amber); }
+.drone-pin.breach i, .drone-pin.returning i { background: var(--red); }
+.air-item { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; }
+.air-item button { width: auto; margin: 0; padding: 5px 10px; font-size: 12px; }
+.breach { padding: 7px 0; border-bottom: 1px solid var(--rule); font-size: 13px; }
+.range { width: 100%; accent-color: var(--accent); padding: 0; }
+.pill-ok { color: var(--green); font-weight: 700; } .pill-warn { color: var(--amber); font-weight: 700; } .pill-bad { color: var(--red); font-weight: 700; }

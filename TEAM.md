@@ -37,6 +37,8 @@ The MongoDB showpiece stream. Verified on our local MongoDB 8.3: Atlas Search (`
 
 ### Stream 3: Simulation and engine (Thanvi)
 
+Update from Nikhil, read before you edit: your simulator is now wired into the flight lifecycle (docs/PIPELINE.md). What I changed in your files, with tests: (1) `/sim/*` and `/live/breaches` now require an official, and `/live` uses the JWT (the old check let everyone in); (2) a pilot's flight launches as its own drone (`launch_flight`, `recall_flight`, `land_flight`) and is no longer wiped by a fleet restart; (3) yellow-zone clearance now follows the drone's own permit area and window instead of `is_approved`; (4) one entry into restricted airspace is one breach event, not one per second; (5) long steps are split so fast playback no longer flies past the landing; (6) the VIP scenario now publishes through the normal notice path; (7) `/live/stream` no longer auto-starts 100 drones. Pull first, and run `python -m pytest backend`.
+
 Files: backend/live.py, sim.py, verdict.py, geo.py, backend/tests/test_verdict.py, new simulator/.
 
 - P0: Fleet simulator in `simulator/` (asyncio): kinematics with speed, heading, altitude, battery drain, wind drift and GPS noise. Approved flights fly their own route, the rest fly random missions. 100 drones at 1 Hz, scalable to 1000.

@@ -25,7 +25,8 @@
   <aside class="side">
     <nav class="tabs">
       <button data-tab="requests" class="on" type="button">Requests<span id="reqCount" class="count hidden">0</span></button>
-      <button data-tab="verify" type="button">Verification<span id="verCount" class="count hidden">0</span></button>
+      <button data-tab="live" type="button">Live</button>
+      <button data-tab="verify" type="button">Verify<span id="verCount" class="count hidden">0</span></button>
       <button data-tab="publish" type="button">Publish</button>
       <button data-tab="notices" type="button">Notices</button>
       <button data-tab="team" id="teamTab" class="hidden" type="button">Team</button>
@@ -41,6 +42,21 @@
         <button class="ghost inline" id="fAll" type="button">All flights</button>
       </div>
       <div id="reqList"></div>
+    </section>
+
+    <section class="pane hidden" id="tab-live" style="padding-top:0">
+      <p class="hint" style="margin-top:0">Everything in the air over the city, live. Pilots' flights are the blue arrows. Grey dots are simulated background traffic.</p>
+      <table class="stats" id="liveStats"></table>
+      <div class="section"><h3>Flights in the air</h3><div id="airList"></div></div>
+      <div class="section"><h3>Recent breaches</h3><div id="breachList"></div></div>
+      <div class="section"><h3>Simulation</h3>
+        <label for="trafficN">Background traffic: <span id="trafficLabel">50</span> drones</label>
+        <input id="trafficN" class="range" type="range" min="0" max="300" step="10" value="50">
+        <div class="btnrow"><button id="trafficGo" type="button">Start traffic</button><button id="trafficStop" class="ghost" type="button">Stop traffic</button></div>
+        <button id="vipGo" class="ghost" type="button">Run the VIP movement scenario</button>
+        <div class="hint">The scenario publishes a real restriction over the drones now in the air. Pilots are alerted, and drones that are inside it become breaches.</div>
+        <div id="simMsg"></div>
+      </div>
     </section>
 
     <section class="pane hidden" id="tab-verify" style="padding-top:0">

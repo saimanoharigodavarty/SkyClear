@@ -295,10 +295,41 @@ async function loadFlights() {
     const list = await api("/flights");
     $("flightList").innerHTML = list.length ? list.map(flightCard).join("") : '<div class="hint">No flights yet. Check a spot, then press Watch or Request permission.</div>';
     $("flightList").querySelectorAll("[data-pre]").forEach(b => b.addEventListener("click", () => runPreflight(b.dataset.pre)));
+    $("flightList").querySelectorAll("[data-launch]").forEach(b => b.addEventListener("click", () => doLaunch(b.dataset.launch)));
+    $("flightList").querySelectorAll("[data-land]").forEach(b => b.addEventListener("click", () => doLand(b.dataset.land)));
+    watchAir(list);
     $("flightList").querySelectorAll("[data-show]").forEach(b => b.addEventListener("click", () => { const [a, o] = b.dataset.show.split(",").map(Number); map.setView([a, o], 14); }));
     $("flightList").querySelectorAll("[data-cancel]").forEach(b => b.addEventListener("click", async () => { await api("/flights/" + b.dataset.cancel + "/cancel", { method: "POST" }); loadFlights(); }));
   } catch (e) { $("flightList").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
+/* ---------- one flight, from request to landing ---------- */
+const AIRBORNE = ["flying", "recalled"];
+let lastFlights = [], air = {}, airTimer = null;
+const liveLayer = L.layerGroup().addTo(map);
+const live = createLive(map, liveLayer, drones => { air = Object.fromEntries(drones.map(d => [d.flight_id, d])); renderAirUI(); });
+const fmtTime = iso => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+
+function nextStep(f) {
+  const who = f.routed_to ? f.routed_to.authority.name : "the officer";
+  if (f.status === "requested") return `Waiting for <b>${esc(who)}</b> to decide. You will get an alert.`;
+  if (f.status === "approved" || f.status === "watching") return f.verdict === "permission_needed" && !f.permit
+    ? "This spot needs permission. Request it from the Check tab." : "<b>Next:</b> run preflight when you are ready. It re-checks your permit, your drone and any new restriction.";
+  if (f.status === "cleared") return `<b>Next:</b> take off. You are cleared until ${esc(fmtTime(f.cleared_until))}, after that run preflight again.`;
+  if (f.status === "flying") return "<b>In the air.</b> Watch the status below. Land when you are done.";
+  if (f.status === "recalled") return `<b>Land now.</b> ${f.recalled_by ? esc(f.recalled_by) + " recalled your drone" + (f.recall_reason ? ": " + esc(f.recall_reason) : "") : "Your permit was revoked"}.`;
+  if (f.status === "completed") return "Flight finished.";
+  if (f.status === "rejected") return "The officer did not approve this request. You can request again with a different spot or time.";
+  if (f.status === "revoked") return "The permit was revoked. You are not cleared to fly.";
+  return "";
+}
+
+function teleHTML(d) {
+  const st = d.phase === "returning" ? '<span class="pill-bad">Returning home</span>' : d.status === "breach" ? '<span class="pill-bad">Inside restricted airspace</span>'
+    : d.status === "warning" ? '<span class="pill-warn">Restricted area ahead</span>' : '<span class="pill-ok">All clear</span>';
+  return `<div><span class="n">${esc(d.speed_mps)}</span><span class="l">m/s</span></div><div><span class="n">${Math.round(d.alt_m)}</span><span class="l">metres up</span></div>
+          <div><span class="n">${Math.round(d.battery_pct)}%</span><span class="l">battery</span></div><div><span class="n" style="font-size:12px">${st}</span><span class="l">status</span></div>`;
+}
+
 function flightCard(f) {
   const pm = f.permit;
   const permit = pm ? `<div class="permit"><div>
@@ -308,23 +339,82 @@ function flightCard(f) {
       ${pm.conditions.length ? `<div class="meta">Conditions: ${esc(pm.conditions.join("; "))}</div>` : ""}
       ${pm.revoked_reason ? `<div class="meta" style="color:var(--red)">Revoked: ${esc(pm.revoked_reason)}</div>` : ""}
     </div><div class="qr">${qrSvg("skyclear:permit:" + pm.permit_id + ":" + pm.signature.slice(0, 12))}</div></div>` : "";
-  const canPre = ["approved", "watching"].includes(f.status) && (pm || f.verdict !== "permission_needed");
+  const canPre = (f.status === "approved" || f.status === "watching") && (pm || f.verdict !== "permission_needed");
+  const pre = f.last_preflight && !f.last_preflight.cleared && ["approved", "watching"].includes(f.status)
+    ? `<div class="msg err"><b>Not cleared at ${esc(fmtTime(f.last_preflight.checked_at))}</b><ul class="reasons">${f.last_preflight.reasons.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "";
+  const log = f.flight_log ? `<div class="msg">Flight log: ${esc(fmtTime(f.flight_log.launched_at))} to ${esc(fmtTime(f.flight_log.landed_at))}, highest ${esc(f.flight_log.max_alt_m)} m, battery left ${esc(f.flight_log.battery_pct)}%, restricted airspace entered ${esc(f.flight_log.breaches)} time${f.flight_log.breaches === 1 ? "" : "s"}.</div>` : "";
+  const buttons = [
+    canPre ? `<button class="inline" type="button" data-pre="${esc(f.flight_id)}">Run preflight</button>` : "",
+    f.status === "cleared" ? `<button class="inline" type="button" data-launch="${esc(f.flight_id)}">Take off</button><button class="ghost inline" type="button" data-pre="${esc(f.flight_id)}">Check again</button>` : "",
+    AIRBORNE.includes(f.status) ? `<button class="inline danger" type="button" data-land="${esc(f.flight_id)}">Land now</button>` : "",
+    `<button class="ghost inline" type="button" data-show="${f.lat},${f.lng}">Show on map</button>`,
+    ["watching", "requested", "approved", "cleared"].includes(f.status) ? `<button class="ghost inline" type="button" data-cancel="${esc(f.flight_id)}">Cancel</button>` : ""].join("");
   return `<div class="item">
     <div class="head"><span class="title mono">${esc(f.flight_id)}</span><span class="tag ${esc(f.status)}">${esc(STATUS_LABEL[f.status] || f.status)}</span></div>
-    <div>${esc(f.drone_name)} <span class="muted">(${esc(f.drone_class)})</span></div>
-    <div class="meta">${esc(fmtWhen(f.start))} to ${esc(fmtWhen(f.end))}</div>
-    <div class="meta mono">${f.lat.toFixed(4)}, ${f.lng.toFixed(4)}</div>
-    ${f.zones.length ? `<div class="meta">${esc(f.zones.join(", "))}</div>` : ""}
+    <div>${esc(f.drone_name)} <span class="muted">(${esc(f.drone_class)})</span>, ${esc(fmtWhen(f.start))} to ${esc(fmtWhen(f.end))}</div>
+    ${flowHTML(f)}
+    <div class="next">${nextStep(f)}</div>
+    ${AIRBORNE.includes(f.status) ? `<div class="telemetry" id="tele-${esc(f.flight_id)}"></div>` : ""}
+    <div class="meta mono">${f.lat.toFixed(4)}, ${f.lng.toFixed(4)}${f.zones.length ? ", " + esc(f.zones.join(", ")) : ""}</div>
     ${f.purpose ? `<div class="meta">Purpose: ${esc(f.purpose)}</div>` : ""}
     ${f.routed_to ? `<div class="route">${routeText(f.routed_to)}${f.overdue ? '<div class="meta" style="color:var(--red)">Overdue, escalated to the supervising office.</div>' : ""}</div>` : ""}
     ${f.decision ? `<div class="msg">${esc(f.decision.by)}: ${esc(f.decision.comment || "No comment")}</div>` : ""}
-    ${permit}
+    ${permit}${pre}${log}
     <div id="pre-${esc(f.flight_id)}"></div>
-    <div class="btnrow">
-      ${canPre ? `<button class="inline" type="button" data-pre="${esc(f.flight_id)}">Preflight</button>` : ""}
-      <button class="ghost inline" type="button" data-show="${f.lat},${f.lng}">Show on map</button>
-      ${["watching", "requested", "approved"].includes(f.status) ? `<button class="ghost inline" type="button" data-cancel="${esc(f.flight_id)}">Cancel</button>` : ""}
-    </div></div>`;
+    <div class="btnrow" style="flex-wrap:wrap">${buttons}</div></div>`;
+}
+
+// What is in the air: the bar at the top of the panel, the live numbers in the flight card, and the polling that drives them.
+function renderAirUI() {
+  const flying = lastFlights.filter(f => AIRBORNE.includes(f.status)), bar = $("flightBar");
+  if (!flying.length) { bar.classList.add("hidden"); return; }
+  bar.classList.remove("hidden");
+  bar.classList.toggle("warn", flying.some(f => f.status === "recalled" || (air[f.flight_id] || {}).status === "breach"));
+  bar.innerHTML = flying.map(f => {
+    const d = air[f.flight_id];
+    const state = f.status === "recalled" ? '<span class="pill-bad">Recalled, land now</span>' : !d ? "Starting up..." : d.status === "breach" ? '<span class="pill-bad">Inside restricted airspace</span>'
+      : d.status === "warning" ? '<span class="pill-warn">Restricted area ahead</span>' : '<span class="pill-ok">All clear</span>';
+    return `<div class="row"><div><b>Your drone is ${f.status === "recalled" ? "returning" : "flying"}</b> ${d ? `${Math.round(d.alt_m)} m, ${d.speed_mps} m/s, battery ${Math.round(d.battery_pct)}%` : ""} ${state}</div>
+      <div class="btnrow"><button class="ghost" type="button" data-follow="${esc(f.flight_id)}">Show</button><button class="danger" type="button" data-land="${esc(f.flight_id)}">Land now</button></div></div>`;
+  }).join("");
+  bar.querySelectorAll("[data-land]").forEach(b => b.addEventListener("click", () => doLand(b.dataset.land)));
+  bar.querySelectorAll("[data-follow]").forEach(b => b.addEventListener("click", () => { const d = air[b.dataset.follow]; if (d) map.flyTo([d.lat, d.lng], 17, { duration: 0.6 }); }));
+  flying.forEach(f => { const t = $("tele-" + f.flight_id); if (t && air[f.flight_id]) t.innerHTML = teleHTML(air[f.flight_id]); });
+}
+
+function watchAir(flights) {
+  lastFlights = flights;
+  const airborne = flights.some(f => AIRBORNE.includes(f.status));
+  if (airborne) {
+    live.start();
+    if (!airTimer) airTimer = setInterval(async () => {
+      try {
+        const fresh = await api("/flights"), before = Object.fromEntries(lastFlights.map(f => [f.flight_id, f.status]));
+        const changed = fresh.some(f => before[f.flight_id] !== f.status);
+        lastFlights = fresh;
+        if (changed) { if (tab === "flights") loadFlights(); pollAlerts(); }
+        if (!fresh.some(f => AIRBORNE.includes(f.status))) watchAir(fresh);
+        renderAirUI();
+      } catch (e) { /* try again */ }
+    }, 3000);
+  } else {
+    live.stop(); liveLayer.clearLayers(); live.markers.clear(); air = {};
+    clearInterval(airTimer); airTimer = null;
+  }
+  renderAirUI();
+}
+
+async function doLaunch(id) {
+  const out = $("pre-" + id); if (out) out.innerHTML = skeleton();
+  try {
+    await api(`/flights/${id}/launch`, { method: "POST" });
+    const f = lastFlights.find(x => x.flight_id === id); if (f) map.flyTo([f.lat, f.lng], 16, { duration: 0.8 });
+    await loadFlights();
+  } catch (e) { if (out) out.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; await loadFlights(); }
+}
+async function doLand(id) {
+  try { await api(`/flights/${id}/land`, { method: "POST" }); await loadFlights(); pollAlerts(); }
+  catch (e) { const out = $("pre-" + id); if (out) out.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 
 async function runPreflight(id) {
@@ -332,9 +422,9 @@ async function runPreflight(id) {
   out.innerHTML = skeleton();
   try {
     const r = await api(`/flights/${id}/preflight`, { method: "POST" });
-    out.innerHTML = r.cleared
-      ? `<div class="cleared">Cleared for takeoff until ${esc(fmtWhen(r.cleared_until))}</div>${r.conditions.length ? `<div class="meta">Conditions: ${esc(r.conditions.join("; "))}</div>` : ""}<div class="small">Checked ${esc(fmtWhen(r.checked_at))}. Cleared means every check passed now. Conditions can change, check again before you fly.</div>`
-      : `<div class="msg err"><b>Not cleared</b><ul class="reasons">${r.reasons.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`;
+    await loadFlights();  // the card now shows the new stage, and the reasons if it was refused
+    const again = $("pre-" + id);
+    if (again && r.cleared) again.innerHTML = `<div class="cleared">Cleared for takeoff until ${esc(fmtWhen(r.cleared_until))}</div>${r.conditions.length ? `<div class="meta">Conditions: ${esc(r.conditions.join("; "))}</div>` : ""}`;
   } catch (e) { out.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 
@@ -383,7 +473,7 @@ $("bannerBtn").addEventListener("click", () => showTab("alerts"));
 $("when").value = toLocalInput(new Date()); $("simWhen").value = $("when").value;
 drawZones(layers); drawNotices(layers.notices); loadDrones();
 window.addEventListener("skyclear:theme", () => { drawZones(layers); drawNotices(layers.notices); });
-if (me()) { refreshMe().catch(() => {}); pollAlerts(); setInterval(() => { pollAlerts(); drawNotices(layers.notices); }, 5000); }
+if (me()) { api("/flights").then(watchAir).catch(() => {}); refreshMe().catch(() => {}); pollAlerts(); setInterval(() => { pollAlerts(); drawNotices(layers.notices); }, 5000); }
 
 function loadExampleRoute() {
   if (!exampleRoute) return;

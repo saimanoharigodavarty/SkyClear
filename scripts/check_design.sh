@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Mechanical checks for DESIGN_RULES.md. Exit 1 if any rule is broken.
 cd "$(dirname "$0")/.." || exit 2
-FILES=$(find frontend backend data README.md API.md TEAM.md CLAUDE.md DESIGN_RULES.md -type f \( -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.md' -o -name '*.py' -o -name '*.json' -o -name '*.geojson' \) ! -name CLAUDE.md ! -name DESIGN_RULES.md)
+FILES=$(find frontend backend data README.md API.md TEAM.md PRODUCT.md CLAUDE.md DESIGN_RULES.md -type f \( -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.md' -o -name '*.py' -o -name '*.json' -o -name '*.geojson' \) ! -name CLAUDE.md ! -name DESIGN_RULES.md)
 fail=0
 chk() { # name, pattern
   out=$(grep -nE "$2" $FILES 2>/dev/null)

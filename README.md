@@ -2,7 +2,7 @@
 
 Track 2: RAG Engine (MongoDB hackathon)
 
-Product spec, accounts, notifications and the loophole list: [PRODUCT.md](PRODUCT.md).
+Product spec, accounts, notifications and the loophole list: [PRODUCT.md](PRODUCT.md). Target architecture: [ARCHITECTURE.md](ARCHITECTURE.md). Who builds what: [TEAM.md](TEAM.md). Interfaces between streams: [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
 ## Problem statement
 
@@ -130,7 +130,7 @@ Tests: `python -m pytest backend` (local JSON) and `USE_MONGO=1 python -m pytest
 
 ```
 data/       rules.json, zones.geojson, drones.json, notices.json, eval_cases.json
-backend/    config.py, db.py, embeddings.py, geo.py, build_zones.py, sim.py, runtime.py, bridge.py, pipeline.py, search.py, verdict.py, explain.py, main.py, load_data.py, eval.py, tests/
+backend/    zones_api.py, live.py, analytics.py, config.py, db.py, embeddings.py, geo.py, build_zones.py, sim.py, runtime.py, bridge.py, pipeline.py, search.py, verdict.py, explain.py, main.py, load_data.py, eval.py, tests/
 frontend/   index.html + pilot.js, official.html + official.js, account.html, common.js, app.css, terms.html, privacy.html
 scripts/    check_design.sh, seed_demo.py
 docker-compose.yml   MongoDB (Atlas Local)

@@ -8,7 +8,7 @@ About 9 minutes. Every step maps to one of the six judging components. Do the se
 2. `cd backend && ../.venv/bin/python manage.py prepare-demo` makes two flights that are ready to fly for the next 6 hours and prints the demo pilot's password.
 3. Run `.venv/bin/python scripts/demo_check.py`. Every line must say PASS. It tells you the fix for each FAIL, and prints the two links you need.
 4. Presentation computer: sign in as the demo pilot, open `/display.html` full screen.
-5. Second window or second laptop: officer console, signed in as the administrator.
+5. Second window or second laptop: officer console, signed in as the administrator. In one browser you can stay signed in as both: use the account menu at the top right ("Add another account...", then switch). Each tab keeps its own account, so a pilot tab and an officer tab can sit side by side.
 6. Your phone and one teammate's phone: same Wi-Fi (or a phone hotspot for everything). Open the guard link, leave it on "Every declared area", tap "Turn alerts on", volume up. If you pick one area by name, it must be exactly the name the officer used for the drill, otherwise nothing sounds.
 7. In the officer console, Notices tab, press "Sound a test siren now". Both phones must go red and sound. If not, fix this first.
 8. Draw the real campus as a boundary: Publish tab, "Draw the boundary", click the corners, publish with an end time several hours ahead.

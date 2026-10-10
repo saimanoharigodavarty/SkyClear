@@ -82,7 +82,7 @@ async function submitDroneVerification(e, droneId) {
     await loadDrones();
   } catch (err) { msg.innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
 }
-async function refreshMe() { const u = await api("/me"); const s = session(); s.user = u; saved("skyclear.session", s); }
+async function refreshMe() { const u = await api("/me"); const s = session(); s.user = u; updateSession(s); }
 
 /* ---------- guidance: welcome, steps, examples, drone help ---------- */
 const CLASS_HELP = Object.fromEntries(CFG.droneClasses.map(c => [c.name, c.label]));

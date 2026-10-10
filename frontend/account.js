@@ -16,7 +16,7 @@ function show(name) {
 document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => show(b.dataset.t === "register" ? "registerForm" : "signinForm")));
 if (params.get("expired")) $("notice").innerHTML = '<div class="msg">Your session ended. Please sign in again.</div>';
 show(tab === "register" ? "registerForm" : "signinForm");
-{ const me = session(); if (me && !params.get("change")) $("notice").innerHTML = `<div class="msg">You are already signed in as ${esc(me.user.name)}, ${esc(me.user.role)}. <a href="${me.user.role === "official" ? "official.html" : "index.html"}">Continue</a> or sign out from the menu to use another account.</div>`; }
+{ const me = session(); if (me && !params.get("change") && !params.get("add")) $("notice").innerHTML = `<div class="msg">You are already signed in as ${esc(me.user.name)}, ${esc(me.user.role)}. <a href="${me.user.role === "official" ? "official.html" : "index.html"}">Continue</a> or sign out from the menu to use another account.</div>`; }
 
 const fail = (id, e) => { $(id).innerHTML = `<div class="msg err" role="alert">${esc(e.message)}</div>`; };
 function finish(t) {

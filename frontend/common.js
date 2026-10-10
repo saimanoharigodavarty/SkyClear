@@ -48,10 +48,31 @@ function setTheme(t) { saved("skyclear.theme", t); applyTheme(); document.queryS
 if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (themeChoice() === "system") applyTheme(); });
 
 /* ---------- session and API ---------- */
-const session = () => saved("skyclear.session");
+// Several accounts can be signed in at once. This tab uses the account kept in sessionStorage, so two tabs can be two different people
+// (a pilot window and an officer window side by side). localStorage keeps every signed-in account ("profiles") and the one used last,
+// which a new tab starts with.
+const sget = (store, key) => { try { return JSON.parse(store.getItem(key)); } catch (e) { return null; } };
+const sput = (store, key, v) => { try { v === null ? store.removeItem(key) : store.setItem(key, JSON.stringify(v)); } catch (e) { /* storage blocked: the page still works until it is reloaded */ } };
+const session = () => sget(sessionStorage, "skyclear.session") || saved("skyclear.session");
 const token = () => (session() || {}).access_token || (session() || {}).token;
-function setSession(t) { saved("skyclear.session", { access_token: t.access_token, token: t.access_token, refresh_token: t.refresh_token, user: t.user }); }
-function clearSession() { saved("skyclear.session", null); }
+const profiles = () => saved("skyclear.profiles") || {};
+if (!sget(sessionStorage, "skyclear.session") && saved("skyclear.session")) sput(sessionStorage, "skyclear.session", saved("skyclear.session"));  // pin this tab to the account it opened with
+function useSession(sess) {  // make this the account of this tab, and the one a new tab starts with
+  sput(sessionStorage, "skyclear.session", sess); saved("skyclear.session", sess);
+  if (sess && sess.user) { const all = profiles(); all[sess.user.user_id] = sess; saved("skyclear.profiles", all); }
+}
+function setSession(t) { useSession({ access_token: t.access_token, token: t.access_token, refresh_token: t.refresh_token, user: t.user }); }
+function updateSession(sess) { useSession(sess); }
+function clearSession() {  // this account is gone (signed out, or the server refused it): forget it here and in the list
+  const s = session();
+  sput(sessionStorage, "skyclear.session", null);
+  const last = saved("skyclear.session"); if (!s || !last || last.user.user_id === s.user.user_id) saved("skyclear.session", null);
+  if (s && s.user) { const all = profiles(); delete all[s.user.user_id]; saved("skyclear.profiles", all); }
+}
+function switchProfile(id) {
+  const p = profiles()[id]; if (!p) return;
+  useSession(p); location.href = "home.html";
+}
 
 function serverDown(show) {
   let bar = $("serverDown");
@@ -107,7 +128,9 @@ async function api(path, { method = "GET", body, auth = true } = {}) {
 async function signOut() {
   const s = session();
   if (s && s.refresh_token) { try { await fetch(API_BASE + "/auth/logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: s.refresh_token }) }); } catch (e) { /* signing out anyway */ } }
-  clearSession(); location.href = "signin.html";
+  clearSession();
+  const rest = Object.values(profiles());
+  if (rest.length) { useSession(rest[0]); location.href = "home.html"; } else location.href = "signin.html";
 }
 
 /* ---------- formatting ---------- */
@@ -143,12 +166,16 @@ function header(active) {
     </nav>
     <div class="who">
       <div class="seg" role="group" aria-label="Theme">${THEMES.map(t => `<button type="button" data-theme="${t}" class="${themeChoice() === t ? "on" : ""}" aria-pressed="${themeChoice() === t}">${{ system: "Auto", light: "Light", dark: "Dark" }[t]}</button>`).join("")}</div>
-      ${s ? `<span>${esc(s.user.name)}</span><span class="role">${esc(s.user.role)}</span><a href="#" id="signout">Sign out</a>`
+      ${s ? `<select id="profileSel" class="profilesel" aria-label="Switch account">${Object.values(profiles()).sort((a, b) => (a.user.user_id === s.user.user_id ? -1 : b.user.user_id === s.user.user_id ? 1 : 0)).map(p => `<option value="${esc(p.user.user_id)}" ${p.user.user_id === s.user.user_id ? "selected" : ""}>${esc(p.user.name)}, ${esc(p.user.role)}</option>`).join("")}<option value="__add">Add another account...</option><option value="__out">Sign out of this account</option></select>`
           : `<a class="btn-ghost" href="signin.html">Sign in</a><a class="btn-sm" href="signin.html?tab=register">Create account</a>`}
     </div>`;
   document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
-  const out = $("signout");
-  if (out) out.addEventListener("click", e => { e.preventDefault(); signOut(); });
+  const sel = $("profileSel");
+  if (sel) sel.addEventListener("change", () => {
+    if (sel.value === "__add") location.href = "signin.html?add=1";
+    else if (sel.value === "__out") signOut();
+    else switchProfile(sel.value);
+  });
 }
 
 /* ---------- map ---------- */

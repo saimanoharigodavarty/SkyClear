@@ -14,10 +14,11 @@ function setView(on) {
   is3d = on; saved("display3d", on);
   $("map3d").classList.toggle("hidden", !on); $("map").classList.toggle("hidden", on);
   $("viewBtn").textContent = on ? "2D map" : "3D view"; $("camBtn").classList.toggle("hidden", !on);
+  if (!on) $("fpvhud").classList.add("hidden");
   if (on) { View3D.init("map3d", [HYD[0], HYD[1]]); View3D.resize(); } else map.invalidateSize();
 }
 $("viewBtn").addEventListener("click", () => setView(!is3d));
-$("camBtn").addEventListener("click", () => View3D.toggleChase());
+$("camBtn").addEventListener("click", () => View3D.nextMode());
 $("fs").addEventListener("click", () => document.documentElement.requestFullscreen && document.documentElement.requestFullscreen());
 drawZones(layers); drawNotices(layers.notices);
 window.addEventListener("skyclear:theme", () => { drawZones(layers); drawNotices(layers.notices); });

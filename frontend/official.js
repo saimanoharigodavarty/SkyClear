@@ -335,6 +335,14 @@ $("guardTest").addEventListener("click", async () => {
 
 /* ---------- drill: declare an area and send a simulated drone toward it ---------- */
 let drillNotice = null;
+async function loadDrillAreas() {  // areas that are already declared can be tested without drawing anything again
+  try {
+    const list = (await api("/notices")).filter(n => n.status === "active"), sel = $("drNotice"), keep = sel.value;
+    sel.innerHTML = '<option value="">A new area, filled in below</option>' + list.map(n => `<option value="${esc(n.notice_id)}">${esc(n.title)}</option>`).join("");
+    if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+  } catch (e) { /* the list stays empty */ }
+}
+loadDrillAreas(); setInterval(loadDrillAreas, 20000);
 $("drHere").addEventListener("click", () => {
   if (!navigator.geolocation) { $("drMsg").innerHTML = '<div class="msg err">This browser cannot give a location. Type the numbers.</div>'; return; }
   navigator.geolocation.getCurrentPosition(p => { $("drLat").value = p.coords.latitude.toFixed(5); $("drLng").value = p.coords.longitude.toFixed(5); $("drMsg").innerHTML = `<div class="msg">Location taken, accurate to about ${Math.round(p.coords.accuracy)} m.</div>`; },
@@ -342,10 +350,11 @@ $("drHere").addEventListener("click", () => {
 });
 $("drGo").addEventListener("click", async () => {
   try {
-    const where = $("drUse").checked ? { polygon: corners.map(c => [c.lng, c.lat]) } : { lat: Number($("drLat").value), lng: Number($("drLng").value) };
+    const existing = $("drNotice").value;
+    const where = existing ? { notice_id: existing } : $("drUse").checked ? { polygon: corners.map(c => [c.lng, c.lat]) } : { lat: Number($("drLat").value), lng: Number($("drLng").value) };
     const r = await api("/sim/scenarios/intruder", { method: "POST", body: { ...where, radius_m: Number($("drRad").value) || 150, title: $("drTitle").value.trim() || "Protected area drill" } });
-    drillNotice = r.notice_id; drawNotices(layers.notices);
-    $("drMsg").innerHTML = `<div class="msg">Drill started. <b>${esc(r.title)}</b> is declared. The drone ${esc(r.drone_id)} reaches it in about ${esc(r.arrives_in_s)} seconds. Devices with the guard page open will sound.</div>`;
+    drillNotice = r.created ? r.notice_id : null; drawNotices(layers.notices); loadDrillAreas();
+    $("drMsg").innerHTML = `<div class="msg">Drill started. <b>${esc(r.title)}</b> is ${r.created ? "declared" : "the area you chose"}. The drone ${esc(r.drone_id)} reaches it in about ${esc(r.arrives_in_s)} seconds. Devices with the guard page open will sound.</div>`;
   } catch (e) { $("drMsg").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 });
 $("drUse").addEventListener("change", () => { if ($("drUse").checked && $("nTitle").value.trim()) $("drTitle").value = $("nTitle").value.trim(); });  // the drill uses the name of the area just drawn, so guard pages watching that name hear it

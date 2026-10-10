@@ -100,3 +100,16 @@ def test_the_drill_can_use_a_drawn_boundary():
     assert r.status_code == 200
     client.delete("/sim/fleet", headers=auth(admin))
     client.post(f"/notices/{r.json()['notice_id']}/cancel", headers=auth(admin))
+
+
+def test_the_drill_can_fly_at_an_area_that_is_already_declared_without_publishing_another():
+    admin = official()
+    n = client.post("/notices", headers=auth(admin), json={"title": "Existing campus", "polygon": POLY, **window()}).json()
+    before = [x["notice_id"] for x in client.get("/notices", headers=auth(admin)).json()]
+    r = client.post("/sim/scenarios/intruder", headers=auth(admin), json={"notice_id": n["notice_id"]})
+    assert r.status_code == 200 and r.json()["created"] is False and r.json()["notice_id"] == n["notice_id"] and r.json()["title"] == "Existing campus"
+    assert [x["notice_id"] for x in client.get("/notices", headers=auth(admin)).json()] == before  # nothing new was published
+    assert client.post("/sim/scenarios/intruder", headers=auth(admin), json={"notice_id": "RN-NOPE00"}).status_code == 404
+    client.post(f"/notices/{n['notice_id']}/cancel", headers=auth(admin))
+    assert client.post("/sim/scenarios/intruder", headers=auth(admin), json={"notice_id": n["notice_id"]}).status_code == 404  # a cancelled area cannot be drilled
+    client.delete("/sim/fleet", headers=auth(admin))

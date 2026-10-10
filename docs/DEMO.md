@@ -11,7 +11,7 @@ About 9 minutes. Every step maps to one of the six judging components. Do the se
 5. Second window or second laptop: officer console, signed in as the administrator. In one browser you can stay signed in as both: use the account menu at the top right ("Add another account...", then switch). Each tab keeps its own account, so a pilot tab and an officer tab can sit side by side.
 6. Your phone and one teammate's phone: same Wi-Fi (or a phone hotspot for everything). Open the guard link, leave it on "Every declared area", tap "Turn alerts on", volume up. If you pick one area by name, it must be exactly the name the officer used for the drill, otherwise nothing sounds.
 7. In the officer console, Notices tab, press "Sound a test siren now". Both phones must go red and sound. If not, fix this first.
-8. Draw the real campus as a boundary: Publish tab, "Draw the boundary", click the corners, publish with an end time several hours ahead.
+8. Declare the campus: Publish tab, "Draw the boundary", click the corners of KLH University on the satellite map, title "KLH University", publish with an end time several hours ahead. In the drill card, pick "KLH University" under "Area to test": the drone is flown at that area and nothing new is published.
 
 Logins are in `data/demo_credentials.txt` (not in git). Do not read passwords out loud.
 
@@ -27,7 +27,7 @@ Logins are in `data/demo_credentials.txt` (not in git). Do not read passwords ou
 | 3:45 | Display screen: take off. Show chase view, then drone view with the map beside it | "A modelled drone in 3D. Drone view shows the distance to the nearest zone and the time to reach it. The map beside it shows where it is." | Advanced |
 | 4:30 | Fly out of the permit area or over the height limit (keyboard or phone) | "Permit-aware geofence. Inside the permit a yellow zone is fine, outside it is a breach. The screen sounds a siren." | Advanced, Security |
 | 5:15 | Officer Live tab: breach appears, press Recall | "The officer sees it at once and recalls. The drone returns home by itself. The pilot is told why." | Backend and API |
-| 6:00 | Officer, Notices tab: "Start the drill" with "Use the boundary I drew". Watch the guard phones | "The area is declared on the real campus boundary. A drone flies at it. First a warning beep on every device in the area, then the siren and a red screen on entry. Only the area name and the time are sent, never who is flying." | MongoDB, Security |
+| 6:00 | Officer, Notices tab: Drill card, "Area to test" = KLH University, "Start the drill". Watch the guard phones | "The area is declared on the real campus boundary. A drone flies at it. First a warning beep on every device in the area, then the siren and a red screen on entry. Only the area name and the time are sent, never who is flying." | MongoDB, Security |
 | 7:15 | End the drill. Insights tab | "Aggregations materialised with $merge, an append-only audit log, change stream status." | MongoDB |
 | 8:00 | Show `docs/RESULTS.md` and `docs/RUBRIC_COVERAGE.md` | "Numbers come from runs, with the machine named. The coverage table lists what is not done." | Performance |
 

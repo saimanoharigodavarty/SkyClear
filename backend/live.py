@@ -191,6 +191,7 @@ class DrillIn(BaseModel):
     lat: Optional[float] = Field(default=None, ge=-90, le=90)
     lng: Optional[float] = Field(default=None, ge=-180, le=180)
     polygon: Optional[list[list[float]]] = None  # a drawn boundary, [lng, lat] corners, used instead of a circle
+    notice_id: Optional[str] = None  # fly the drone at an area that is already declared, nothing new is published
     radius_m: float = Field(default=120, ge=30, le=2000)
     title: str = Field(default="Protected area drill", min_length=3, max_length=80)
     approach_m: float = Field(default=600, ge=150, le=3000)
@@ -207,13 +208,19 @@ async def inject_intruder_scenario(body: DrillIn, authorization: Optional[str] =
     import secrets
     from simulator.kinematics import DroneKinematics
     now = datetime.now(timezone.utc)
-    if body.polygon is None and (body.lat is None or body.lng is None):
-        raise HTTPException(422, "give a centre or draw the boundary")
-    try:
-        notice = bridge.create_notice(body.title, "Drill: a simulated drone is sent toward this area.", body.lat, body.lng, body.radius_m / 1000,
-                                      now.isoformat(timespec="seconds"), (now + timedelta(hours=2)).isoformat(timespec="seconds"), user["name"], actor=user, polygon=body.polygon)
-    except ValueError as e:
-        raise HTTPException(422, str(e))
+    created = body.notice_id is None
+    if not created:  # the area is already declared: fly at it, publish nothing
+        notice = next((n for n in runtime.all_("notices") if n["notice_id"] == body.notice_id and n.get("origin") == "official"), None)
+        if notice is None or notice["status"] != "active":
+            raise HTTPException(404, "that area is not declared and active")
+    else:
+        if body.polygon is None and (body.lat is None or body.lng is None):
+            raise HTTPException(422, "give a centre or draw the boundary")
+        try:
+            notice = bridge.create_notice(body.title, "Drill: a simulated drone is sent toward this area.", body.lat, body.lng, body.radius_m / 1000,
+                                          now.isoformat(timespec="seconds"), (now + timedelta(hours=2)).isoformat(timespec="seconds"), user["name"], actor=user, polygon=body.polygon)
+        except ValueError as e:
+            raise HTTPException(422, str(e))
     body.lat, body.lng = notice["center"]["lat"], notice["center"]["lng"]  # for a drawn boundary the drone flies at its middle
     bearing = math.radians(secrets.randbelow(360))
     dlat = lambda m, b: m * math.cos(b) / 111320.0  # noqa: E731
@@ -227,7 +234,7 @@ async def inject_intruder_scenario(body: DrillIn, authorization: Optional[str] =
         sim.drones.append(drone)
         sim.is_running = True
     sim._ensure_task()
-    return {"ok": True, "notice_id": notice["notice_id"], "title": notice["title"], "drone_id": drone.drone_id,
+    return {"ok": True, "notice_id": notice["notice_id"], "title": notice["title"], "created": created, "drone_id": drone.drone_id,
             "arrives_in_s": round(body.approach_m / body.speed_mps)}
 
 

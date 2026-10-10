@@ -1,4 +1,4 @@
-"""Authority analytics with MongoDB aggregation pipelines. OWNER: stream 4. Contract: docs/CONTRACTS.md.
+"""Authority analytics with MongoDB aggregation pipelines. OWNER: Manohari (stream 4). Contract: docs/CONTRACTS.md.
 
 TODO (stream 4): heatmap of planned flights by area, breaches per zone, median time to decision.
 """

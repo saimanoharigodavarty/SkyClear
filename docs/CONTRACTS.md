@@ -6,7 +6,7 @@ Build against these, not against each other's code. Anything marked "done" alrea
 
 `GET /zones?bbox=west,south,east,north` returns a GeoJSON FeatureCollection of zones touching the box. Each feature has `properties: { zone_id, name, zone_type, rule_ids, source }`. `GET /zones` without bbox returns all.
 
-## 2. Authentication (stream 2 builds, stream 1 consumes)
+## 2. Authentication (Nikhil builds in stream 2A and consumes in stream 1)
 
 | Endpoint | Body | Response |
 |---|---|---|
@@ -18,7 +18,7 @@ Build against these, not against each other's code. Anything marked "done" alrea
 
 Tokens object: `{ "access_token": "...", "refresh_token": "...", "expires_in": 900, "token": "<same as access_token, kept until the frontend moves>" }`. Send `Authorization: Bearer <access_token>`. An expired access token returns 401 with `{ "detail": "token_expired" }`, and the client calls /auth/refresh once and retries. Admin only: `POST /admin/officials` invites an official.
 
-## 3. Live airspace (stream 3 builds, stream 1 consumes)
+## 3. Live airspace (Thanvi, stream 3, builds; Nikhil, stream 1, consumes)
 
 `GET /live/drones?bbox=w,s,e,n` returns:
 
@@ -32,7 +32,7 @@ Tokens object: `{ "access_token": "...", "refresh_token": "...", "expires_in": 9
 
 `GET /live/stream` is server-sent events with these event types, each `data:` a JSON object: `position` (one drone as above), `breach` (`{ event_id, drone_id, flight_id, kind: "zone" or "notice", name, lat, lng, severity, ts }`), `alert` (a notification for the signed-in user), `ping` every 15 seconds.
 
-## 4. Simulation control (stream 3 builds, stream 1 consumes, official or admin only)
+## 4. Simulation control (Thanvi builds, Nikhil consumes, official or admin only)
 
 | Endpoint | Purpose |
 |---|---|
@@ -41,14 +41,14 @@ Tokens object: `{ "access_token": "...", "refresh_token": "...", "expires_in": 9
 | GET /sim/status | `{ "running": true, "drones": 100, "ticks_per_second": 99.8 }` |
 | POST /sim/scenarios/vip | Publish a notice that crosses the paths of running drones, so a demo shows breaches and alerts live |
 
-## 5. Telemetry record (stream 3 writes, anyone reads)
+## 5. Telemetry record (Thanvi writes, anyone reads)
 
 Time series collection `telemetry`: `{ ts, drone_id, flight_id, position: {type:"Point", coordinates:[lng,lat]}, alt_m, speed_mps, heading_deg, battery_pct, source: "sim" or "mavlink" }`. A real autopilot adapter writes the same shape.
 
-## 6. Analytics (stream 4 builds, stream 1 consumes, officials only)
+## 6. Analytics (Manohari builds, Nikhil consumes, officials only)
 
 `GET /analytics/summary` returns `{ "heatmap": [ { "cell": [lng, lat], "count": 12 } ], "breaches_by_zone": [ { "zone_id": "Z-VOHY", "name": "Begumpet Airport", "count": 4 } ], "median_decision_minutes": 18.5, "flights_by_status": { "requested": 3, "approved": 8 } }`.
 
-## 7. Alerts (stream 2 builds)
+## 7. Alerts (stream 2A builds)
 
-When a notice is published or cancelled, or a decision is made, stream 2 writes documents to `notifications` (shape in API.md) from a change stream listener, not from the HTTP handler. Stream 3's `/live/stream` pushes new notifications of the requesting user as `alert` events.
+When a notice is published or cancelled, or a decision is made, stream 2A writes documents to `notifications` (shape in API.md) from a change stream listener, not from the HTTP handler. Thanvi's `/live/stream` pushes new notifications of the requesting user as `alert` events.

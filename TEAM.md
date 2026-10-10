@@ -8,46 +8,18 @@ See "Running it" in README.md. Short version: copy .env.example to .env, `docker
 
 ## Workstreams (four people)
 
-Read [ARCHITECTURE.md](ARCHITECTURE.md) first (10 minutes), then [docs/CONTRACTS.md](docs/CONTRACTS.md). The contracts are the only thing the streams share, so everyone works at the same time. Where a contract is not built yet, code against the stub or a mock. Write each name in the Owner row.
+Read [ARCHITECTURE.md](ARCHITECTURE.md) first (10 minutes), then [docs/CONTRACTS.md](docs/CONTRACTS.md). The contracts are the only thing the streams share, so everyone works at the same time. Where a contract is not built yet, code against the stub or a mock.
 
-| | Stream 1: Experience | Stream 2: Identity and platform | Stream 3: Simulation and engine | Stream 4: MongoDB data and RAG |
-|---|---|---|---|---|
-| Owner | Nikhil | ____ | ____ | ____ |
-| Files | frontend/*, docs/DEMO.md | backend/bridge.py, runtime.py, main.py, new backend/security.py, docker/, locust/ | backend/live.py, sim.py, verdict.py, geo.py, new simulator/ | backend/search.py, load_data.py, zones_api.py, analytics.py, embeddings.py, explain.py, eval.py, data/, new ingestion/ |
-| Goal | A map and screens that look and feel like a real product | Real authentication, workflow and a deployment that scales out | A proper drone simulation with live geofencing | Real data, deep MongoDB geo search, and a strong RAG engine |
+| Person | Streams | Why this split |
+|---|---|---|
+| Manohari | Stream 4: MongoDB data and RAG | The core of the hackathon track. Geo, vector and hybrid search, real data, evaluation numbers |
+| Thanvi | Stream 3: Simulation and engine | The most visible technical piece. Live drones, geofencing, route checks |
+| Nikhil | Stream 1: Experience, and Stream 2A: Identity and workflow | Everything the user sees, plus authentication and alerts, which touch every screen |
+| Suhas | Stream 2B: Deployment, load testing and demo material | Self-contained, clear steps, and it makes the scale claims provable |
 
-### Stream 1: Experience (Nikhil)
+### Stream 4: MongoDB data and RAG (Manohari)
 
-- P0: Rebuild the map on MapLibre GL JS with OpenFreeMap vector tiles. Load zones by viewport (`/zones?bbox=` on every moveend), style them by severity, smooth clustering of labels.
-- P0: Live airspace view for the pilot and the authority: drones moving on the map from `/live/stream`, color by status, breach feed panel.
-- P0: Simulation screen for officials: start and stop a fleet, scale slider, "inject VIP movement" button (contract 4).
-- P0: Auth screens against contract 2 (refresh handling, TOTP step for officials, logout).
-- P1: Authority dashboard with the analytics (heatmap layer, charts without effects, contract 6). Mobile layout and keyboard accessibility.
-- P1: Demo lead: 3 minute script, backup recording, slides using real numbers from docs/RESULTS.md.
-- Done when: a stranger completes the pilot and the authority flow on a phone and a laptop, and the live view stays smooth with 200 drones.
-
-### Stream 2: Identity and platform
-
-- P0: Authentication per contract 2: JWT access and rotating refresh tokens (PyJWT), argon2id (argon2-cffi), roles pilot, official, admin, invite-only officials with TOTP (pyotp), account lockout, rate limits (slowapi), refresh token TTL index and revocation.
-- P0: Alerts by change stream: a listener on `notices` and `flights` writes `notifications`. Remove the notification calls from the HTTP handlers.
-- P0: Permission decisions in a MongoDB transaction (flight update, audit entry, notification together). Audit log for every official action.
-- P0: Scale-out deployment: `docker compose` with Nginx, 3 API replicas, MongoDB replica set. Prometheus and Grafana with a latency dashboard.
-- P0: Locust load test script, run it, record numbers in docs/RESULTS.md (target in ARCHITECTURE.md).
-- P1: Email alerts (aiosmtplib or ntfy). Security headers, CORS policy, input size caps. Flight and notice list endpoints with pagination.
-- Done when: a notice published from a second terminal alerts a pilot in 2 seconds with no call from the handler, officials cannot self-register, a stolen refresh token is rejected after use, and the load test numbers are recorded.
-
-### Stream 3: Simulation and engine
-
-- P0: Fleet simulator in `simulator/` (asyncio): kinematics with speed, heading, altitude, battery drain, wind drift and GPS noise. Approved flights fly their own route, the rest fly random missions. 100 drones at 1 Hz, scalable to 1000.
-- P0: Telemetry into a MongoDB time series collection with batched inserts, TTL and a 2dsphere index (contract 5).
-- P0: Geofence engine: every tick, test positions against zones and notices with MongoDB geo queries, predict breaches ahead along the heading (lookahead and ETA), write `breaches`. Make `/live/drones` and `/live/stream` real (contract 3) from change streams.
-- P0: Simulation control endpoints (contract 4), including the VIP scenario that makes running drones breach on demand.
-- P0: Verdict engine fixes from PRODUCT.md: A3 (route against polygon intersection, not 100 m sampling), A4, A5, A6, with tests.
-- P1: Altitude and day or night rules in the verdict. Corridor buffer around routes.
-- P1 stretch: ArduPilot SITL in Docker with pymavlink writing the same telemetry shape (`source: "mavlink"`).
-- Done when: 100 drones fly live on the map, a VIP scenario produces breaches and alerts within seconds, and a narrow corridor notice is always caught on a route.
-
-### Stream 4: MongoDB data and RAG
+Files: backend/search.py, load_data.py, zones_api.py, analytics.py, embeddings.py, explain.py, eval.py, data/, new ingestion/.
 
 - P0: Real zones: ingest OpenStreetMap for Telangana (Geofabrik extract, osmium or Overpass): aeroways, military land, prisons, government sites, power plants, stadiums. Keep source and ODbL attribution. Aim for 300 or more Hyderabad zones. Add JSON schema validation and the right indexes to `zones`.
 - P0: Geo queries done properly: viewport `$geoIntersects`, `$geoNear` for nearest zones, flights stored as GeoJSON with a time range and a geo plus time overlap query. Prove index use with `explain()` and note it in docs/SCALING.md.
@@ -58,6 +30,53 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first (10 minutes), then [docs/CONTRACTS
 - P1: Sharding plan in docs/SCALING.md (telemetry by drone_id and time, zones by geohash prefix), test with a larger synthetic dataset.
 - Done when: the map shows 300 or more real zones fast, `explain()` shows index scans, docs/RESULTS.md has real numbers, and 0 false-safe on 30 cases.
 
+### Stream 3: Simulation and engine (Thanvi)
+
+Files: backend/live.py, sim.py, verdict.py, geo.py, backend/tests/test_verdict.py, new simulator/.
+
+- P0: Fleet simulator in `simulator/` (asyncio): kinematics with speed, heading, altitude, battery drain, wind drift and GPS noise. Approved flights fly their own route, the rest fly random missions. 100 drones at 1 Hz, scalable to 1000.
+- P0: Telemetry into a MongoDB time series collection with batched inserts, TTL and a 2dsphere index (contract 5).
+- P0: Geofence engine: every tick, test positions against zones and notices with MongoDB geo queries, predict breaches ahead along the heading (lookahead and ETA), write `breaches`. Make `/live/drones` and `/live/stream` real (contract 3) from change streams.
+- P0: Simulation control endpoints (contract 4), including the VIP scenario that makes running drones breach on demand.
+- P0: Verdict engine fixes from PRODUCT.md: A3 (route against polygon intersection, not 100 m sampling), A4, A5, A6, with tests.
+- P1: Altitude and day or night rules in the verdict. Corridor buffer around routes.
+- P1 stretch: ArduPilot SITL in Docker with pymavlink writing the same telemetry shape (`source: "mavlink"`).
+- Done when: 100 drones fly live on the map, a VIP scenario produces breaches and alerts within seconds, and a narrow corridor notice is always caught on a route.
+
+### Stream 1: Experience (Nikhil)
+
+Files: frontend/*.
+
+- P0: Rebuild the map on MapLibre GL JS with OpenFreeMap vector tiles. Load zones by viewport (`/zones?bbox=` on every moveend), style them by severity, tidy the labels.
+- P0: Live airspace view for the pilot and the authority: drones moving on the map from `/live/stream`, color by status, breach feed panel.
+- P0: Simulation screen for officials: start and stop a fleet, scale slider, "inject VIP movement" button (contract 4).
+- P0: Auth screens against contract 2 (refresh handling, TOTP step for officials, logout).
+- P1: Authority dashboard with the analytics (heatmap layer, plain charts, contract 6). Mobile layout and keyboard accessibility.
+- Done when: a stranger completes the pilot and the authority flow on a phone and a laptop, and the live view stays smooth with 200 drones.
+
+### Stream 2A: Identity and workflow (Nikhil)
+
+Files: backend/bridge.py, runtime.py, main.py, new backend/security.py.
+
+- P0: Authentication per contract 2: JWT access and rotating refresh tokens (PyJWT), argon2id (argon2-cffi), roles pilot, official, admin, invite-only officials with TOTP (pyotp), account lockout, rate limits (slowapi), refresh token TTL index and revocation.
+- P0: Alerts by change stream: a listener on `notices` and `flights` writes `notifications`. Remove the notification calls from the HTTP handlers.
+- P0: Permission decisions in a MongoDB transaction (flight update, audit entry, notification together). Audit log for every official action.
+- P1: Pagination on flight and notice lists. Security headers, CORS policy, input size caps.
+- Done when: a notice published from a second terminal alerts a pilot in 2 seconds with no call from the handler, officials cannot self-register, and a stolen refresh token is rejected after use.
+
+### Stream 2B: Deployment, load testing and demo material (Suhas)
+
+Files: docker/, docker-compose.prod.yml, locust/, monitoring/, backend/notify_email.py (new), docs/RESULTS.md (load section), docs/DEMO.md, docs/SLIDES.md.
+
+Do these in order, each is a clear step with a visible result:
+
+1. Production-style compose file `docker-compose.prod.yml`: Nginx in front, 3 copies of the API (a Dockerfile in docker/ for the backend), MongoDB as a replica set. `docker compose -f docker-compose.prod.yml up` must serve the app on http://localhost:8080. Nginx gzips responses and caches `GET /zones` for 30 seconds.
+2. Monitoring: add `prometheus-fastapi-instrumentator` to the backend (one small change in backend/main.py, tell Nikhil first), Prometheus and Grafana in the compose file, one Grafana dashboard with request rate, p95 latency and error rate, saved as JSON in monitoring/.
+3. Load test in `locust/`: a user that checks random Hyderabad spots (`POST /check`), loads zones by viewport and logs in. Run it with 50, 200 and 500 users. Put the real numbers (requests per second, p95, errors) in docs/RESULTS.md with the date and the machine.
+4. Email alerts: `backend/notify_email.py` sending a notification by SMTP (test with MailHog or Mailpit in the compose file). Nikhil wires it into the alert listener, you provide `send_alert(to, subject, body)` and a test.
+5. Demo material: docs/DEMO.md with a 3 minute script (what to click, what to say, which numbers to quote) and docs/SLIDES.md with the slide outline for the Track 2 pitch. Use PRODUCT.md for the honest limits and judge questions. Record a backup screen video once the app is ready.
+- Done when: the prod compose runs from a clean clone, the Grafana dashboard moves during a load test, RESULTS.md has real load numbers, and the demo script has been rehearsed once end to end.
+
 ## Order of work
 
 1. Everyone (first 30 minutes): pull, run the setup above, run the app, read ARCHITECTURE.md and docs/CONTRACTS.md. Stream 4 starts the Ollama laptop.
@@ -67,7 +86,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first (10 minutes), then [docs/CONTRACTS
 
 ## Who touches what
 
-Only the owner edits a stream's files. Need a change in someone else's file, ask them. Shared files (README.md, API.md, PRODUCT.md, TEAM.md, docs/CONTRACTS.md) get small edits only, with `git pull --rebase` first. `backend/main.py` belongs to stream 2: to add a router, ask stream 2 or add one include line and tell them.
+Only the owner edits a stream's files. Need a change in someone else's file, ask them. Shared files (README.md, API.md, PRODUCT.md, TEAM.md, docs/CONTRACTS.md) get small edits only, with `git pull --rebase` first. `backend/main.py` belongs to Nikhil: to add a router or middleware, add one line and tell him.
 
 ## Rules
 

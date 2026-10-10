@@ -1,4 +1,4 @@
-"""Live airspace: simulated drone positions, breaches, event stream. OWNER: stream 3 (simulation). Contract: docs/CONTRACTS.md.
+"""Live airspace: simulated drone positions, breaches, event stream. OWNER: Thanvi (stream 3, simulation). Contract: docs/CONTRACTS.md.
 
 Stub that already answers with the right shape so the frontend can be built against it.
 TODO (stream 3): read the telemetry time-series collection, run the geofence engine, stream breaches from a MongoDB change stream.

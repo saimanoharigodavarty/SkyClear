@@ -1,4 +1,4 @@
-"""Zones API. OWNER: stream 4 (MongoDB data and RAG). Contract: docs/CONTRACTS.md.
+"""Zones API. OWNER: Manohari (stream 4, MongoDB data and RAG). Contract: docs/CONTRACTS.md.
 
 GET /zones                      all zones (small areas only)
 GET /zones?bbox=w,s,e,n         only zones that touch the box, this is what the map calls on every pan and zoom

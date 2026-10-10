@@ -33,7 +33,7 @@ async function loadRequests() {
   try {
     const list = await api("/flights" + (filter === "requested" ? "?status=requested" : ""));
     reqLayer.clearLayers();
-    list.forEach(f => L.circleMarker([f.lat, f.lng], { radius: 6, color: "#1b1f24", weight: 2, fillColor: f.status === "requested" ? "#a15c00" : "#faf9f6", fillOpacity: 1 }).bindPopup(`<b class="mono">${esc(f.flight_id)}</b><br>${esc(f.pilot_name)}`).addTo(reqLayer));
+    list.forEach(f => L.marker([f.lat, f.lng], { icon: pinIcon(f.status === "requested" ? "pending" : ""), keyboard: false }).bindPopup(`<b class="mono">${esc(f.flight_id)}</b><br>${esc(f.pilot_name)}`).addTo(reqLayer));
     $("reqList").innerHTML = list.length ? list.map(f => `
       <div class="item" id="r-${esc(f.flight_id)}">
         <div class="head"><span class="title mono">${esc(f.flight_id)}</span><span class="tag ${esc(f.status)}">${esc(STATUS_LABEL[f.status] || f.status)}</span></div>
@@ -107,5 +107,5 @@ async function loadNotices() {
 /* ---------- start ---------- */
 const now = new Date();
 $("nStart").value = toLocalInput(now); $("nEnd").value = toLocalInput(new Date(now.getTime() + 3 * 3600000));
-drawZones(layers.zones); drawNotices(layers.notices); loadStats(); loadRequests();
+drawZones(layers); drawNotices(layers.notices); loadStats(); loadRequests();
 setInterval(() => { loadStats(); if (tab === "requests") loadRequests(); }, 6000);

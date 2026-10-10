@@ -32,7 +32,7 @@ async function loadDrones() {
 map.on("click", e => {
   if (tab === "check") {
     picked = e.latlng;
-    if (marker) marker.setLatLng(picked); else marker = L.circleMarker(picked, { radius: 7, color: "#1b1f24", weight: 2, fillColor: "#faf9f6", fillOpacity: 1 }).addTo(layers.work);
+    if (marker) marker.setLatLng(picked); else marker = L.marker(picked, { icon: pinIcon(), keyboard: false }).addTo(layers.work);
     $("picked").innerHTML = `Selected <span class="mono">${picked.lat.toFixed(4)}, ${picked.lng.toFixed(4)}</span>`;
     $("go").disabled = false;
   } else if (tab === "sim") addWaypoint(e.latlng);
@@ -41,8 +41,13 @@ map.on("click", e => {
 /* ---------- check ---------- */
 function drawCheck(r) {
   resultLayer.clearLayers();
-  (r.zones || []).forEach(z => L.geoJSON(z.geometry, { style: { color: ZONE_COLOR[z.zone_type] || "#a15c00", weight: 3, fillOpacity: 0.25 } }).addTo(resultLayer));
-  (r.notices || []).forEach(n => L.geoJSON(n.geometry, { style: { color: NOTICE_COLOR, weight: 3, dashArray: "6 5", fillOpacity: 0.2 } }).addTo(resultLayer));
+  const shapes = [];
+  (r.zones || []).filter(z => z.distance_km === 0).forEach(z => shapes.push(L.geoJSON(z.geometry, { style: zoneStyle(z.zone_type, true), interactive: false }).addTo(resultLayer)));
+  (r.notices || []).forEach(n => shapes.push(L.geoJSON(n.geometry, { style: { color: NOTICE_COLOR, weight: 3, dashArray: "6 5", fillColor: NOTICE_COLOR, fillOpacity: 0.18 }, interactive: false }).addTo(resultLayer)));
+  if (shapes.length && picked) {  // frame the spot together with what it is inside
+    const b = L.latLngBounds([picked]); shapes.forEach(s => b.extend(s.getBounds()));
+    map.fitBounds(b, { padding: [40, 40], maxZoom: 14 });
+  }
 }
 const resultLayer = L.layerGroup().addTo(layers.work);
 
@@ -54,6 +59,7 @@ function renderCheck(r) {
   $("result").innerHTML = `
     <div class="verdict ${esc(r.verdict)}"><div class="v">${esc(VERDICT_LABEL[r.verdict] || r.verdict)}</div><div class="s">For the selected drone, spot and time</div></div>
     <p style="margin:0">${esc(r.summary)}</p>
+    <div class="small" style="margin-top:6px">${r.explained_by === "llm" ? "Explanation written by an AI model from the rules below. The verdict itself is decided by rules, not by the model." : "The verdict is decided by rules."}</div>
     ${inside.length ? `<div class="section"><h3>Inside</h3><ul class="list">${inside.map(zl).join("")}</ul></div>` : ""}
     ${r.notices.length ? `<div class="section"><h3>Active notices</h3><ul class="list">${r.notices.map(n => `<li><b>${esc(n.title)}</b><div class="meta">${esc(fmtWhen(n.starts_at))} to ${esc(fmtWhen(n.ends_at))}</div></li>`).join("")}</ul></div>` : ""}
     ${near.length ? `<div class="section"><h3>Nearby</h3><ul class="list">${near.map(zl).join("")}</ul></div>` : ""}
@@ -232,5 +238,5 @@ $("bannerBtn").addEventListener("click", () => showTab("alerts"));
 
 /* ---------- start ---------- */
 $("when").value = toLocalInput(new Date());
-drawZones(layers.zones); drawNotices(layers.notices); loadDrones();
+drawZones(layers); drawNotices(layers.notices); loadDrones();
 if (me()) { pollAlerts(); setInterval(() => { pollAlerts(); drawNotices(layers.notices); }, 5000); }

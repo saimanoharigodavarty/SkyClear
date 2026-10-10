@@ -12,8 +12,10 @@ const VERDICT_LABEL = {
   cannot_determine: "Can't determine"
 };
 const STATUS_LABEL = { watching: "Watching", requested: "Pending", approved: "Approved", rejected: "Rejected", cancelled: "Cancelled", active: "Active" };
-const ZONE_COLOR = { airport: "#b3261e", military: "#b3261e", park: "#a15c00", government: "#a15c00" };
-const NOTICE_COLOR = "#1f4e79";
+const RED = "#b3261e", AMBER = "#a15c00", NOTICE_COLOR = "#1f4e79";
+// Severity grouping: defence zones are prohibited, the rest need permission (or depend on the drone).
+const ZONE_GROUP = { military: "red", airport: "amber", park: "amber", government: "amber" };
+const zoneColor = type => (ZONE_GROUP[type] === "red" ? RED : AMBER);
 
 function saved(key, value) {
   try { if (value === undefined) return JSON.parse(localStorage.getItem(key)); if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, JSON.stringify(value)); }
@@ -65,30 +67,63 @@ function footer() {
   return '<footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a>Decision support only, not legal permission. Zones and rules are sample or derived data until verified.</footer>';
 }
 
-function circleOf(n) { return L.geoJSON(n.area || n.geometry, { style: { color: NOTICE_COLOR, weight: 2, dashArray: "6 5", fillOpacity: 0.12 } }); }
+function circleOf(n) { return L.geoJSON(n.area || n.geometry, { style: { color: NOTICE_COLOR, weight: 2, dashArray: "6 5", fillColor: NOTICE_COLOR, fillOpacity: 0.1 }, interactive: false }); }
 
-// Base map: Hyderabad, all zones, all active notices.
+// Base map: Hyderabad, calm light basemap, zones grouped by severity, active notices, clickable legend.
 function makeMap() {
-  const map = L.map("map", { zoomControl: true }).setView(HYD, 11);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors", maxZoom: 19 }).addTo(map);
-  const layers = { zones: L.layerGroup().addTo(map), notices: L.layerGroup().addTo(map), work: L.layerGroup().addTo(map) };
+  const map = L.map("map", { zoomControl: false, minZoom: 5 }).setView(HYD, 11);
+  L.control.zoom({ position: "topright" }).addTo(map);
+  L.control.scale({ metric: true, imperial: false, position: "bottomright" }).addTo(map);
+  const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  // Esri gray canvas: calm, no API key. Reference layer adds place names on top.
+  const esri = name => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${dark ? "Dark" : "Light"}_Gray_${name}/MapServer/tile/{z}/{y}/{x}`;
+  const tile = { maxNativeZoom: 16, maxZoom: 18, attribution: "Tiles © Esri, map data © OpenStreetMap contributors" };
+  L.tileLayer(esri("Base"), tile).addTo(map);
+  L.tileLayer(esri("Reference"), { ...tile, attribution: "", pane: "shadowPane" }).addTo(map);
+  const layers = { red: L.layerGroup().addTo(map), amber: L.layerGroup().addTo(map), notices: L.layerGroup().addTo(map), work: L.layerGroup().addTo(map) };
+
+  const Reset = L.Control.extend({ options: { position: "topright" }, onAdd() {
+    const d = L.DomUtil.create("div", "leaflet-bar reset"); const a = L.DomUtil.create("a", "", d);
+    a.href = "#"; a.textContent = "Hyderabad"; a.title = "Back to Hyderabad";
+    L.DomEvent.on(a, "click", e => { L.DomEvent.preventDefault(e); map.setView(HYD, 11); }); return d; } });
+  new Reset().addTo(map);
+
+  const legend = $("legend");
+  if (legend) {
+    const rows = [["red", RED, "Defence zone, flying prohibited"], ["amber", AMBER, "Airport, park, government: permission"], ["notices", NOTICE_COLOR, "Official notice, time limited"]];
+    legend.innerHTML = '<div class="label" style="margin:0 0 6px">Layers</div>' + rows.map(([k, col, text]) =>
+      `<label class="lg"><input type="checkbox" data-layer="${k}" checked><i style="border-color:${col};background:${col}22;${k === "notices" ? "border-style:dashed" : ""}"></i>${text}</label>`).join("");
+    legend.querySelectorAll("input").forEach(box => box.addEventListener("change", () => {
+      const l = layers[box.dataset.layer]; box.checked ? l.addTo(map) : map.removeLayer(l); }));
+  }
+  const labelZoom = () => { const k = map.getContainer().classList; k.toggle("zoom-low", map.getZoom() < 10); k.toggle("zoom-mid", map.getZoom() < 13); };
+  map.on("zoomend", labelZoom); labelZoom();
   return { map, layers };
 }
-async function drawZones(layer) {
-  layer.clearLayers();
+
+function zoneStyle(type, strong) { const col = zoneColor(type); return { color: col, weight: strong ? 3 : 1.5, fillColor: col, fillOpacity: strong ? 0.22 : 0.08 }; }
+
+async function drawZones(layers) {
+  layers.red.clearLayers(); layers.amber.clearLayers();
   try {
     const fc = await api("/zones", { auth: false });
-    L.geoJSON(fc, {
-      style: f => ({ color: ZONE_COLOR[f.properties.zone_type] || "#a15c00", weight: 1.5, fillOpacity: 0.14 }),
-      onEachFeature: (f, l) => l.bindPopup(`<b>${esc(f.properties.name)}</b><br>${esc(f.properties.zone_type)}<br><span class="small">${esc(f.properties.source)}</span>`)
-    }).addTo(layer);
+    fc.features.forEach(f => {
+      const p = f.properties, layer = ZONE_GROUP[p.zone_type] === "red" ? layers.red : layers.amber;
+      // Not interactive: clicks must reach the map so a pilot can pick a spot inside a zone.
+      const shape = L.geoJSON(f, { style: () => zoneStyle(p.zone_type), interactive: false });
+      const major = p.zone_type === "military" || p.zone_type === "airport";
+      shape.bindTooltip(esc(p.name), { permanent: true, direction: "center", className: "zlabel" + (major ? "" : " minor"), interactive: false });
+      shape.addTo(layer);
+    });
   } catch (e) { /* the check result still draws the zones it needs */ }
 }
 async function drawNotices(layer) {
   layer.clearLayers();
   try {
     const list = await api("/notices/active", { auth: false });
-    list.forEach(n =>
-      circleOf(n).bindPopup(`<b>${esc(n.title)}</b><br>${esc(fmtWhen(n.starts_at))} to ${esc(fmtWhen(n.ends_at))}<br><span class="small">${esc(n.source || "")}</span>`).addTo(layer));
-  } catch (e) { /* notices need sign-in; the static sample notice still applies in checks */ }
+    list.forEach(n => circleOf(n).bindTooltip(esc(n.title), { permanent: true, direction: "center", className: "zlabel notice", interactive: false }).addTo(layer));
+  } catch (e) { /* the static sample notice still applies in checks */ }
 }
+
+// A square target pin, crisp at any zoom.
+function pinIcon(extra = "") { return L.divIcon({ className: "", html: `<div class="pin ${extra}"></div>`, iconSize: [22, 22], iconAnchor: [11, 11] }); }

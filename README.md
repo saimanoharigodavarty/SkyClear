@@ -101,6 +101,20 @@ Decision support only, not legal permission. Always confirm with the official po
 
 ## Running it
 
+One command (it sets up Python, starts MongoDB if Docker is running, loads the data, starts the server and opens your browser):
+
+```
+./run.sh --seed        # first run: also creates the demo pilot, flights and officers
+./run.sh               # later runs
+./run.sh --local       # no Docker, use the JSON files in data/
+```
+
+Open http://localhost:8000. Do not open frontend/index.html directly from the folder. (It still works if you do, because it talks to http://localhost:8000, but the server must be running.) If the server is down the page shows a red bar telling you how to start it.
+
+Demo logins (also listed on the sign-in page): pilot `asha@example.com` / `longenough1`, officers `official@skyclear.demo` (sees every office), `police@`, `rgia@`, `begumpet@`, `defence@`, `forest@`, `hq@` `skyclear.demo` with password `skyclear-demo`. To register a new pilot use any 10-digit number starting 6 to 9, the one-time code is shown on screen in demo mode (`OTP_DEV_ECHO=1`). Switch demo mode off and set `JWT_SECRET`, `PERMIT_SECRET` and `OFFICIAL_PASSWORD` before any shared deployment.
+
+By hand, if you prefer:
+
 ```
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
@@ -108,10 +122,8 @@ cp .env.example .env                 # edit: USE_MONGO, OLLAMA_URL, USE_LLM
 docker compose up -d                 # MongoDB with geo, text and vector search (Atlas Local)
 python backend/load_data.py          # zones, rules, drones, notices, embeddings, indexes
 cd backend && uvicorn main:app --reload
-python ../scripts/seed_demo.py       # optional: demo pilot, flights and a VIP notice
+python ../scripts/seed_demo.py       # optional demo data
 ```
-
-Open http://localhost:8000. Demo officers use the password `skyclear-demo`, see API.md. Without Docker, leave `USE_MONGO=0` and everything runs from the JSON files in data/.
 
 Ollama runs on another laptop, never required on yours. On the Ollama laptop:
 
@@ -147,6 +159,8 @@ docker-compose.yml   MongoDB (Atlas Local)
 - [x] Ollama explanation with citation validation, consistency checks and fallback
 - [x] False-safe bugs A1 and A2 fixed
 - [x] 20 eval cases and metrics (verdict accuracy, false-safe rate, citation recall, text vs vector vs hybrid)
+- [x] Authentication: phone OTP, argon2id, JWT with rotating refresh tokens, lockout, authenticator codes for officials, invite-only officials
+- [x] Friendlier UI: welcome and examples, step guide, map search, checklist, light and dark theme, run.sh
 - [x] Authority routing, signed permits with preflight and revoke, document verification with officer queue, satellite toggle
 - [ ] Real rule text verified against the official regulation, real notices source
 - [ ] Run eval against the remote Ollama and record the vector vs hybrid numbers

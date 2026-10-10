@@ -72,7 +72,7 @@ This stream also holds everything added after the first plan, so nobody else's l
 - P0: Routing (contract 12): each permission request goes to the right authority (zone owner, then jurisdiction polygon, then nearest office), officers see only their queue, overdue requests escalate to the parent, the pilot sees who will review. Authorities data for Hyderabad is sample data, labelled.
 - P0: Permits and preflight (contract 10): approval creates a signed permit with conditions, `/flights/{id}/preflight`, revoke, conflicting permits listed when a notice is published.
 - P0: Verification (contract 9): uploads in GridFS, pilot and drone verification queue for officers, unique serial index, permission requests only from verified pilots with verified drones.
-- P0: Authentication per contract 2: JWT access and rotating refresh tokens (PyJWT), argon2id (argon2-cffi), roles pilot, official, admin, invite-only officials with TOTP (pyotp), account lockout, rate limits (slowapi), refresh token TTL index and revocation.
+- P0 (done): Authentication per contract 2: JWT access and rotating refresh tokens, argon2id, phone OTP, roles pilot, official, admin, invite-only officials with TOTP, lockout, rate limits, refresh token TTL index. Remaining: move rate limits to MongoDB for several replicas, real SMS provider.
 - P0: Alerts by change stream: a listener on `notices` and `flights` writes `notifications`. Remove the notification calls from the HTTP handlers.
 - P0: Permission decisions in a MongoDB transaction (flight update, audit entry, notification together). Audit log for every official action.
 - P1: Zone authority data side (contract 11): `class`, `official`, `version` fields, `zone_versions`, maker and checker publish rule, KML and GeoJSON import.

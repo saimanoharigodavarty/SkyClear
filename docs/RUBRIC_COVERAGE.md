@@ -36,7 +36,7 @@ Gap: no Atlas Charts dashboard, no sharding or replica-set write concern discuss
 - 3D live view: satellite chase camera, drone camera with a heads-up display and distance to the nearest zone, zone and permit volumes.
 - MAVLink telemetry adapter (tested with a mocked message).
 - Real tracker input: `POST /ingest/position` with a per-tracker key (`docs/TRACKERS.md`), so a Remote ID receiver or radar feeds the same geofence and alerts.
-- Gap: no real drone hardware tested, no real video feed, no terrain or building heights in 3D, tracker drones are not drawn on the live map.
+- Gap: no real drone hardware tested, no real video feed, no terrain or building heights in 3D.
 
 ## AI/ML implementation and integration
 

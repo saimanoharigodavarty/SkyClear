@@ -196,3 +196,12 @@ function beep() {
 function alarmFor(status) { if (status === "breach") sirenStart(); else { sirenStop(); if (status === "warning") beep(); } }
 $("sndBtn").textContent = soundOn ? "Sound: on" : "Sound: off";
 $("sndBtn").addEventListener("click", () => { soundOn = !soundOn; saved("displaySound", soundOn); $("sndBtn").textContent = soundOn ? "Sound: on" : "Sound: off"; if (!soundOn) sirenStop(); });
+
+
+/* ---------- officials also see the other drones in the sky around the one they watch (tracker drones and background traffic) ---------- */
+if (sess && sess.user.role === "official") {
+  setInterval(async () => {
+    if (!FID || !is3d) return;
+    try { const out = await api("/live/drones"); View3D.setOthers(out.drones.filter(d => d.flight_id !== FID)); } catch (e) { /* the next tick tries again */ }
+  }, 1500);
+}

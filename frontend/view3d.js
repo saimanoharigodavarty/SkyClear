@@ -3,7 +3,7 @@
 // a height line and a trail. MapLibre GL draws the world, three.js draws the drone in the same depth buffer.
 const View3D = (() => {
   let map = null, ready = false, scene, camera, renderer, rig, rotors = [], light, shadow, drop, trailLine, trailGeo, origin = null, mercO = null;
-  let cur = null, prev = null, tPrev = 0, tCur = 0, mode = "chase", camHeading = 0, gimbal = 25, trail = [], onReady = [], zoneGeo = [], nearest = null, lastNear = 0, raf = 0;
+  let cur = null, prev = null, tPrev = 0, tCur = 0, mode = "chase", camHeading = 0, gimbal = 25, trail = [], onReady = [], zoneGeo = [], nearest = null, lastNear = 0, raf = 0, others = new Map(), othersGroup = null, volGroup = null, volSrc = { zones: [], notices: [], permit: [] };
   const MODES = ["chase", "fpv", "top", "free"], MODE_LABEL = { chase: "Camera: chase", fpv: "Camera: drone view", top: "Camera: from above", free: "Camera: free" };
   const M_LAT = 110574, M_LNG = 111320, MAX_TRAIL = 900;
   const RED = 0xd64545, AMBER = 0xe0a030, GREEN = 0x3fae6a, ACCENT = 0x4aa3df;
@@ -104,6 +104,39 @@ const View3D = (() => {
     if (strip) strip.style.backgroundPositionX = (-(camHeading % 360) * 4 + strip.clientWidth / 2) + "px";
   }
 
+  // Zones, notices and the permit are drawn as see-through volumes by three.js with depth writing off, so the drone stays visible inside them
+  // (MapLibre's own extrusions write depth and would hide a drone that is inside a zone or a permit).
+  function volumeFor(feature, color, height) {
+    const g = feature.geometry, polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [], out = [];
+    polys.forEach(poly => {
+      const pts = poly[0].map(([lng, lat]) => local(lng, lat, 0));
+      if (pts.length < 4) return;
+      if (Math.min(...pts.map(p => Math.hypot(p.x, p.y))) > 7000 && !pointInside(pts)) return;  // far from the drone: not drawn
+      const shape = new THREE.Shape(pts.map(p => new THREE.Vector2(p.x, p.y)));
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false });
+      const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
+      const mesh = new THREE.Mesh(geo, mat); mesh.renderOrder = 2;
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.75, depthWrite: false })); edges.renderOrder = 3;
+      out.push(mesh, edges);
+    });
+    return out;
+  }
+  function pointInside(pts) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) if ((pts[i].y > 0) !== (pts[j].y > 0) && 0 < (pts[j].x - pts[i].x) * (0 - pts[i].y) / (pts[j].y - pts[i].y) + pts[i].x) inside = !inside;
+    return inside;
+  }
+  function rebuildVolumes() {
+    if (!origin || !volGroup) return;
+    while (volGroup.children.length) { const o = volGroup.children.pop(); o.geometry && o.geometry.dispose(); o.material && o.material.dispose(); }
+    let budget = 150;  // a city has hundreds of zones: draw the nearest ones
+    const near = f => { try { const c = f.geometry.type === "Polygon" ? f.geometry.coordinates[0][0] : f.geometry.coordinates[0][0][0]; const p = local(c[0], c[1], 0); return Math.hypot(p.x, p.y); } catch (e) { return 1e9; } };
+    ["zones", "notices", "permit"].forEach(k => [...volSrc[k]].sort((a, b) => near(a) - near(b)).forEach(f => {
+      if (budget <= 0) return;
+      volumeFor(f, new THREE.Color(f.properties.color), f.properties.h).forEach(o => volGroup.add(o)); budget--;
+    }));
+  }
+
   const layer = {
     id: "drone3d", type: "custom", renderingMode: "3d",
     onAdd(m, gl) {
@@ -116,6 +149,8 @@ const View3D = (() => {
       trailGeo = new THREE.BufferGeometry(); trailGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(MAX_TRAIL * 3), 3)); trailGeo.setDrawRange(0, 0);
       trailLine = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: 0xffffff })); trailLine.frustumCulled = false; scene.add(trailLine);
       renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true }); renderer.autoClear = false;
+      othersGroup = new THREE.Group(); scene.add(othersGroup);
+      volGroup = new THREE.Group(); scene.add(volGroup);
       rig.visible = shadow.visible = drop.visible = false;
     },
     render(gl, matrix) {
@@ -130,6 +165,7 @@ const View3D = (() => {
         light.material.color.setHex(cur.status === "breach" ? RED : cur.status === "warning" ? AMBER : GREEN);
         rig.visible = mode !== "fpv";  // from inside the drone you do not see its own body
       }
+      others.forEach(o => { o.pos.lerp(o.target, 0.2); o.group.position.copy(o.pos); o.pole.scale.set(1, 1, Math.max(1, o.pos.z)); });
       const s = mercO.meterInMercatorCoordinateUnits();
       const l = new THREE.Matrix4().makeTranslation(mercO.x, mercO.y, mercO.z).scale(new THREE.Vector3(s, -s, s));
       camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix).multiply(l);
@@ -162,6 +198,7 @@ const View3D = (() => {
     const notices = { type: "FeatureCollection", features: [] };
     try { (await api("/notices/active", { auth: false })).forEach(n => { const g = n.area || n.geometry; if (g) notices.features.push({ type: "Feature", geometry: g, properties: { color: C.notice, h: 150 } }); }); } catch (e) { /* none */ }
     if (origin) buildRings();
+    volSrc.zones = zones.features; volSrc.notices = notices.features; rebuildVolumes();
     map.getSource("zones").setData(zones); map.getSource("notices").setData(notices);
   }
 
@@ -176,8 +213,8 @@ const View3D = (() => {
     map.on("load", () => {
       const empty = { type: "FeatureCollection", features: [] };
       ["zones", "notices", "permit", "path"].forEach(id => map.addSource(id, { type: "geojson", data: empty }));
-      const ext = (id, src, opacity) => map.addLayer({ id, type: "fill-extrusion", source: src, paint: { "fill-extrusion-color": ["get", "color"], "fill-extrusion-height": ["get", "h"], "fill-extrusion-base": 0, "fill-extrusion-opacity": opacity } });
-      ext("zones", "zones", 0.32); ext("notices", "notices", 0.3); ext("permit", "permit", 0.22);
+      const flat = (id, src, opacity) => { map.addLayer({ id, type: "fill", source: src, paint: { "fill-color": ["get", "color"], "fill-opacity": opacity } }); map.addLayer({ id: id + "-line", type: "line", source: src, paint: { "line-color": ["get", "color"], "line-width": 2 } }); };
+      flat("zones", "zones", 0.18); flat("notices", "notices", 0.2); flat("permit", "permit", 0.12);
       map.addLayer({ id: "path", type: "line", source: "path", paint: { "line-color": "#f4f7fa", "line-width": 3, "line-opacity": 0.8 } });
       map.addLayer(layer);
       ready = true; drawStatic(); onReady.forEach(f => f()); onReady = [];
@@ -194,12 +231,15 @@ const View3D = (() => {
     init, setMode, setChase(on) { setMode(on ? "chase" : "free"); }, nextMode() { setMode(MODES[(MODES.indexOf(mode) + 1) % MODES.length]); }, get mode() { return mode; },
     refresh() { when(drawStatic); },
     setPermit(area, altMax) {
-      when(() => map.getSource("permit").setData({ type: "FeatureCollection", features: area ? [{ type: "Feature", geometry: area, properties: { color: C.accent, h: altMax || 60 } }] : [] }));
+      when(() => {
+        const fc = { type: "FeatureCollection", features: area ? [{ type: "Feature", geometry: area, properties: { color: C.accent, h: altMax || 60 } }] : [] };
+        map.getSource("permit").setData(fc); volSrc.permit = fc.features; rebuildVolumes();
+      });
     },
     reset() { origin = null; prev = cur = null; trail = []; when(() => { map.getSource("path").setData({ type: "FeatureCollection", features: [] }); if (trailGeo) trailGeo.setDrawRange(0, 0); }); },
     update(d) {
       when(() => {
-        if (!origin) { origin = [d.lng, d.lat]; mercO = maplibregl.MercatorCoordinate.fromLngLat(origin, 0); camHeading = d.heading_deg; buildRings(); }
+        if (!origin) { origin = [d.lng, d.lat]; mercO = maplibregl.MercatorCoordinate.fromLngLat(origin, 0); camHeading = d.heading_deg; buildRings(); rebuildVolumes(); }
         const f = cur ? { ...d, lng: cur.lng + (d.lng - cur.lng) * 0.45, lat: cur.lat + (d.lat - cur.lat) * 0.45 } : d;  // soften the simulated GPS noise
         prev = cur; cur = d = f; tPrev = tCur; tCur = performance.now();
         trail.push([d.lng, d.lat, d.alt_m]); if (trail.length > MAX_TRAIL) trail.shift();
@@ -210,6 +250,28 @@ const View3D = (() => {
         map.getSource("path").setData({ type: "Feature", geometry: { type: "LineString", coordinates: trail.map(t => [t[0], t[1]]) } });
       });
     },
+    // other drones in the sky (drones seen by trackers, background traffic): a coloured marker with a line down to the ground
+    setOthers(list) {
+      when(() => {
+        if (!origin || !othersGroup) return;
+        const seen = new Set();
+        list.forEach(d => {
+          const id = d.flight_id || d.drone_id; seen.add(id);
+          const color = d.status === "breach" ? RED : d.status === "warning" ? AMBER : d.kind === "tracker" ? ACCENT : 0x9aa4ad, target = local(d.lng, d.lat, (d.alt_m || 0) + 2);
+          let o = others.get(id);
+          if (!o) {
+            const group = new THREE.Group(), mat = new THREE.MeshBasicMaterial({ color });
+            const body = new THREE.Mesh(new THREE.OctahedronGeometry(d.kind === "tracker" ? 9 : 6), mat); group.add(body);
+            const poleMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.6 });
+            const pole = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]), poleMat); group.add(pole);
+            othersGroup.add(group); o = { group, body, pole, mat, poleMat, pos: target.clone(), target }; others.set(id, o);
+          }
+          o.target = target; o.mat.color.setHex(color); o.poleMat.color.setHex(color);
+        });
+        others.forEach((o, id) => { if (!seen.has(id)) { othersGroup.remove(o.group); others.delete(id); } });
+      });
+    },
+    get othersCount() { return others.size; },
     resize() { if (map) map.resize(); },
   };
 })();

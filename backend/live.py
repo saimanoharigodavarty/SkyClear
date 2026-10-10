@@ -25,6 +25,7 @@ from security import decode_access
 from simulator.fleet import get_fleet_simulator
 
 router = APIRouter(prefix="/live")
+_live_cache = {}
 sim_router = APIRouter(prefix="/sim")
 
 
@@ -69,7 +70,14 @@ async def live_drones(bbox: str = Query(default=""), authorization: Optional[str
             bbox_list = None
 
     user = get_current_user(authorization)
-    out = sim.get_drones(bbox=bbox_list, user=user)
+    # The simulator moves once a tick, so everyone asking within the same tick gets the same answer: build it once.
+    key = (sim._tick_n, len(sim.drones), user.get("role") if user else None, user.get("user_id") if user and user.get("role") == "pilot" else None, tuple(bbox_list or ()))
+    hit = _live_cache.get(key)
+    if hit is None:
+        if len(_live_cache) > 200:
+            _live_cache.clear()
+        hit = _live_cache[key] = sim.get_drones(bbox=bbox_list, user=user)
+    out = {"as_of": hit["as_of"], "drones": list(hit["drones"])}
     if user and user.get("role") == "official":  # drones seen by real trackers, for officials only
         from ingest_api import tracker_drones
         out["drones"] = [*out["drones"], *tracker_drones(bbox_list)]

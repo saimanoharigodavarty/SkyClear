@@ -20,3 +20,10 @@ COVERAGE_BBOX = (68.0, 6.5, 97.5, 37.0)  # India; airport zones come from OurAir
 NEARBY_KM = 5.0
 DATA_LAST_UPDATED = "2026-10-10"
 DISCLAIMER = "Decision support only, not legal permission."
+
+# Runtime data (accounts, flights, official notices, alerts). JSON file for the prototype.
+RUNTIME_PATH = Path(os.getenv("RUNTIME_PATH", str(DATA_DIR / "runtime.json")))
+# Demo official account, seeded on startup. Change for any shared deployment.
+OFFICIAL_EMAIL = os.getenv("OFFICIAL_EMAIL", "official@skyclear.demo")
+OFFICIAL_PASSWORD = os.getenv("OFFICIAL_PASSWORD", "skyclear-demo")
+OFFICIAL_NAME = os.getenv("OFFICIAL_NAME", "Hyderabad Airspace Desk")

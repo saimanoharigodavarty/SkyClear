@@ -8,6 +8,7 @@ import json
 from datetime import datetime
 
 import config
+import runtime
 from geo import distance_to_polygon_km, point_in_polygon
 
 
@@ -24,7 +25,8 @@ class LocalStore:
         self.drones = _load("drones.json")
 
     def get_drone(self, drone_id):
-        return next((d for d in self.drones if d["drone_id"] == drone_id), None)
+        found = next((d for d in self.drones if d["drone_id"] == drone_id), None)
+        return found or next((d for d in runtime.all_("drones") if d["drone_id"] == drone_id), None)
 
     def zones_near(self, lat, lng, radius_km=config.NEARBY_KM):
         """Zones containing the point or within radius_km. Each item: zone dict + inside + distance_km."""
@@ -39,7 +41,8 @@ class LocalStore:
     def notices_at(self, lat, lng, when: datetime):
         """Notices that contain the point and are active at `when`."""
         out = []
-        for n in self.notices:
+        published = [n for n in runtime.all_("notices") if n["status"] == "active"]
+        for n in self.notices + published:
             starts = datetime.fromisoformat(n["starts_at"])
             ends = datetime.fromisoformat(n["ends_at"])
             if starts <= when <= ends and point_in_polygon(lng, lat, n["area"]):

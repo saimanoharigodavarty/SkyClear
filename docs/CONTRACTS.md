@@ -52,3 +52,7 @@ Time series collection `telemetry`: `{ ts, drone_id, flight_id, position: {type:
 ## 7. Alerts (stream 2A builds)
 
 When a notice is published or cancelled, or a decision is made, stream 2A writes documents to `notifications` (shape in API.md) from a change stream listener, not from the HTTP handler. Thanvi's `/live/stream` pushes new notifications of the requesting user as `alert` events.
+
+## 8. Zone search box (Manohari builds, Nikhil consumes)
+
+`GET /zones/search?q=begum` returns up to 8 matches: `[ { "zone_id": "Z-VOHY", "name": "Begumpet Airport", "zone_type": "airport", "source": "...", "center": { "lat": 17.4531, "lng": 78.4676 } } ]`. Works today with a simple name match. Manohari upgrades it to an Atlas Search autocomplete index with fuzzy matching, the response shape stays the same.

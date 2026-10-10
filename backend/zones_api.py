@@ -2,6 +2,7 @@
 
 GET /zones                      all zones (small areas only)
 GET /zones?bbox=w,s,e,n         only zones that touch the box, this is what the map calls on every pan and zoom
+GET /zones/search?q=            search box by zone name
 """
 from typing import Optional
 
@@ -23,3 +24,11 @@ def zones(bbox: Optional[str] = None):
     if not (-180 <= w < e <= 180 and -90 <= s < n <= 90):
         raise HTTPException(422, "bbox out of range")
     return store.zones_in_bbox(w, s, e, n)
+
+
+@router.get("/zones/search")
+def zones_search(q: str):
+    """Search box: zones whose name matches q, each with a map centre. Contract 8."""
+    if len(q.strip()) < 2:
+        return []
+    return store.search_zones(q)

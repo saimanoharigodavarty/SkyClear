@@ -59,3 +59,9 @@ def test_zones_bbox_returns_only_zones_in_view():
 def test_live_and_analytics_stubs_have_the_contract_shape():
     assert client.get("/live/drones").json()["drones"] == []
     assert "zones" in client.get("/analytics/summary").json()
+
+
+def test_zone_search_box():
+    hits = client.get("/zones/search?q=begum").json()
+    assert hits and hits[0]["name"] == "Begumpet Airport" and {"lat", "lng"} <= set(hits[0]["center"])
+    assert client.get("/zones/search?q=x").json() == []

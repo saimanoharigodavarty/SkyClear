@@ -25,6 +25,11 @@ def _touches_box(geometry, w, s, e, n):
     return not (max(xs) < w or min(xs) > e or max(ys) < s or min(ys) > n)
 
 
+def _center(geometry):
+    ring = geometry["coordinates"][0]
+    return {"lat": round(sum(y for _, y in ring) / len(ring), 5), "lng": round(sum(x for x, _ in ring) / len(ring), 5)}
+
+
 class LocalStore:
     def __init__(self):
         self.zones = _load("zones.geojson")["features"]
@@ -60,6 +65,12 @@ class LocalStore:
     def rules_for(self, zone_types, drone_class, query=""):
         """Metadata-filtered rules. MongoStore also ranks them by vector + keyword search using `query`."""
         return [r for r in self.rules if r["zone_type"] in zone_types and drone_class in r["drone_classes"]]
+
+    def search_zones(self, q, limit=8):
+        """Find zones by name. Simple substring match here. MongoStore should use Atlas Search autocomplete."""
+        q = q.strip().lower()
+        hits = [f["properties"] | {"center": _center(f["geometry"])} for f in self.zones if q in f["properties"]["name"].lower()]
+        return hits[:limit]
 
     def zones_in_bbox(self, w, s, e, n):
         box = {"type": "Polygon", "coordinates": [[[w, s], [e, s], [e, n], [w, n], [w, s]]]}
@@ -103,6 +114,12 @@ class MongoStore(LocalStore):
             geom = z.pop("geometry")
             feats.append({"type": "Feature", "properties": z, "geometry": geom})
         return {"type": "FeatureCollection", "features": feats}
+
+    def search_zones(self, q, limit=8):
+        """TODO (Manohari): replace with an Atlas Search autocomplete query on zones.name."""
+        import re
+        found = self.db.zones.find({"name": {"$regex": re.escape(q.strip()), "$options": "i"}}, {"_id": 0}).limit(limit)
+        return [{**{k: v for k, v in z.items() if k != "geometry"}, "center": _center(z["geometry"])} for z in found]
 
     def zones_in_bbox(self, w, s, e, n):
         box = {"type": "Polygon", "coordinates": [[[w, s], [e, s], [e, n], [w, n], [w, s]]]}

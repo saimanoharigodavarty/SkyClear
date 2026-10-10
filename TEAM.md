@@ -15,28 +15,33 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first (10 minutes), then [docs/CONTRACTS
 | Manohari | Stream 4: MongoDB data and RAG | The core of the hackathon track. Geo, vector and hybrid search, real data, evaluation numbers |
 | Thanvi | Stream 3: Simulation and engine | The most visible technical piece. Live drones, geofencing, route checks |
 | Nikhil | Stream 1: Experience, and Stream 2A: Identity and workflow | Everything the user sees, plus authentication and alerts, which touch every screen |
-| Suhas | Stream 2B: Deployment, load testing and demo material | Self-contained, clear steps, and it makes the scale claims provable |
+| Suhas | Stream 2B: Atlas, charts, load testing and demo material | Self-contained, clear steps. Puts the demo on MongoDB Atlas with live Atlas Charts, and makes the scale claims provable |
 
 ### Stream 4: MongoDB data and RAG (Manohari)
 
 Files: backend/search.py, load_data.py, zones_api.py, analytics.py, embeddings.py, explain.py, eval.py, data/, new ingestion/.
 
+The MongoDB showpiece stream. Verified on our local MongoDB 8.3: Atlas Search (`$search`) and `$rankFusion` work. See the feature map in ARCHITECTURE.md.
+
 - P0: Real zones: ingest OpenStreetMap for Telangana (Geofabrik extract, osmium or Overpass): aeroways, military land, prisons, government sites, power plants, stadiums. Keep source and ODbL attribution. Aim for 300 or more Hyderabad zones. Add JSON schema validation and the right indexes to `zones`.
+- P0: Hybrid search done the MongoDB way: create an Atlas Search index on `rules.text` and use `$rankFusion` over `$vectorSearch` and `$search` instead of the hand-written merge in `search_rules`. Keep the metadata filters. Fall back to `$search` alone when embeddings are missing.
+- P0: Atlas Search autocomplete with fuzzy matching on `zones.name` for the search box (contract 8). The endpoint already exists with a plain name match, keep the response shape.
 - P0: Geo queries done properly: viewport `$geoIntersects`, `$geoNear` for nearest zones, flights stored as GeoJSON with a time range and a geo plus time overlap query. Prove index use with `explain()` and note it in docs/SCALING.md.
 - P0: Real rules: replace placeholder text with the actual regulation (section and date for each). Decide the notices source (authority entry only).
-- P0: RAG with the remote Ollama: run `load_data.py`, vector index, hybrid search, tune the prompt on all eval cases, adversarial notice tests for prompt injection.
-- P0: Evaluation: grow to 30 cases including zone edges and overlaps, record real vector, text and hybrid numbers in docs/RESULTS.md.
-- P0: Analytics aggregation pipelines (contract 6): heatmap cells, breaches per zone, median decision time.
+- P0: RAG with the remote Ollama: run `load_data.py`, vector index, tune the prompt on all eval cases, adversarial notice tests for prompt injection.
+- P0: Evaluation: grow to 30 cases including zone edges and overlaps, record real numbers for keyword (`$search`), vector and `$rankFusion` hybrid in docs/RESULTS.md.
+- P0: Analytics aggregation pipelines (contract 6): `$facet`, `$bucket`, `$group`, heatmap cells, breaches per zone, median decision time. Write results into summary collections with `$merge` so the dashboard and Atlas Charts read fast.
 - P1: Sharding plan in docs/SCALING.md (telemetry by drone_id and time, zones by geohash prefix), test with a larger synthetic dataset.
-- Done when: the map shows 300 or more real zones fast, `explain()` shows index scans, docs/RESULTS.md has real numbers, and 0 false-safe on 30 cases.
+- P2 stretch: MongoDB MCP server (open source) so officials can ask the airspace questions in plain language.
+- Done when: the map shows 300 or more real zones fast, `explain()` shows index scans, hybrid search runs inside MongoDB with `$rankFusion`, docs/RESULTS.md has real numbers, and 0 false-safe on 30 cases.
 
 ### Stream 3: Simulation and engine (Thanvi)
 
 Files: backend/live.py, sim.py, verdict.py, geo.py, backend/tests/test_verdict.py, new simulator/.
 
 - P0: Fleet simulator in `simulator/` (asyncio): kinematics with speed, heading, altitude, battery drain, wind drift and GPS noise. Approved flights fly their own route, the rest fly random missions. 100 drones at 1 Hz, scalable to 1000.
-- P0: Telemetry into a MongoDB time series collection with batched inserts, TTL and a 2dsphere index (contract 5).
-- P0: Geofence engine: every tick, test positions against zones and notices with MongoDB geo queries, predict breaches ahead along the heading (lookahead and ETA), write `breaches`. Make `/live/drones` and `/live/stream` real (contract 3) from change streams.
+- P0: Telemetry into a MongoDB time series collection with batched inserts, TTL and a 2dsphere index (contract 5). Use `$setWindowFields` for smoothed speed and track.
+- P0: Geofence engine: every tick, test positions against zones and notices with MongoDB geo queries, predict breaches ahead along the heading (lookahead and ETA), write `breaches`. Make `/live/drones` and `/live/stream` real (contract 3) from MongoDB change streams.
 - P0: Simulation control endpoints (contract 4), including the VIP scenario that makes running drones breach on demand.
 - P0: Verdict engine fixes from PRODUCT.md: A3 (route against polygon intersection, not 100 m sampling), A4, A5, A6, with tests.
 - P1: Altitude and day or night rules in the verdict. Corridor buffer around routes.
@@ -48,6 +53,7 @@ Files: backend/live.py, sim.py, verdict.py, geo.py, backend/tests/test_verdict.p
 Files: frontend/*.
 
 - P0: Rebuild the map on MapLibre GL JS with OpenFreeMap vector tiles. Load zones by viewport (`/zones?bbox=` on every moveend), style them by severity, tidy the labels.
+- P0: Search box on the map using `/zones/search` (contract 8), jump to the zone on select.
 - P0: Live airspace view for the pilot and the authority: drones moving on the map from `/live/stream`, color by status, breach feed panel.
 - P0: Simulation screen for officials: start and stop a fleet, scale slider, "inject VIP movement" button (contract 4).
 - P0: Auth screens against contract 2 (refresh handling, TOTP step for officials, logout).
@@ -64,19 +70,19 @@ Files: backend/bridge.py, runtime.py, main.py, new backend/security.py.
 - P1: Pagination on flight and notice lists. Security headers, CORS policy, input size caps.
 - Done when: a notice published from a second terminal alerts a pilot in 2 seconds with no call from the handler, officials cannot self-register, and a stolen refresh token is rejected after use.
 
-### Stream 2B: Deployment, load testing and demo material (Suhas)
+### Stream 2B: Atlas, charts, load testing and demo material (Suhas)
 
-Files: docker/, docker-compose.prod.yml, locust/, monitoring/, backend/notify_email.py (new), docs/RESULTS.md (load section), docs/DEMO.md, docs/SLIDES.md.
+Files: docs/ATLAS.md, docs/RESULTS.md (load section), docs/DEMO.md, docs/SLIDES.md, locust/, docker/, docker-compose.prod.yml, monitoring/, backend/notify_email.py (new).
 
-Do these in order, each is a clear step with a visible result:
+Do these in order, each is a clear step with a visible result. MongoDB comes first because this is a MongoDB hackathon.
 
-1. Production-style compose file `docker-compose.prod.yml`: Nginx in front, 3 copies of the API (a Dockerfile in docker/ for the backend), MongoDB as a replica set. `docker compose -f docker-compose.prod.yml up` must serve the app on http://localhost:8080. Nginx gzips responses and caches `GET /zones` for 30 seconds.
-2. Monitoring: add `prometheus-fastapi-instrumentator` to the backend (one small change in backend/main.py, tell Nikhil first), Prometheus and Grafana in the compose file, one Grafana dashboard with request rate, p95 latency and error rate, saved as JSON in monitoring/.
-3. Load test in `locust/`: a user that checks random Hyderabad spots (`POST /check`), loads zones by viewport and logs in. Run it with 50, 200 and 500 users. Put the real numbers (requests per second, p95, errors) in docs/RESULTS.md with the date and the machine.
-4. Email alerts: `backend/notify_email.py` sending a notification by SMTP (test with MailHog or Mailpit in the compose file). Nikhil wires it into the alert listener, you provide `send_alert(to, subject, body)` and a test.
-5. Demo material: docs/DEMO.md with a 3 minute script (what to click, what to say, which numbers to quote) and docs/SLIDES.md with the slide outline for the Track 2 pitch. Use PRODUCT.md for the honest limits and judge questions. Record a backup screen video once the app is ready.
-6. Stretch, only after steps 1 to 5: MongoDB Charts on an Atlas free cluster. First check the free-tier limits (time series collections, change streams, geo, vector). Then copy a snapshot of flights and breaches to Atlas, build 3 or 4 charts (flights by area, breaches per zone, decision times) and link or embed them on the authority page as a second view. Keep our own dashboard as the default, because Charts needs the internet and cannot run on the local Docker MongoDB. Take a screenshot as a backup for the demo.
-- Done when: the prod compose runs from a clean clone, the Grafana dashboard moves during a load test, RESULTS.md has real load numbers, and the demo script has been rehearsed once end to end.
+1. P0, Atlas as the demo database: create a free MongoDB Atlas cluster, allow your IP, set `MONGO_URI` in `.env` to the Atlas connection string, run `python backend/load_data.py`, start the app and run `USE_MONGO=1 python -m pytest backend`. Write docs/ATLAS.md: the exact steps, and which features worked on the free tier and which did not (vector search, Atlas Search, time series collections, change streams, transactions, geo). The team needs this answer early, so do it first and tell everyone the result.
+2. P0, Atlas Charts on live data: with the app running on Atlas, build 4 charts in Atlas Charts (flights by area, breaches per zone, decision times, drones by status), a dashboard, and an embed or link on the authority page. Agree the embed approach with Nikhil. Take screenshots as a backup for the demo.
+3. P0, demo material: docs/DEMO.md with a 3 minute script (what to click, what to say, which numbers to quote) and docs/SLIDES.md with the slide outline for the Track 2 pitch, built around the MongoDB feature map in ARCHITECTURE.md. Use PRODUCT.md for the honest limits and judge questions. Record a backup screen video once the app is ready.
+4. P1, load test in `locust/`: a user that checks random Hyderabad spots (`POST /check`), loads zones by viewport and logs in. Run it with 50, 200 and 500 users. Put the real numbers (requests per second, p95, errors) in docs/RESULTS.md with the date and the machine.
+5. P1, production-style compose file `docker-compose.prod.yml`: Nginx in front, 3 copies of the API (a Dockerfile in docker/), MongoDB replica set. Nginx gzips and caches `GET /zones` for 30 seconds.
+6. P1, monitoring and email: `prometheus-fastapi-instrumentator` (one small change in backend/main.py, tell Nikhil first), Prometheus and Grafana with a latency dashboard in monitoring/. `backend/notify_email.py` with `send_alert(to, subject, body)` tested against Mailpit, Nikhil wires it into the alert listener.
+- Done when: docs/ATLAS.md exists with real findings, the app runs on Atlas with Charts showing live data, the demo script has been rehearsed once end to end, and RESULTS.md has real load numbers.
 
 ## Order of work
 

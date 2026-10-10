@@ -31,6 +31,7 @@ The MongoDB showpiece stream. Verified on our local MongoDB 8.3: Atlas Search (`
 - P0: RAG with the remote Ollama: run `load_data.py`, vector index, tune the prompt on all eval cases, adversarial notice tests for prompt injection.
 - P0: Evaluation: grow to 30 cases including zone edges and overlaps, record real numbers for keyword (`$search`), vector and `$rankFusion` hybrid in docs/RESULTS.md.
 - P0: Analytics aggregation pipelines (contract 6): `$facet`, `$bucket`, `$group`, heatmap cells, breaches per zone, median decision time. Write results into summary collections with `$merge` so the dashboard and Atlas Charts read fast.
+- P0: Authorities data (contract 12): `authorities` collection with jurisdiction polygons and office points for Hyderabad (sample data, labelled), 2dsphere indexes, `authority_id` on zones.
 - P0: Zone authority data side (contract 11): `class`, `official`, `version` fields, `zone_versions` collection, maker and checker rule enforced in the publish endpoint, KML and GeoJSON import for official zone files, schema validation.
 - P1: Sharding plan in docs/SCALING.md (telemetry by drone_id and time, zones by geohash prefix), test with a larger synthetic dataset.
 - P2 stretch: MongoDB MCP server (open source) so officials can ask the airspace questions in plain language.
@@ -45,6 +46,7 @@ Files: backend/live.py, sim.py, verdict.py, geo.py, backend/tests/test_verdict.p
 - P0: Geofence engine: every tick, test positions against zones and notices with MongoDB geo queries, predict breaches ahead along the heading (lookahead and ETA), write `breaches`. Make `/live/drones` and `/live/stream` real (contract 3) from MongoDB change streams.
 - P0: Simulation control endpoints (contract 4), including the VIP scenario that makes running drones breach on demand.
 - P0: Verdict engine fixes from PRODUCT.md: A3 (route against polygon intersection, not 100 m sampling), A4, A5, A6, with tests.
+- P0: Follow docs/SIMULATION.md: level 1 fleet first, scenarios A, B and E for the core story.
 - P0: Permit-aware simulation (contract 10): a drone arms only if its flight passes preflight. Yellow-zone flights without a valid permit, or with a serial that does not match, become breaches. Telemetry carries the drone serial.
 - P1: Altitude and day or night rules in the verdict. Corridor buffer around routes.
 - P1 stretch: ArduPilot SITL in Docker with pymavlink writing the same telemetry shape (`source: "mavlink"`).
@@ -74,6 +76,7 @@ Files: backend/bridge.py, runtime.py, main.py, new backend/security.py.
 - P0: Permission decisions in a MongoDB transaction (flight update, audit entry, notification together). Audit log for every official action.
 - P1: Pagination on flight and notice lists. Security headers, CORS policy, input size caps.
 - P0: Permits and preflight (contract 10): approval creates a signed permit with conditions, `/flights/{id}/preflight`, revoke, conflicting permits listed when a notice is published. See docs/PERMITS_AND_VERIFICATION.md.
+- P0: Routing (contract 12): send each permission request to the right authority (zone owner, then jurisdiction polygon, then nearest office), officers see only their queue, escalate after the response time, pilot sees who will review it.
 - P0: Verification (contract 9): uploads in GridFS, pilot and drone verification queue for officers, unique serial index, permission requests only from verified pilots with verified drones.
 - Done when: a notice published from a second terminal alerts a pilot in 2 seconds with no call from the handler, officials cannot self-register, a stolen refresh token is rejected after use, and a pilot cannot get cleared for takeoff without an active permit that matches their drone.
 

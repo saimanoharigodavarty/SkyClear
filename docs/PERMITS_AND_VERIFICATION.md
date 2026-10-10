@@ -42,6 +42,19 @@ stateDiagram-v2
 
 Honest limit: SkyClear cannot physically stop a drone. In the real world, enforcement is the drone firmware refusing to arm without a valid signed permit (the "no permission, no takeoff" idea). We simulate that with the simulator refusing to arm. Say this plainly in the pitch.
 
+## Routing the request to the right official
+
+The pilot can ask to fly anywhere, so the system works out who must decide from the location. Officials only see requests for their own area and type of airspace.
+
+1. Zone owner: every zone has an `authority_id` (airport zone to the airport authority, defence zone to the defence estate officer, park to the forest department, VIP or event notice to the city police, government site to its security office). The request goes to the authority that owns the most restrictive zone the flight touches. The other owners of touched zones are notified and can comment.
+2. Jurisdiction: if the zone has no owner, find the authority whose jurisdiction polygon contains the flight area (`$geoIntersects` on `authorities.jurisdiction`).
+3. Nearest office: if no polygon matches, use the nearest authority office (`$geoNear` on `authorities.office`) and mark the reason "nearest office".
+4. Nothing found, for example a spot outside the places we cover: the pilot is told "no authority registered for this area in our data" and given the official portal. The request is not silently dropped.
+5. Escalation: each authority has a response time (`sla_minutes`). An unanswered request is flagged and escalates to the parent authority.
+6. If a flight touches zones owned by two authorities, the first version asks only the primary one and notifies the other. A later version can require both to approve.
+
+The pilot sees who will review the request and why, before and after pressing Request. The authority data in the prototype is sample data (the real mapping of offices to areas must be confirmed with the authorities) and is labelled as such.
+
 ## Who is this person, and is this their drone
 
 We cannot prove ownership cryptographically. We can prove that an officer checked the documents on a date, and that the drone in the air is the drone on the permit. Three layers:

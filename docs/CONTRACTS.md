@@ -77,3 +77,9 @@ When a notice is published, the response also lists `conflicting_permits` so the
 Zones gain `class: "red" | "yellow"`, `official: true | false`, `version`, `effective_from`, `effective_to`, `alt_band_m`.
 `POST /admin/zones/drafts` creates a draft from GeoJSON plus those fields. `POST /admin/zones/{zone_id}/publish` publishes it and must be called by a different officer than the author. `GET /admin/zones/{zone_id}/versions` lists versions. `POST /admin/zones/import` accepts a KML or GeoJSON file of official zones.
 `GET /zones` returns published zones only, with the fields above.
+
+## 12. Authorities and routing (Manohari builds the data, Nikhil builds the routing)
+
+Collection `authorities`: `{ authority_id, name, type: "airport" | "police" | "defence" | "forest" | "state", jurisdiction: Polygon, office: Point, handles: ["airport"], contact, sla_minutes, parent_id }` with 2dsphere indexes on `jurisdiction` and `office`. Zones gain `authority_id`. Officials gain `authority_id` (admin has none and sees all).
+`POST /flights` with `kind: "permission"` also returns `routed_to: { authority_id, name, reason: "zone_owner" | "jurisdiction" | "nearest_office", distance_km }`, plus `also_notified: [authority_id]`. With no authority found it returns 422 and `{ "detail": "no_authority_for_area" }`.
+`GET /flights?status=requested` for an official returns only the requests routed to that official's authority. `GET /authorities` lists authorities for the pilot screen.

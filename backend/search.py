@@ -10,7 +10,7 @@ from datetime import datetime
 import config
 import runtime
 from embeddings import embed
-from geo import circle, distance_to_polygon_km, point_in_polygon
+from geo import distance_to_polygon_km, point_in_polygon
 
 RULES_SEARCH_INDEX = "rules_search"
 RULES_VECTOR_INDEX = "rules_vector"
@@ -141,13 +141,22 @@ class MongoStore(LocalStore):
         return {"type": "FeatureCollection", "features": feats}
 
     def zones_near(self, lat, lng, radius_km=config.NEARBY_KM):
-        """Mongo finds zones touching a circle around the point (2dsphere index). Distance is refined here."""
+        """Return containing and nearby zones ordered by MongoDB's spherical distance."""
+        pipeline = [
+            {"$geoNear": {
+                "near": {"type": "Point", "coordinates": [lng, lat]},
+                "key": "geometry",
+                "distanceField": "distance_m",
+                "maxDistance": radius_km * 1000,
+                "spherical": True,
+            }},
+            {"$project": {"_id": 0}},
+        ]
         out = []
-        search_area = circle(lat, lng, radius_km)
-        for z in self.db.zones.find({"geometry": {"$geoIntersects": {"$geometry": search_area}}}, {"_id": 0}):
-            dist = distance_to_polygon_km(lat, lng, z["geometry"])
-            out.append({**z, "inside": dist == 0.0, "distance_km": round(dist, 2)})
-        return sorted(out, key=lambda z: z["distance_km"])
+        for zone in self.db.zones.aggregate(pipeline):
+            distance_m = zone.pop("distance_m")
+            out.append({**zone, "inside": distance_m <= 0.01, "distance_km": round(distance_m / 1000, 2)})
+        return out
 
     def notices_at(self, lat, lng, when):
         point = {"type": "Point", "coordinates": [lng, lat]}

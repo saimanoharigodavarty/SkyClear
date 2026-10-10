@@ -67,3 +67,18 @@ def test_zone_search_uses_fuzzy_autocomplete_and_preserves_contract():
     assert found[0]["zone_id"] == "Z-1"
     assert found[0]["center"] == {"lat": 17.425, "lng": 78.425}
     assert "geometry" not in found[0]
+
+
+def test_nearby_zones_use_geonear_distance_and_preserve_contract():
+    zone = {"zone_id": "Z-1", "name": "Example", "zone_type": "airport", "distance_m": 1234.5,
+            "geometry": {"type": "Polygon", "coordinates": [[[78.4, 17.4], [78.5, 17.4], [78.4, 17.5], [78.4, 17.4]]]}}
+    db = FakeDb(zones=[zone])
+    found = store_with(db).zones_near(17.4, 78.4, radius_km=7)
+    geo = db.zones.pipelines[0][0]["$geoNear"]
+    assert geo["near"] == {"type": "Point", "coordinates": [78.4, 17.4]}
+    assert geo["key"] == "geometry"
+    assert geo["maxDistance"] == 7000
+    assert geo["spherical"] is True
+    assert found[0]["distance_km"] == 1.23
+    assert found[0]["inside"] is False
+    assert "distance_m" not in found[0]

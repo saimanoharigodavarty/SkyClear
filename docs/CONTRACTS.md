@@ -56,3 +56,24 @@ When a notice is published or cancelled, or a decision is made, stream 2A writes
 ## 8. Zone search box (Manohari builds, Nikhil consumes)
 
 `GET /zones/search?q=begum` returns up to 8 matches: `[ { "zone_id": "Z-VOHY", "name": "Begumpet Airport", "zone_type": "airport", "source": "...", "center": { "lat": 17.4531, "lng": 78.4676 } } ]`. Works today with a simple name match. Manohari upgrades it to an Atlas Search autocomplete index with fuzzy matching, the response shape stays the same.
+
+## 9. Verification (Nikhil builds, Nikhil consumes in the UI)
+
+`POST /uploads` (multipart, signed in) stores a file in MongoDB GridFS and returns `{ "file_id": "..." }`. Only the owner and officials can read it.
+`POST /me/verification/pilot` with `{ cert_no, file_ids: [...] }` and `POST /me/drones/{drone_id}/verification` with `{ serial, uin, file_ids: [...] }` create a pending request.
+`GET /verification/queue` (official) lists pending requests. `POST /verification/{id}/decision` with `{ "decision": "approved" or "rejected", "comment": "..." }` decides it.
+Pilot and drone objects gain `verification: { status: "unverified" | "pending" | "verified" | "rejected", by, at }`. A serial can belong to only one active owner. Permission requests are accepted only from a verified pilot with a verified drone.
+
+## 10. Permits and preflight (Nikhil builds, Thanvi and the UI consume)
+
+Approving a request (existing endpoint) now also creates a permit:
+`{ "permit_id": "P-9F3A21", "flight_id": "F-...", "pilot_id": "U-...", "drone_id": "D-...", "serial": "...", "area": GeoJSON, "alt_max_m": 60, "starts_at": "...", "ends_at": "...", "conditions": ["Daylight only"], "issued_by": "...", "issued_at": "...", "status": "active", "signature": "..." }` with status `active`, `used`, `expired` or `revoked`.
+`GET /permits/{permit_id}` returns it. `POST /permits/{permit_id}/revoke` (official, reason required) revokes it and alerts the pilot.
+`POST /flights/{flight_id}/preflight` returns `{ "cleared": true, "reasons": [], "cleared_until": "...", "permit": {...} }` or `{ "cleared": false, "reasons": ["permit revoked", "serial mismatch"] }`. The simulator calls the same check before a drone arms.
+When a notice is published, the response also lists `conflicting_permits` so the officer can revoke.
+
+## 11. Zone management (Manohari builds the data side, Nikhil builds the editor UI, officials only)
+
+Zones gain `class: "red" | "yellow"`, `official: true | false`, `version`, `effective_from`, `effective_to`, `alt_band_m`.
+`POST /admin/zones/drafts` creates a draft from GeoJSON plus those fields. `POST /admin/zones/{zone_id}/publish` publishes it and must be called by a different officer than the author. `GET /admin/zones/{zone_id}/versions` lists versions. `POST /admin/zones/import` accepts a KML or GeoJSON file of official zones.
+`GET /zones` returns published zones only, with the fields above.

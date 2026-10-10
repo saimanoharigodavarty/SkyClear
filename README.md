@@ -2,7 +2,7 @@
 
 Track 2: RAG Engine (MongoDB hackathon)
 
-Product spec, accounts, notifications and the loophole list: [PRODUCT.md](PRODUCT.md). Target architecture: [ARCHITECTURE.md](ARCHITECTURE.md). Who builds what: [TEAM.md](TEAM.md). Interfaces between streams: [docs/CONTRACTS.md](docs/CONTRACTS.md).
+Product spec, accounts, notifications and the loophole list: [PRODUCT.md](PRODUCT.md). Target architecture: [ARCHITECTURE.md](ARCHITECTURE.md). Permits, verification and the official map: [docs/PERMITS_AND_VERIFICATION.md](docs/PERMITS_AND_VERIFICATION.md). Who builds what: [TEAM.md](TEAM.md). Interfaces between streams: [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
 ## Problem statement
 

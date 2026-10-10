@@ -1,53 +1,74 @@
-# Evaluation results
+# Results
 
-Only measured runs are recorded here. Vector and true hybrid numbers remain pending until the remote Ollama host is connected; the current hybrid path correctly falls back to MongoDB Search.
+Real measurements only. Every number here came from a run, with the date and setup. Re-run `cd backend && USE_MONGO=1 python eval.py` after any change to rules, zones or search and update this file. Do not quote numbers in a pitch that are not in here.
 
-## Run environment
+## Setup of the runs below (10 Oct 2026)
 
-- Date: 2026-10-10
-- Client: Windows, Python 3.14.3, PyMongo 4.16.0
-- Database: MongoDB Atlas 8.0.34
-- Store modes tested: local JSON and MongoDB
-- Zones: 454
-- Rules: 9 passages: 7 prototype context rules plus 2 attributable Digital Sky red/yellow airspace rules. The prototype context rules remain pending official verification.
-- Evaluation cases: 32
-- LLM/embedding host: unavailable for this run
+- App and MongoDB (Atlas Local in Docker) on a Mac.
+- Language model and embeddings on a separate Windows laptop over Wi-Fi, CPU only: `qwen2.5:3b` and `nomic-embed-text` (768 dimensions) through Ollama.
+- Data: 156 zones, 7 sample rules (placeholder paraphrase, not the real regulation), 20 evaluation cases.
 
-## Verdict and citation results
-
-The same results were observed with the local JSON store and MongoDB store.
+## Verdict accuracy (code decides, no model involved)
 
 | Metric | Result |
-|---|---:|
-| Verdict accuracy | 32/32 (100%) |
-| False-safe | 0/32 |
-| Citation recall | 18/18 (100%) |
+|---|---|
+| Verdict accuracy | 20 of 20 |
+| False-safe (said "can fly" when it should not) | 0 of 20 |
+| Citation recall (expected rule is in the citations) | 14 of 14 |
 
-The cases cover airport, military, park and government rules; active and inactive notices; exact notice start/end times; different drone classes; unverified OSM contexts; overlapping known and unknown zones; just-inside and just-outside airport-edge points; and coverage-boundary behavior.
+## Rule retrieval: keyword vs vector vs hybrid
 
-## Retrieval results
+8 questions, each with one expected rule. "Recall at k" counts how often the expected rule is in the top k results.
 
-Twelve evaluation cases contain a natural-language retrieval query and one or more expected rule IDs.
+| Method | Recall at 1 | Recall at 3 |
+|---|---|---|
+| Keyword (Atlas Search, English analyzer) | 7 of 8 | 8 of 8 |
+| Vector (Atlas Vector Search, nomic-embed-text) | 6 of 8 | 7 of 8 |
+| Hybrid (`$rankFusion` of both, inside MongoDB) | 6 of 8 | 8 of 8 |
 
-| Mode | Recall@1 | Recall@3 | Status |
-|---|---:|---:|---|
-| MongoDB Search (`$search`) | 8/12 | 12/12 | Measured |
-| Vector (`$vectorSearch`) | Pending | Pending | Ollama unavailable; vector index not built |
-| Hybrid (`$rankFusion`) | 8/12 | 12/12 | Keyword fallback only, not a true hybrid measurement |
+Read this with care. There are only 7 rules and 8 questions, so one question changes a result by 12 points. Keyword search wins at the top here because the sample rules share words with the questions. These numbers say nothing yet about the real regulation. Re-run them once the real corpus (hundreds of passages) is loaded, that is where vector and hybrid search are expected to pull ahead.
 
-Do not present the fallback row as a vector/hybrid result. After connecting Ollama, rerun `python backend/load_data.py` and `$env:USE_MONGO="1"; python backend/eval.py`, then replace the pending cells with the real output.
+## Relevance gate for Ask
 
-## Prompt-injection regression
+Vector search always returns its nearest rules, even for a question about pizza, so Ask answers only when keywords match or the best vector similarity reaches `ASK_MIN_SCORE` (0.78).
 
-A focused test supplies an active notice containing an instruction to ignore the fixed verdict and claim that the pilot can fly. A simulated model response follows that malicious instruction. SkyClear rejects the contradictory response and returns the deterministic template with the deciding rule citation.
+| Question | Best vector similarity |
+|---|---|
+| Related to the rules (4 questions) | 0.80 to 0.91 |
+| Unrelated: pizza, cake, cricket | 0.71 to 0.76 |
 
-Notice text is labelled as third-party data in the prompt, whitespace-normalized and capped at 200 characters. This does not make arbitrary model output trustworthy; the fixed code verdict, citation allow-list and consistency checks remain the enforcement boundary.
+The gap is small and measured on 8 questions. Recalibrate with the eval once there are more rules and questions.
 
-## Automated tests
+## Speed (Windows laptop, CPU only)
 
-| Suite | Result |
-|---|---:|
-| Local JSON | 130 passed, 7 skipped |
-| MongoDB integration | Not re-run after this change; previously 133 passed, 1 skipped |
+| Step | Time |
+|---|---|
+| Embedding one question | about 1.2 s |
+| Answer from `qwen2.5:3b` | about 6 to 12 s (about 9 tokens per second) |
+| Check: verdict shown | immediately |
+| Check: AI explanation fills in | about 10 to 16 s later |
+| Ask with the AI model | about 8 to 12 s |
 
-The small Atlas tier cannot duplicate the production Search indexes in `skyclear_test`. MongoDB integration tests therefore skip only the autocomplete endpoint test; that pipeline has focused unit coverage and was verified directly against the production `zones_autocomplete` index.
+The verdict never waits for the model. A faster machine or a GPU would cut these a lot.
+
+## What the small model got wrong, and what stops it
+
+Found by running real questions, not by guessing. Each one now has a guard and a test.
+
+| Observed | Guard |
+|---|---|
+| Wrote "not allowed" for a permission-needed spot | Wording rules per verdict reject it and use the plain explanation |
+| Wrote that micro drones can fly over a nearby airport and park | An explanation may not name zones the pilot is not inside |
+| Repeated our prompt labels ("the SPOT FACTS provided") | Label leaks are rejected |
+| Said a VIP movement needs permission, citing the wrong rule | The restriction rule now mentions VIP movements, so retrieval finds it first. Better retrieval from the real corpus will help further |
+| Answered a night-flying question with unrelated rules as if they were the answer | Without a direct answer, Ask says "These are the closest rules we hold, check that they answer your question" |
+
+The model is a small one. The rule is: it may only reword what the rules and the rule engine already say, and anything doubtful falls back to the plain text. The verdict is always decided by code.
+
+## Additional safety regression (Windows / Atlas, 10 Oct 2026)
+
+- 454 OSM-derived zones, 9 rules (including two attributable Digital Sky airspace rules), and 32 evaluation cases.
+- Deterministic verdict accuracy: 32/32; false-safe: 0/32; citation recall: 18/18.
+- Keyword retrieval: recall@1 8/12 and recall@3 12/12.
+- The remote Ollama endpoint was unreachable in this run, so vector and true `$rankFusion` hybrid results were not measured. The fallback used keyword search only.
+- Automated local suite: 130 passed, 7 skipped. MongoDB integration had previously passed 133 with 1 expected autocomplete-index skip; rerun it after loading an official geometry export.

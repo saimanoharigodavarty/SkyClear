@@ -144,8 +144,8 @@ function renderCheck(r) {
   const zl = z => `<li><b>${esc(z.name)}</b> <span class="muted">${esc(z.zone_type)}</span><span class="meta mono" style="float:right">${z.distance_km === 0 ? "inside" : esc(z.distance_km) + " km"}</span></li>`;
   $("result").innerHTML = `
     <div class="verdict ${esc(r.verdict)}"><div class="v">${esc(VERDICT_LABEL[r.verdict] || r.verdict)}</div><div class="s">${esc(VERDICT_MEANING[r.verdict] || "")}</div></div>
-    <p style="margin:0"><b>Why:</b> ${esc(r.summary)}</p>
-    <div class="small" style="margin-top:6px">${r.explained_by === "llm" ? "Explanation written by an AI model from the rules below. The verdict itself is decided by rules, not by the model." : "The verdict is decided by rules."}</div>
+    <p style="margin:0"><b>Why:</b> <span id="whyText">${esc(r.summary)}</span></p>
+    <div class="small" style="margin-top:6px" id="whyNote">${r.explained_by === "llm" ? "Explanation written by an AI model from the rules below. The verdict itself is decided by rules, not by the model." : "The verdict is decided by rules."}</div>
     ${inside.length ? `<div class="section"><h3>Inside</h3><ul class="list">${inside.map(zl).join("")}</ul></div>` : ""}
     ${r.notices.length ? `<div class="section"><h3>Active notices</h3><ul class="list">${r.notices.map(n => `<li><b>${esc(n.title)}</b><div class="meta">${esc(fmtWhen(n.starts_at))} to ${esc(fmtWhen(n.ends_at))}</div></li>`).join("")}</ul></div>` : ""}
     ${near.length ? `<div class="section"><h3>Nearby</h3><ul class="list">${near.map(zl).join("")}</ul></div>` : ""}
@@ -200,10 +200,23 @@ $("go").addEventListener("click", async () => {
   $("result").scrollIntoView({ behavior: "smooth", block: "start" });
   try {
     setStep(3);
-    renderCheck(await api("/check", { method: "POST", auth: false, body: { lat: picked.lat, lng: picked.lng, drone_id: $("drone").value, datetime: toISO($("when").value) } }));
+    const body = { lat: picked.lat, lng: picked.lng, drone_id: $("drone").value, datetime: toISO($("when").value) };
+    // The verdict comes back at once. If a language model is connected, a clearer explanation fills in a few seconds later.
+    renderCheck(await api("/check", { method: "POST", auth: false, body: { ...body, explain: false } }));
+    if (CFG.llm) upgradeExplanation(body);
   } catch (e) { $("result").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
   finally { btn.disabled = false; btn.textContent = "Check this spot"; }
 });
+
+async function upgradeExplanation(body) {
+  const note = $("whyNote"); if (note) note.textContent = "The AI model is writing a clearer explanation. The verdict above is already final.";
+  try {
+    const r = await api("/check", { method: "POST", auth: false, body: { ...body, explain: true } });
+    if (!$("whyText")) return;  // the pilot moved on
+    if (r.explained_by === "llm") { $("whyText").textContent = r.summary; $("whyNote").textContent = "Explanation written by an AI model from the rules below. The verdict itself is decided by rules, not by the model."; }
+    else $("whyNote").textContent = "The verdict is decided by rules.";
+  } catch (e) { const n = $("whyNote"); if (n) n.textContent = "The verdict is decided by rules."; }
+}
 
 /* ---------- simulation ---------- */
 let waypoints = [], routeLine = null, playTimer = null;
@@ -401,7 +414,7 @@ $("askForm").addEventListener("submit", async e => {
   e.preventDefault();
   const body = { question: $("askQ").value };
   if ($("askSpot").checked && picked) Object.assign(body, { lat: picked.lat, lng: picked.lng, drone_id: $("drone").value, datetime: toISO($("when").value) });
-  const btn = $("askGo"); btn.disabled = true; btn.textContent = "Searching the rules...";
+  const btn = $("askGo"); btn.disabled = true; btn.textContent = CFG.llm ? "Searching the rules, the AI model is writing the answer (about 10 seconds)..." : "Searching the rules...";
   $("askResult").innerHTML = skeleton();
   try {
     const r = await api("/ask", { method: "POST", auth: false, body });

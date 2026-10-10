@@ -166,8 +166,8 @@ Done and tested (78 backend tests in two modes, plus a 17-step browser test of t
 
 Left to build (owner in brackets, details in TEAM.md):
 - [ ] Real data: 300+ real zones from OpenStreetMap, real regulation text with sources, a real source for notices (Manohari)
-- [x] Hybrid search with `$rankFusion` over vector and Atlas Search, Atlas Search index, `manage.py check-llm`, `/health/llm` (needs only the Ollama laptop's address to go live, see docs/OLLAMA.md)
-- [ ] MongoDB showpieces: Atlas Search autocomplete for the zone search, `explain()` proof of index use, analytics aggregations with `$merge`, 30 eval cases with recorded vector vs keyword vs hybrid numbers, run against the Ollama laptop (Manohari)
+- [x] Language model connected (Ollama on a Windows laptop): hybrid search with `$rankFusion`, AI-worded explanations and answers with guards, relevance gate for Ask, `manage.py check-llm`. Real numbers in docs/RESULTS.md
+- [ ] MongoDB showpieces: Atlas Search autocomplete for the zone search, `explain()` proof of index use, analytics aggregations with `$merge`, grow the eval to 30 cases and re-run the keyword vs vector vs hybrid comparison on the real corpus (Manohari, first numbers are in docs/RESULTS.md)
 - [ ] Live simulation: fleet simulator, telemetry in a time series collection, geofence engine with early warning, `/live` feed from change streams, the VIP scenario, route fixes A3 to A6 (Thanvi)
 - [ ] Atlas free cluster as the demo database and Atlas Charts on live data, load test numbers, production compose with Nginx, monitoring, demo script, slides and backup video (Suhas)
 - [ ] Live airspace screens and officer simulation controls, analytics dashboard, zone editor (Nikhil, waiting on the feeds above for the first two)

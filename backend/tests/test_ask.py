@@ -71,3 +71,18 @@ def test_validation():
 def test_off_topic_question_is_refused_even_with_a_spot_picked():
     r = post(question="What is the best pizza restaurant in town?", lat=17.407, lng=78.47, drone_id="small-1800").json()
     assert r["answered_by"] == "none" and r["spot"] is None and r["citations"] == []
+
+
+def test_when_only_close_rules_exist_the_answer_says_so():
+    r = post(question="Can I fly my drone in heavy rain with a payload?").json()
+    if r["answered_by"] == "extracted":
+        assert r["answer"].startswith("These are the closest rules we hold")
+
+
+def test_a_general_answer_may_say_prohibited_but_never_safe(monkeypatch):
+    monkeypatch.setattr(config, "USE_LLM", True)
+    ask._down_until = 0
+    monkeypatch.setattr(ask, "_chat", lambda p: json.dumps({"answer": "Flying over military areas is prohibited for all drones [R-002].", "citations": ["R-002"]}))
+    assert post(question="Can I fly over a military area?").json()["answered_by"] == "llm"
+    monkeypatch.setattr(ask, "_chat", lambda p: json.dumps({"answer": "Military areas are safe to fly over [R-002].", "citations": ["R-002"]}))
+    assert post(question="Can I fly over a military area?").json()["answered_by"] == "extracted"

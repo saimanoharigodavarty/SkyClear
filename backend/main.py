@@ -23,6 +23,12 @@ import runtime
 from sim import sample_route, summarize_route
 
 app = FastAPI(title="SkyClear")
+
+
+@app.on_event("startup")
+def _warm_up_model():
+    import llm
+    llm.warm_up()  # loads the model on the Ollama laptop in the background (does nothing when USE_LLM=0)
 # Bearer tokens, no cookies, so a page opened from a file can still talk to the API in development.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(config_router)
@@ -43,6 +49,7 @@ class CheckRequest(BaseModel):
     lng: float
     drone_id: str
     datetime: Optional[str] = None
+    explain: bool = True  # False: answer at once with the plain explanation. The page then asks again with True to get the AI wording
 
 
 @app.get("/health")
@@ -67,9 +74,10 @@ def drones():
 def check(req: CheckRequest):
     drone = get_drone(req.drone_id)
     verdict, near, notices, used = evaluate(req.lat, req.lng, drone, parse_when(req.datetime))
+    use_ai = config.USE_LLM and req.explain
     extra = store.search_rules(f"{drone['class']} drone {' '.join(z['zone_type'] for z in near if z['inside'])}", k=3) \
-        if config.USE_LLM and hasattr(store, "search_rules") else []
-    summary, cited_ids, source = explain(verdict, near, notices, used, drone=drone, extra_rules=extra)
+        if use_ai and hasattr(store, "search_rules") else []
+    summary, cited_ids, source = explain(verdict, near, notices, used, drone=drone if use_ai else None, extra_rules=extra)
     by_id = {r["rule_id"]: r for r in [*extra, *used]}
     return {
         "verdict": verdict,

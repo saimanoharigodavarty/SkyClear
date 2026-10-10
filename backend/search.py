@@ -191,6 +191,21 @@ class MongoStore(LocalStore):
             return self._vector(vec[0], k)
         return self._hybrid(query, vec[0], k)
 
+    def retrieve(self, query, k=4):
+        """Passages for Ask, and whether the question is about the rules at all.
+
+        Embeds the question once. A question is relevant when keywords match, or the best vector similarity reaches ASK_MIN_SCORE,
+        because a vector search always returns its nearest neighbours, even for a question about pizza.
+        """
+        text = self._text(query, k * 3)
+        vec = embed([query], "query")
+        if not vec:
+            return {"rules": text[:k], "relevant": bool(text), "vector": False}
+        vector = self._vector(vec[0], k * 3)
+        relevant = bool(text) or bool(vector and vector[0].get("score", 0) >= config.ASK_MIN_SCORE)
+        rules = self._hybrid(query, vec[0], k) if relevant else []
+        return {"rules": rules, "relevant": relevant, "vector": True}
+
     def _search_stage(self, query):
         return {"$search": {"index": RULES_SEARCH_INDEX, "text": {"query": query, "path": "text"}}}
 

@@ -21,7 +21,7 @@ def public_config():
     import runtime
     has_admin = any(u["role"] == "official" and not u.get("authority_id") for u in runtime.all_("users"))
     return {"city": r["name"], "center": r["center"], "zoom": r["zoom"], "searchViewbox": r["search_viewbox"], "countryCode": r["country_code"],
-            "droneClasses": config.DRONE_CLASSES, "otpChannel": config.OTP_CHANNEL,
+            "droneClasses": config.DRONE_CLASSES, "otpChannel": config.OTP_CHANNEL, "llm": config.USE_LLM,
             # No secrets here: only whether first-time setup is needed and whether generated development logins exist on this machine.
             "needsAdmin": not has_admin, "devLogins": (config.DATA_DIR / "demo_credentials.txt").exists()}
 

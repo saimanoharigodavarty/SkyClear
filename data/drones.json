@@ -1,0 +1,7 @@
+[
+  {"drone_id": "nano-200", "name": "Sample Nano 200 g", "weight_g": 200, "class": "nano"},
+  {"drone_id": "micro-800", "name": "Sample Micro 800 g", "weight_g": 800, "class": "micro"},
+  {"drone_id": "small-1800", "name": "Sample Small 1.8 kg", "weight_g": 1800, "class": "small"},
+  {"drone_id": "small-9000", "name": "Sample Survey 9 kg", "weight_g": 9000, "class": "small"},
+  {"drone_id": "medium-20000", "name": "Sample Agri 20 kg", "weight_g": 20000, "class": "medium"}
+]

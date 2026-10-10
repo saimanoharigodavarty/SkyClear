@@ -1,0 +1,20 @@
+[
+  {"rule_id": "R-001", "zone_type": "airport", "drone_classes": ["nano", "micro", "small"], "effect": "permission_needed",
+   "text": "Sample paraphrase: flying within the airport zone needs prior permission from the airport authority.",
+   "effective_from": "2021-08-25", "source": "Sample source (verify against official regulation)"},
+  {"rule_id": "R-001B", "zone_type": "airport", "drone_classes": ["medium"], "effect": "prohibited",
+   "text": "Sample paraphrase: medium drones may not be flown inside the airport zone.",
+   "effective_from": "2021-08-25", "source": "Sample source (verify against official regulation)"},
+  {"rule_id": "R-002", "zone_type": "military", "drone_classes": ["nano", "micro", "small", "medium"], "effect": "prohibited",
+   "text": "Sample paraphrase: flying over military areas is prohibited for all drones.",
+   "effective_from": "2021-08-25", "source": "Sample source (verify against official regulation)"},
+  {"rule_id": "R-003", "zone_type": "park", "drone_classes": ["small", "medium"], "effect": "permission_needed",
+   "text": "Sample paraphrase: small and medium drones need permission to fly over protected parks.",
+   "effective_from": "2021-08-25", "source": "Sample source (verify against official regulation)"},
+  {"rule_id": "R-003B", "zone_type": "park", "drone_classes": ["nano", "micro"], "effect": "allowed",
+   "text": "Sample paraphrase: nano and micro drones may fly over parks during daylight below the height limit.",
+   "effective_from": "2021-08-25", "source": "Sample source (verify against official regulation)"},
+  {"rule_id": "R-004", "zone_type": "notice", "drone_classes": ["nano", "micro", "small", "medium"], "effect": "prohibited",
+   "text": "Sample paraphrase: flying inside the area of an active temporary restriction notice is prohibited.",
+   "effective_from": "2021-08-25", "source": "Sample source (verify against official regulation)"}
+]

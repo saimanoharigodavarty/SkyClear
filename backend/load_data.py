@@ -13,6 +13,45 @@ from db import get_db
 from embeddings import DIMENSIONS, embed
 
 
+ZONE_VALIDATOR = {
+    "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["zone_id", "name", "zone_type", "geometry", "rule_ids", "source"],
+        "properties": {
+            "zone_id": {"bsonType": "string", "minLength": 1},
+            "name": {"bsonType": "string", "minLength": 1},
+            "zone_type": {"bsonType": "string", "minLength": 1},
+            "geometry": {
+                "bsonType": "object",
+                "required": ["type", "coordinates"],
+                "properties": {
+                    "type": {"enum": ["Polygon", "MultiPolygon"]},
+                    "coordinates": {"bsonType": "array", "minItems": 1},
+                },
+            },
+            "rule_ids": {"bsonType": "array", "items": {"bsonType": "string"}},
+            "source": {"bsonType": "string", "minLength": 1},
+        },
+    }
+}
+
+
+def ensure_zones_collection(db):
+    """Create zones or enforce its GeoJSON and attribution contract on future writes."""
+    options = {"validator": ZONE_VALIDATOR, "validationLevel": "strict", "validationAction": "error"}
+    if "zones" in db.list_collection_names():
+        db.command("collMod", "zones", **options)
+    else:
+        db.create_collection("zones", **options)
+
+
+def ensure_zone_indexes(db):
+    """Create indexes used by point, viewport, type and identity queries."""
+    db.zones.create_index([("geometry", "2dsphere")])
+    db.zones.create_index("zone_id", unique=True)
+    db.zones.create_index("zone_type")
+
+
 def _read(name):
     with open(config.DATA_DIR / name, encoding="utf-8") as f:
         return json.load(f)
@@ -21,6 +60,7 @@ def _read(name):
 def load(verbose=True):
     db = get_db()
     log = print if verbose else (lambda *a, **k: None)
+    ensure_zones_collection(db)
 
     # drones: seed catalog has no owner_id (pilot drones do)
     db.drones.delete_many({"owner_id": {"$exists": False}})
@@ -30,8 +70,7 @@ def load(verbose=True):
     # zones
     db.zones.delete_many({})
     db.zones.insert_many([{**f["properties"], "geometry": f["geometry"]} for f in _read("zones.geojson")["features"]])
-    db.zones.create_index([("geometry", "2dsphere")])
-    db.zones.create_index("zone_id", unique=True)
+    ensure_zone_indexes(db)
 
     # notices: replace seed notices only
     db.notices.delete_many({"origin": "seed"})

@@ -6,6 +6,7 @@ while other drones execute randomized area patrol missions.
 """
 from datetime import datetime, timezone
 import math
+import time
 import random
 
 
@@ -50,7 +51,17 @@ class DroneKinematics:
         permit_start: datetime = None,
         permit_end: datetime = None,
         one_shot: bool = False,
+        manual: bool = False,
+        alt_limit_m: float = None,
     ):
+        # manual: flown live by a pilot's phone (sticks). Otherwise it follows its waypoints.
+        self.manual = manual
+        self.alt_limit_m = alt_limit_m      # the permit's altitude cap (or the legal ceiling), going over it is a breach
+        self.cmd = {"fwd": 0.0, "right": 0.0, "yaw": 0.0, "climb": 0.0}
+        self.cmd_at = 0.0
+        self.vf = 0.0                       # speed forward and to the right, metres per second, in the drone's own frame
+        self.vr = 0.0
+        self.returning = False              # the pilot pressed Return home
         # kind "flight" is a pilot's real (simulated) flight tied to a permit, "traffic" is background fleet traffic.
         self.kind = kind
         self.permit_id = permit_id
@@ -122,9 +133,49 @@ class DroneKinematics:
                 break
             self._step(dt / n, wind_mps, wind_heading_deg)
 
+    MAX_FORWARD_MPS = 14.0
+    MAX_SIDE_MPS = 8.0
+    MAX_YAW_DEG_S = 90.0
+    MAX_CLIMB_MPS = 4.0
+    COMMAND_TIMEOUT_S = 1.5   # the phone stops talking (finger lifted, signal lost): the drone hovers
+
+    def set_command(self, fwd=0.0, right=0.0, yaw=0.0, climb=0.0):
+        """Stick positions from the pilot, each from -1 to 1."""
+        clamp = lambda v: max(-1.0, min(1.0, float(v)))
+        self.cmd = {"fwd": clamp(fwd), "right": clamp(right), "yaw": clamp(yaw), "climb": clamp(climb)}
+        self.cmd_at = time.monotonic()
+
+    def _step_manual(self, dt, wind_mps, wind_heading_deg):
+        """Fly by the sticks: yaw turns the drone, forward and right move it, climb goes up and down. Smooth, like a real drone."""
+        cmd = self.cmd if (time.monotonic() - self.cmd_at) < self.COMMAND_TIMEOUT_S else {"fwd": 0.0, "right": 0.0, "yaw": 0.0, "climb": 0.0}
+        self.heading_deg = (self.heading_deg + cmd["yaw"] * self.MAX_YAW_DEG_S * dt) % 360.0
+        accel = 7.0 * dt
+        for attr, target in (("vf", cmd["fwd"] * self.MAX_FORWARD_MPS), ("vr", cmd["right"] * self.MAX_SIDE_MPS)):
+            cur = getattr(self, attr)
+            setattr(self, attr, target if abs(target - cur) <= accel else cur + math.copysign(accel, target - cur))
+        h = math.radians(self.heading_deg)
+        north = self.vf * math.cos(h) - self.vr * math.sin(h)
+        east = self.vf * math.sin(h) + self.vr * math.cos(h)
+        w = math.radians(wind_heading_deg)
+        north += wind_mps * math.cos(w) * (1.0 if self.alt_m > 1 else 0.0)  # no wind drift on the ground
+        east += wind_mps * math.sin(w) * (1.0 if self.alt_m > 1 else 0.0)
+        self.alt_m = max(0.0, min(150.0, self.alt_m + cmd["climb"] * self.MAX_CLIMB_MPS * dt))
+        self.speed_mps = math.hypot(self.vf, self.vr)
+        self.lat += (north * dt) / 111320.0
+        self.lng += (east * dt) / (111320.0 * max(0.1, math.cos(math.radians(self.lat))))
+        min_lng, min_lat, max_lng, max_lat = self.bbox
+        self.lat = max(min_lat + 0.001, min(max_lat - 0.001, self.lat))
+        self.lng = max(min_lng + 0.001, min(max_lng - 0.001, self.lng))
+        self.battery_pct = max(0.0, self.battery_pct - (self.drain_rate_per_sec * (1.0 + self.speed_mps / 15.0) * 2.0) * dt)
+        self.max_alt_m = max(self.max_alt_m, self.alt_m)
+        self.reported_lat, self.reported_lng = self.get_reported_position()
+
     def _step(self, dt: float, wind_mps: float = 2.0, wind_heading_deg: float = 90.0):
         """Update kinematics over dt seconds with wind drift, turn limits, and battery drain."""
         if self.landed:
+            return
+        if self.manual and not self.recalled and not self.returning:
+            self._step_manual(dt, wind_mps, wind_heading_deg)
             return
         if not self.waypoints:
             self._generate_random_waypoints(3)
@@ -218,9 +269,18 @@ class DroneKinematics:
         self.reported_lat, self.reported_lng = self.get_reported_position()
 
     def recall(self):
-        """Order the drone home: fly straight back to where it launched, then land."""
+        """An officer orders the drone home: fly straight back to where it launched, then land."""
         self.recalled = True
+        self._head_home()
+
+    def return_home(self):
+        """The pilot presses Return home: same flight back, but it ends as a normal landing, not a recall."""
+        self.returning = True
+        self._head_home()
+
+    def _head_home(self):
         self.one_shot = True
+        self.manual = False
         self.waypoints = [(self.launch_pos[0], self.launch_pos[1], 40.0)]
         self.waypoint_idx = 0
         self.target_speed_mps = max(self.target_speed_mps, 14.0)
@@ -247,7 +307,9 @@ class DroneKinematics:
             "battery_pct": round(self.battery_pct, 1),
             "status": self.status,
             "zone": self.zone,
-            "phase": "returning" if self.recalled else "flying",
+            "phase": "returning" if (self.recalled or self.returning) else "flying",
+            "mode": "manual" if self.manual else "auto",
+            "alt_limit_m": self.alt_limit_m,
             "kind": self.kind,
             "ts": ts,
         }

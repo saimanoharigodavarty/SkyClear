@@ -127,6 +127,7 @@ function header(active) {
     <nav class="nav">
       <a href="index.html" class="${active === "pilot" ? "on" : ""}">Pilot</a>
       <a href="official.html" class="${active === "official" ? "on" : ""}">Authority</a>
+      <a href="display.html" class="${active === "display" ? "on" : ""}">Demo screen</a>
       <a href="guide.html" class="${active === "guide" ? "on" : ""}">Guide</a>
     </nav>
     <div class="who">
@@ -143,7 +144,7 @@ function header(active) {
 function circleOf(n) { return L.geoJSON(n.area || n.geometry, { style: { color: C.notice, weight: 2, dashArray: "6 5", fillColor: C.notice, fillOpacity: 0.12 }, interactive: false }); }
 
 // Base map: centred on the configured city, calm basemap that follows the theme, satellite toggle, zones grouped by severity, active notices, clickable legend.
-function makeMap() {
+function makeMap(opts = {}) {
   const map = L.map("map", { zoomControl: false, minZoom: 5 }).setView(HYD, CFG.zoom);
   L.control.zoom({ position: "topright" }).addTo(map);
   L.control.scale({ metric: true, imperial: false, position: "bottomright" }).addTo(map);
@@ -151,12 +152,14 @@ function makeMap() {
   const esri = (tone, name) => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${tone}_Gray_${name}/MapServer/tile/{z}/{y}/{x}`;
   const plain = tone => L.layerGroup([L.tileLayer(esri(tone, "Base"), tile), L.tileLayer(esri(tone, "Reference"), { ...tile, attribution: "", pane: "shadowPane" })]);
   const light = plain("Light"), dark = plain("Dark");
-  const sat = L.layerGroup([L.tileLayer("https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2021_3857/default/g/{z}/{y}/{x}.jpg",
-    { maxNativeZoom: 13, maxZoom: 18, attribution: "Sentinel-2 cloudless by EOX (contains modified Copernicus Sentinel data 2021)" }),
-    L.tileLayer(esri("Dark", "Reference"), { ...tile, attribution: "", pane: "shadowPane" })]);
-  let satOn = false, current = null;
+  // Satellite: Esri World Imagery (sharp down to rooftops, zoom 19) with place names on top.
+  const sat = L.layerGroup([L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { maxNativeZoom: 19, maxZoom: 20, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" }),
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxNativeZoom: 19, maxZoom: 20, attribution: "", pane: "shadowPane" })]);
+  let satOn = !!opts.satellite, current = null;
   const show = () => {
     const want = satOn ? sat : (isDark() ? dark : light);
+    map.getContainer().classList.toggle("sat-on", satOn);
     if (current === want) return;
     if (current) map.removeLayer(current);
     current = want; want.addTo(map);
@@ -169,7 +172,7 @@ function makeMap() {
     a.href = "#"; a.textContent = text; a.title = title;
     L.DomEvent.on(a, "click", e => { L.DomEvent.preventDefault(e); onclick(a); }); return d; } }))().addTo(map);
   control(CFG.city || "Reset view", "Back to the start view", () => map.setView(HYD, CFG.zoom));
-  control("Satellite", "Switch between map and satellite", a => { satOn = !satOn; a.textContent = satOn ? "Map" : "Satellite"; show(); });
+  const satBtn = control(opts.satellite ? "Map" : "Satellite", "Switch between map and satellite", a => { satOn = !satOn; a.textContent = satOn ? "Map" : "Satellite"; show(); });
 
   const layers = { red: L.layerGroup().addTo(map), amber: L.layerGroup().addTo(map), notices: L.layerGroup().addTo(map), work: L.layerGroup().addTo(map) };
   const legend = $("legend");

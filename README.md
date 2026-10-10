@@ -2,7 +2,7 @@
 
 Track 2: RAG Engine (MongoDB hackathon)
 
-The whole flow, step by step, with diagrams: [docs/PIPELINE.md](docs/PIPELINE.md). Product spec, accounts, notifications and the loophole list: [PRODUCT.md](PRODUCT.md). Target architecture: [ARCHITECTURE.md](ARCHITECTURE.md). Permits, verification and the official map: [docs/PERMITS_AND_VERIFICATION.md](docs/PERMITS_AND_VERIFICATION.md). Simulation: [docs/SIMULATION.md](docs/SIMULATION.md). Who builds what: [TEAM.md](TEAM.md). Interfaces between streams: [docs/CONTRACTS.md](docs/CONTRACTS.md).
+The whole flow, step by step, with diagrams: [docs/PIPELINE.md](docs/PIPELINE.md). Presentation demo, flying the simulated drone from a phone on a big satellite screen: [docs/PHONE_DEMO.md](docs/PHONE_DEMO.md). Product spec, accounts, notifications and the loophole list: [PRODUCT.md](PRODUCT.md). Target architecture: [ARCHITECTURE.md](ARCHITECTURE.md). Permits, verification and the official map: [docs/PERMITS_AND_VERIFICATION.md](docs/PERMITS_AND_VERIFICATION.md). Simulation: [docs/SIMULATION.md](docs/SIMULATION.md). Who builds what: [TEAM.md](TEAM.md). Interfaces between streams: [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
 ## Problem statement
 
@@ -172,6 +172,7 @@ Left to build (owner in brackets, details in TEAM.md):
 - [x] Live simulation (Thanvi): fleet simulator, telemetry in a time series collection, geofence engine with early warning, `/live` feed, VIP scenario, route fixes A3 to A6. Nikhil connected it to flights (docs/PIPELINE.md). Still open for Thanvi: feed `/live/stream` from MongoDB change streams, performance at 1000 drones, optional ArduPilot link
 - [ ] Atlas free cluster as the demo database and Atlas Charts on live data, load test numbers, production compose with Nginx, monitoring, demo script, slides and backup video (Suhas)
 - [x] Live airspace on both maps, the officer Live tab with simulation controls
+- [x] Phone demo: fly the simulated drone from a phone (QR pairing, two sticks, return home), full-screen satellite follow view, altitude limit, event log (docs/PHONE_DEMO.md)
 - [ ] Analytics dashboard, zone editor (Nikhil, the dashboard waits on Manohari's aggregations)
 - [ ] Alerts through a MongoDB change stream (today they are written when the notice is published), permission decisions in a MongoDB transaction with an audit log, rate limits shared across servers, real SMS (Nikhil)
 - [ ] Future scope: DigiLocker and regulator record checks, real drone telemetry

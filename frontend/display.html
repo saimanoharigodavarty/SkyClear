@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyClear, live demo screen</title>
+<script>try{var t=localStorage.getItem("skyclear.theme");t=t&&JSON.parse(t);if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="stage" data-require-auth="1">
+<div id="map" class="stage-map"></div>
+
+<div class="hud" id="brandcard"><a class="brand" href="index.html">Sky<b>Clear</b></a><span class="who2" id="whoLine"></span></div>
+<div class="hud idle" id="banner2"><div class="big">Ready</div><div class="sub">Choose a flight to start the demo</div></div>
+<button id="fs" type="button">Full screen</button>
+
+<div class="hud hidden" id="telepanel">
+  <h2>Live flight</h2>
+  <div class="bigtele">
+    <div><span class="n" id="tAlt">0</span><span class="u">metres up</span></div>
+    <div><span class="n" id="tSpd">0</span><span class="u">metres per second</span></div>
+    <div><span class="n" id="tBat">0%</span><span class="u">battery</span></div>
+    <div><div class="compass"><i id="tNeedle"></i></div><span class="u" id="tHdg">0 degrees</span></div>
+  </div>
+  <div class="small" style="margin-top:10px" id="altLabel">Altitude limit</div>
+  <div class="bar"><i id="altBar" style="width:0"></i></div>
+  <div class="small" style="margin-top:10px" id="permitLine"></div>
+</div>
+
+<div class="hud hidden" id="eventpanel"><h2>Event log</h2><div id="events"></div></div>
+<div class="hud hidden" id="pairpanel"><h2>Fly it from your phone</h2><div class="qr2" id="qr"></div><div class="small">Scan with the phone camera. Same Wi-Fi.</div><div class="mono" style="font-size:10px;word-break:break-all;margin-top:6px;color:var(--muted)" id="pairUrl"></div></div>
+<div class="hud" id="chooser"><h2>Start the demo</h2><div id="chooseBody">Loading...</div></div>
+<div class="hud hidden" id="endcard"></div>
+<div class="keyhint hidden" id="keyhint">Keyboard: W A S D move, Q E turn, R F up and down</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script src="display.js"></script>
+</body>
+</html>

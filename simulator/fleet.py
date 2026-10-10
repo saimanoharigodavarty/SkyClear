@@ -47,6 +47,10 @@ class FleetSimulator:
         self._loop = None            # the server's event loop, set at startup, so any thread can start the simulation
         self.on_landed = None        # callback(flight_id, reason, stats): a pilot's flight ended
         self.on_breach = None        # callback(breach, drone): a pilot's drone entered restricted airspace
+        self.events = {}             # flight_id -> the last events for that flight (took off, warning, breach, landed), for the big screen
+        self._zones_cache = (0.0, [])
+        self._notices_cache = (0.0, [])
+        self._tick_n = 0
 
     def _get_db(self):
         if config.USE_MONGO:
@@ -133,7 +137,7 @@ class FleetSimulator:
         self.actual_tps = 0.0
 
     # ---- a pilot's flight: launch, recall, land ----
-    def launch_flight(self, flight, permit=None, alt_max_m=60.0, laps=2):
+    def launch_flight(self, flight, permit=None, alt_max_m=60.0, laps=2, manual=False):
         """Start a simulated drone for one flight. Needs a cleared preflight, which the API checks before calling this.
 
         The route is a loop of `laps` circles around the flight spot (inside the permit area when there is a permit),
@@ -153,17 +157,46 @@ class FleetSimulator:
         end = datetime.fromisoformat(permit["ends_at"].replace("Z", "+00:00")) if permit else None
         d = DroneKinematics(
             drone_id=flight.get("drone_id", f"FL-{flight['flight_id']}"), flight_id=flight["flight_id"],
-            initial_lat=lat, initial_lng=lng, initial_alt_m=2.0, speed_mps=10.0, battery_pct=random.uniform(88.0, 100.0),
-            waypoints=pts, bbox=self.bbox, owner_id=flight.get("pilot_id"), kind="flight", one_shot=True,
+            initial_lat=lat, initial_lng=lng, initial_alt_m=10.0 if manual else 2.0, speed_mps=0.0 if manual else 10.0, battery_pct=random.uniform(88.0, 100.0),
+            waypoints=pts, bbox=self.bbox, owner_id=flight.get("pilot_id"), kind="flight", one_shot=not manual, manual=manual,
+            alt_limit_m=float(alt_max_m) if permit else 120.0,
             permit_id=permit["permit_id"] if permit else None, permit_area=area,
             permit_start=start.replace(tzinfo=start.tzinfo or timezone.utc) if start else None,
             permit_end=end.replace(tzinfo=end.tzinfo or timezone.utc) if end else None)
         with self._lock:
             self.drones = [x for x in self.drones if x.flight_id != flight["flight_id"]]  # one drone per flight
             self.drones.append(d)
+            self.events[flight["flight_id"]] = []
             self.is_running = True
             self._ensure_task()
+        self.log_event(flight["flight_id"], "takeoff", "Took off, flying by phone" if manual else "Took off, flying its route")
         return d.drone_id
+
+    def command_flight(self, flight_id, fwd=0.0, right=0.0, yaw=0.0, climb=0.0):
+        """Stick positions from the pilot's phone. Returns False if the drone is not in the air or not flown by hand."""
+        d = self.get_flight_drone(flight_id)
+        if d is None or d.landed or not d.manual:
+            return False
+        d.set_command(fwd, right, yaw, climb)
+        return True
+
+    def return_home_flight(self, flight_id):
+        """The pilot presses Return home: the drone flies back to where it launched and lands."""
+        d = self.get_flight_drone(flight_id)
+        if d is None or d.landed or d.returning or d.recalled:
+            return False
+        d.return_home()
+        self.log_event(flight_id, "home", "Return home pressed")
+        return True
+
+    def log_event(self, flight_id, kind, text):
+        """A line for the big screen's event log."""
+        ev = self.events.setdefault(flight_id, [])
+        ev.append({"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), "kind": kind, "text": text})
+        del ev[:-30]
+
+    def flight_events(self, flight_id):
+        return list(self.events.get(flight_id, []))
 
     def get_flight_drone(self, flight_id):
         return next((d for d in self.drones if d.flight_id == flight_id), None)
@@ -174,6 +207,7 @@ class FleetSimulator:
         if d is None or d.landed:
             return False
         d.recall()
+        self.log_event(flight_id, "recall", "Recalled by an officer, flying home")
         return True
 
     def land_flight(self, flight_id):
@@ -190,6 +224,7 @@ class FleetSimulator:
             if not self.drones:
                 self._halt()
         self._dispatch_event("landed", {"flight_id": d.flight_id, "drone_id": d.drone_id, **stats})
+        self.log_event(d.flight_id, "landed", "Landed")
         return stats
 
     def tick(self, dt: float = 1.0):
@@ -201,9 +236,20 @@ class FleetSimulator:
         # 1. Fetch active zones and notices
         active_zones = []
         active_notices = []
+        fast = dt < 0.5  # smooth manual flying runs at 10 Hz: keep database reads off every tick
+        self._tick_n += 1
+        t_m = time.monotonic()
         try:
-            active_zones = store.all_zones_geojson().get("features", [])
-            active_notices = store.active_notices()
+            if fast and self._zones_cache[1] and t_m - self._zones_cache[0] < 5.0:
+                active_zones = self._zones_cache[1]
+            else:
+                active_zones = store.all_zones_geojson().get("features", [])
+                self._zones_cache = (t_m, active_zones)
+            if fast and t_m - self._notices_cache[0] < 1.0:
+                active_notices = self._notices_cache[1]
+            else:
+                active_notices = store.active_notices()
+                self._notices_cache = (t_m, active_notices)
         except Exception:
             pass
 
@@ -222,6 +268,14 @@ class FleetSimulator:
             status, zone_name, breach = self.geofence.evaluate_drone(
                 drone, active_zones, active_notices, now_dt=now
             )
+            if drone.kind == "flight":  # tell the big screen about changes of state
+                before = getattr(drone, "last_status", "ok")
+                if status != before:
+                    if status == "warning":
+                        self.log_event(drone.flight_id, "warning", f"Warning: {zone_name}")
+                    elif status == "ok":
+                        self.log_event(drone.flight_id, "clear", "Back in clear airspace")
+                    drone.last_status = status
             if breach:
                 key = (breach["kind"], breach["name"])
                 if drone.last_breach != key:  # one entry into restricted airspace is one event, not one per second
@@ -229,6 +283,8 @@ class FleetSimulator:
                     drone.breach_count += 1
                     breaches_generated.append(breach)
                     self.geofence.log_breach(breach)
+                    if drone.kind == "flight":
+                        self.log_event(drone.flight_id, "breach", f"BREACH: {breach['name']}")
                     if drone.kind == "flight" and self.on_breach:
                         try:
                             self.on_breach(breach, drone)
@@ -238,8 +294,8 @@ class FleetSimulator:
                 drone.last_breach = None
 
             # Batch telemetry record (Contract 5)
-            rec = drone.telemetry_record(now_dt=now)
-            telemetry_batch.append(rec)
+            if not fast or self._tick_n % 10 == 0:  # telemetry is recorded once a second
+                telemetry_batch.append(drone.telemetry_record(now_dt=now))
 
         # 3. Batched insert into MongoDB time series collection (Contract 5)
         if config.USE_MONGO and db is not None and telemetry_batch:
@@ -258,6 +314,8 @@ class FleetSimulator:
                          "battery_pct": round(d.battery_pct, 1), "launched_at": d.launched_at.isoformat(timespec="seconds"),
                          "landed_at": now.isoformat(timespec="seconds")}
                 self._dispatch_event("landed", {"flight_id": d.flight_id, "drone_id": d.drone_id, **stats})
+                if d.kind == "flight":
+                    self.log_event(d.flight_id, "landed", "Landed" if stats["reason"] == "completed" else "Landed after a recall")
                 if d.kind == "flight" and self.on_landed:
                     try:
                         self.on_landed(d.flight_id, stats["reason"], stats)
@@ -277,7 +335,8 @@ class FleetSimulator:
                 self._halt()
                 break
             t0 = time.monotonic()
-            step_res = self.tick(dt=1.0)
+            hz = 10 if any(d.manual for d in self.drones) else 1  # smooth movement while a pilot flies by hand
+            step_res = self.tick(dt=1.0 / hz)
             telemetry_batch = step_res["telemetry"]
             breaches_generated = step_res["breaches"]
             now_iso = step_res["now"].isoformat(timespec="seconds")
@@ -305,7 +364,7 @@ class FleetSimulator:
 
             # Sleep remainder of interval
             duration = t1 - t0
-            sleep_time = max(0.01, (1.0 / self.speed_x) - duration)
+            sleep_time = max(0.01, (1.0 / (hz * self.speed_x)) - duration)
             try:
                 await asyncio.sleep(sleep_time)
             except asyncio.CancelledError:

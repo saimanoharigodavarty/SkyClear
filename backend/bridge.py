@@ -5,7 +5,7 @@ OWNER: platform teammate. Prototype auth: bearer token from /auth/login, roles "
 from datetime import datetime
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 import config
@@ -14,7 +14,7 @@ import routing
 import runtime
 from geo import circle, point_in_polygon
 from pipeline import evaluate, get_drone, parse_when
-from security import current_user, require
+from security import current_user, flight_claims, make_pair_token, require
 
 router = APIRouter()
 ACTIVE_FLIGHT = ("watching", "requested", "approved", "cleared", "flying")
@@ -199,8 +199,12 @@ def _fleet():
     return get_fleet_simulator()
 
 
+class LaunchIn(BaseModel):
+    mode: Literal["auto", "manual"] = "auto"   # auto: flies its route. manual: flown live from the phone
+
+
 @router.post("/flights/{flight_id}/launch")
-def launch_flight(flight_id: str, user=Depends(require("pilot"))):
+def launch_flight(flight_id: str, body: LaunchIn = LaunchIn(), user=Depends(require("pilot"))):
     """Take off (simulated). Only a flight that passes preflight right now can launch."""
     f = _get_flight(flight_id)
     if f["pilot_id"] != user["user_id"]:
@@ -214,15 +218,16 @@ def launch_flight(flight_id: str, user=Depends(require("pilot"))):
         runtime.update("flights", "flight_id", flight_id, {"status": f.get("before_clearance") or "approved", "cleared_until": None})
         raise HTTPException(409, "Not cleared to take off: " + "; ".join(result["reasons"]))
     permit = permits.get_permit(f["permit_id"]) if f.get("permit_id") else None
-    drone_id = _fleet().launch_flight(f, permit, alt_max_m=permit["alt_max_m"] if permit else 60)
-    return {**runtime.update("flights", "flight_id", flight_id, {"status": "flying", "launched_at": runtime.now_iso(), "cleared_until": None, "breaches": 0}), "drone_id": drone_id}
+    drone_id = _fleet().launch_flight(f, permit, alt_max_m=permit["alt_max_m"] if permit else 60, manual=body.mode == "manual")
+    return {**runtime.update("flights", "flight_id", flight_id, {"status": "flying", "launched_at": runtime.now_iso(), "cleared_until": None, "breaches": 0, "control": body.mode}), "drone_id": drone_id}
 
 
 @router.post("/flights/{flight_id}/land")
-def land_flight(flight_id: str, user=Depends(require("pilot"))):
-    """Land the drone now."""
+def land_flight(flight_id: str, authorization: Optional[str] = Header(default=None)):
+    """Land the drone now. The pilot, or the phone paired with this flight."""
+    actor = flight_claims(flight_id, authorization)
     f = _get_flight(flight_id)
-    if f["pilot_id"] != user["user_id"]:
+    if actor["role"] != "pilot" or f["pilot_id"] != actor["user_id"]:
         raise HTTPException(403, "not your flight")
     if f["status"] not in ("flying", "recalled"):
         raise HTTPException(409, "this flight is not in the air")
@@ -230,6 +235,78 @@ def land_flight(flight_id: str, user=Depends(require("pilot"))):
     if stats is None:  # the drone already landed (for example it finished its route)
         return _get_flight(flight_id)
     return complete_flight(flight_id, "completed" if f["status"] == "flying" else "recalled", stats)
+
+
+# ---- flying by phone and showing it on the big screen ----
+class Sticks(BaseModel):
+    fwd: float = 0.0     # -1 back to 1 forward
+    right: float = 0.0   # -1 left to 1 right
+    yaw: float = 0.0     # -1 turn left to 1 turn right
+    climb: float = 0.0   # -1 down to 1 up
+
+
+def _owner_only(flight_id, authorization):
+    """The pilot who owns the flight, or the phone paired with it. Checked against the drone itself, no database read."""
+    actor = flight_claims(flight_id, authorization)
+    d = _fleet().get_flight_drone(flight_id)
+    if d is None:
+        raise HTTPException(409, "this flight is not in the air")
+    if actor["role"] != "pilot" or d.owner_id != actor["user_id"]:
+        raise HTTPException(403, "not your flight")
+    return d
+
+
+@router.post("/flights/{flight_id}/control")
+def control_flight(flight_id: str, body: Sticks, authorization: Optional[str] = Header(default=None)):
+    """Stick positions from the phone, sent about ten times a second. If they stop, the drone hovers."""
+    d = _owner_only(flight_id, authorization)
+    if not d.manual:
+        raise HTTPException(409, "the drone is flying itself now (it was recalled or is returning home)")
+    d.set_command(body.fwd, body.right, body.yaw, body.climb)
+    return {"ok": True}
+
+
+@router.post("/flights/{flight_id}/home")
+def return_home(flight_id: str, authorization: Optional[str] = Header(default=None)):
+    """Return home: the drone flies back to where it took off and lands."""
+    _owner_only(flight_id, authorization)
+    if not _fleet().return_home_flight(flight_id):
+        raise HTTPException(409, "the drone is already coming home")
+    return {"ok": True}
+
+
+@router.post("/flights/{flight_id}/pair")
+def pair_controller(flight_id: str, user=Depends(require("pilot"))):
+    """A short-lived token for a phone to fly this flight. The big screen puts it in a QR code."""
+    f = _get_flight(flight_id)
+    if f["pilot_id"] != user["user_id"]:
+        raise HTTPException(403, "not your flight")
+    if f["status"] not in ("flying", "cleared", "approved", "watching"):
+        raise HTTPException(409, "this flight cannot be flown now")
+    return {"token": make_pair_token(user["user_id"], flight_id), "expires_in": 45 * 60}
+
+
+@router.get("/flights/{flight_id}/live")
+def flight_live(flight_id: str, authorization: Optional[str] = Header(default=None)):
+    """Fast live view of one flight for the big screen and the phone: the drone, and its event log. Cheap on purpose, polled several times a second."""
+    actor = flight_claims(flight_id, authorization)
+    sim = _fleet()
+    d = sim.get_flight_drone(flight_id)
+    if d is not None and actor["role"] == "pilot" and d.owner_id != actor["user_id"]:
+        raise HTTPException(403, "not your flight")
+    snap = d.snapshot() if d is not None else None
+    return {"flight_id": flight_id, "airborne": d is not None, "drone": snap, "events": sim.flight_events(flight_id)}
+
+
+@router.get("/flights/{flight_id}/info")
+def flight_info(flight_id: str, authorization: Optional[str] = Header(default=None)):
+    """The flight itself, with its permit and where it is allowed to fly. Read once by the big screen and the phone."""
+    actor = flight_claims(flight_id, authorization)
+    f = _get_flight(flight_id)
+    if actor["role"] == "pilot" and f["pilot_id"] != actor["user_id"]:
+        raise HTTPException(403, "not your flight")
+    pm = permits.view(permits.get_permit(f["permit_id"])) if f.get("permit_id") else None
+    return {**f, "permit": pm, "pilot_name": f["pilot_name"]}
 
 
 class Recall(BaseModel):

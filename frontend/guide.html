@@ -63,7 +63,15 @@
     <li>Press Land now as the pilot. The flight log shows the times, the highest point and how many times restricted airspace was entered.</li>
   </ol>
 
-  <h2>6. Administrator only</h2>
+  <h2>6. Fly it from your phone, on a big screen</h2>
+  <ol>
+    <li>Run <code class="mono">python backend/manage.py prepare-demo</code>. It prepares a demo pilot with two approved flights.</li>
+    <li>Sign in as that pilot and open <a href="display.html">Demo screen</a>. Pick a flight and press Take off with phone control. A full-screen satellite view follows the drone.</li>
+    <li>Scan the QR code with a phone on the same network. The phone becomes the controller: two sticks, Return home and Land. No sign-in needed.</li>
+    <li>Climb past the permit's height limit or fly out of the dashed permit area: the banner turns red and the log records the breach. Full setup and a three minute script: docs/PHONE_DEMO.md.</li>
+  </ol>
+
+  <h2>7. Administrator only</h2>
   <ol>
     <li>Open the Team tab to invite an official. You get a temporary password to hand over. They must choose their own at first sign-in.</li>
   </ol>

@@ -25,7 +25,7 @@ Source of truth for the look and the writing of SkyClear. Supplied by the projec
 | 15 | "It's not X, it's Y" | No contrast-reveal phrasing in any copy |
 | 16 | Checkmark bullets | Plain bullets or numbers only |
 | 17 | 3 pricing tiers | No pricing section. SkyClear is free |
-| 18 | Soft corner radius | Normal, modest corners: 6px for buttons, inputs and tags, 10px for cards and panels. No pills and no circles for buttons or cards (`border-radius` of 50% or 999px) |
+| 18 | Soft corner radius | Normal, modest corners: 6px for buttons, inputs and tags, 10px for cards and panels. No pills and no circles for buttons or cards (`border-radius` of 50% or 999px). Round instruments are fine: the joystick ring and knob, and the compass |
 | 19 | Purple and black | No purple anywhere, no purple-on-black scheme |
 | 20 | Radial orbs | No blurred color blobs |
 | 21 | Dot grids | No dotted background patterns |

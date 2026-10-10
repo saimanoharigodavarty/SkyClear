@@ -62,6 +62,14 @@ class GeofenceEngine:
         now = now_dt or datetime.now(timezone.utc)
         now_iso = now.isoformat(timespec="seconds")
 
+        # 0. Altitude: a permit caps the height (and the law does too). Going over it is a breach, close to it is a warning.
+        limit = getattr(drone, "alt_limit_m", None)
+        if limit and drone.alt_m > limit:
+            name = f"Altitude limit ({limit:g} m)"
+            drone.status, drone.zone = "breach", name
+            return "breach", name, {"event_id": f"BR-{secrets.token_hex(3).upper()}", "drone_id": drone.drone_id, "flight_id": drone.flight_id, "kind": "altitude",
+                                    "name": name, "lat": round(drone.lat, 5), "lng": round(drone.lng, 5), "severity": "prohibited", "ts": now_iso}
+
         # 1. Check current position against active notices
         for n in active_notices:
             geom = n.get("area") or n.get("geometry")
@@ -167,6 +175,10 @@ class GeofenceEngine:
             eta_s = round(earliest_t * self.lookahead_s, 1)
             drone.status = "warning"
             drone.zone = f"{warning_name} (ETA {eta_s}s)"
+            return "warning", drone.zone, None
+
+        if limit and drone.alt_m > 0.9 * limit:
+            drone.status, drone.zone = "warning", f"Near the altitude limit ({limit:g} m)"
             return "warning", drone.zone, None
 
         # 4. Airspace clear

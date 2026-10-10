@@ -6,8 +6,9 @@
 OWNER: Nikhil (stream 1).
 """
 import json
+import socket
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 import config
@@ -63,3 +64,18 @@ def examples():
             out.append({"label": "An open area", "kind": "clear", "lat": round(lat, 5), "lng": round(lng, 5), "droneClass": None})
             break
     return {"spots": out, "route": route}
+
+
+@router.get("/lan")
+def lan(request: Request):
+    """This computer's address on the local network, so the big screen can put a QR code a phone can open (localhost would not work from a phone)."""
+    ips = []
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("10.255.255.255", 1))  # no packet is sent, this only asks the system which network address it would use
+        ips.append(s.getsockname()[0])
+        s.close()
+    except OSError:
+        pass
+    port = request.url.port or 8000
+    return {"urls": [f"http://{ip}:{port}" for ip in ips if not ip.startswith("127.")], "port": port}

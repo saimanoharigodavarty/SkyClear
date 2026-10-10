@@ -101,28 +101,34 @@ Decision support only, not legal permission. Always confirm with the official po
 
 ## Running it
 
-One command (it sets up Python, starts MongoDB if Docker is running, loads the data, starts the server and opens your browser):
+One command (it sets up Python, starts MongoDB and a mail catcher if Docker is running, loads the data, asks you for the first admin, starts the server and opens your browser):
 
 ```
-./run.sh --seed        # first run: also creates the demo pilot, flights and officers
-./run.sh               # later runs
-./run.sh --local       # no Docker, use the JSON files in data/
+./run.sh            # run the app
+./run.sh --seed     # also create one officer per office and a verified demo pilot with flights
+./run.sh --local    # no Docker: JSON files in data/, one-time codes printed in the terminal
 ```
 
-Open http://localhost:8000. Do not open frontend/index.html directly from the folder. (It still works if you do, because it talks to http://localhost:8000, but the server must be running.) If the server is down the page shows a red bar telling you how to start it.
+Open http://localhost:8000. Do not open frontend/index.html straight from the folder (it can still talk to http://localhost:8000, but the server must be running). If the server is down the page shows a red bar saying how to start it.
 
-Demo logins (also listed on the sign-in page): pilot `asha@example.com` / `longenough1`, officers `official@skyclear.demo` (sees every office), `police@`, `rgia@`, `begumpet@`, `defence@`, `forest@`, `hq@` `skyclear.demo` with password `skyclear-demo`. To register a new pilot use any 10-digit number starting 6 to 9, the one-time code is shown on screen in demo mode (`OTP_DEV_ECHO=1`). Switch demo mode off and set `JWT_SECRET`, `PERMIT_SECRET` and `OFFICIAL_PASSWORD` before any shared deployment.
+**Nothing is hardcoded.** There are no built-in accounts or passwords:
+- The first administrator is created on first run (`./run.sh` asks for an email and generates a password, shown once). Or by hand: `python backend/manage.py create-admin --email you@example.com --generate`.
+- Officials are invited by the admin (Authority page, Team tab). They get a temporary password and must choose their own at first sign-in. `python backend/manage.py seed-officers` makes one officer per office for development, with generated passwords.
+- `python backend/manage.py seed-demo` adds a verified demo pilot, a drone, flights and a notice. Generated passwords are printed once and saved in `data/demo_credentials.txt` (git-ignored, delete it when done).
+- Secrets (`JWT_SECRET`, `PERMIT_SECRET`) are generated on first start in `data/.secrets.json` (git-ignored), or set them in `.env`.
+- One-time codes go out by real email (SMTP) or SMS (Twilio). In development with Docker they land in the mail catcher at http://localhost:8025. Nothing is shown on screen.
+- The city, map centre, drone classes and the example buttons come from `data/region.json` and the zones in the database through the server (`/config.js`, `/examples`).
 
 By hand, if you prefer:
 
 ```
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
-cp .env.example .env                 # edit: USE_MONGO, OLLAMA_URL, USE_LLM
-docker compose up -d                 # MongoDB with geo, text and vector search (Atlas Local)
+cp .env.example .env                 # edit as needed
+docker compose up -d                 # MongoDB (geo, text, vector search) and the mail catcher
 python backend/load_data.py          # zones, rules, drones, notices, embeddings, indexes
+python backend/manage.py create-admin --email you@example.com --generate
 cd backend && uvicorn main:app --reload
-python ../scripts/seed_demo.py       # optional demo data
 ```
 
 Ollama runs on another laptop, never required on yours. On the Ollama laptop:
@@ -159,7 +165,8 @@ docker-compose.yml   MongoDB (Atlas Local)
 - [x] Ollama explanation with citation validation, consistency checks and fallback
 - [x] False-safe bugs A1 and A2 fixed
 - [x] 20 eval cases and metrics (verdict accuracy, false-safe rate, citation recall, text vs vector vs hybrid)
-- [x] Authentication: phone OTP, argon2id, JWT with rotating refresh tokens, lockout, authenticator codes for officials, invite-only officials
+- [x] Authentication: one-time codes by email or SMS, password reset and change, argon2id, JWT with rotating refresh tokens, lockout, authenticator codes for officials, invite-only officials. No built-in accounts or secrets
+- [ ] Future scope: DigiLocker and regulator record checks for identity verification
 - [x] Friendlier UI: welcome and examples, step guide, map search, checklist, light and dark theme, run.sh
 - [x] Authority routing, signed permits with preflight and revoke, document verification with officer queue, satellite toggle
 - [ ] Real rule text verified against the official regulation, real notices source

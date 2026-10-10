@@ -99,11 +99,10 @@ def cmd_seed_demo(a):
         raise SystemExit("Create an admin first: python backend/manage.py create-admin --generate ...")
     if _exists(a.pilot_email):
         raise SystemExit(f"{a.pilot_email} already exists, demo data is already there")
-    pilot_pw, admin_pw = secrets.token_urlsafe(12), secrets.token_urlsafe(16)
-    # The admin signs in through the real API with a one-off password so nothing needs to be known in advance.
-    runtime.update("users", "user_id", admin["user_id"], {"password": runtime.hash_password(admin_pw)})
+    pilot_pw = secrets.token_urlsafe(12)
+    import auth
     create_user(a.pilot_email, "Demo Pilot", "pilot", pilot_pw, verified=True, phone="+919" + str(secrets.randbelow(10**9)).zfill(9))
-    a_tok = client.post("/auth/login", json={"identifier": admin["email"], "password": admin_pw}).json()["token"]
+    a_tok = auth.access_token(admin)  # a short-lived token minted here, so the admin password is never touched
     p_tok = client.post("/auth/login", json={"identifier": a.pilot_email, "password": pilot_pw}).json()["token"]
     ha, hp = {"Authorization": f"Bearer {a_tok}"}, {"Authorization": f"Bearer {p_tok}"}
     png = bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6300010000000500010d0a2db40000000049454e44ae426082")
@@ -126,10 +125,7 @@ def cmd_seed_demo(a):
         lat, lng = center(airport)
         client.post("/flights", headers=hp, json={"drone_id": drone["drone_id"], "lat": lat, "lng": lng, "kind": "watch", "start": iso(now + timedelta(minutes=30)), "end": iso(now + timedelta(minutes=90))})
         client.post("/notices", headers=ha, json={"title": "Demo VIP movement", "note": "Demo notice.", "lat": lat, "lng": lng, "radius_km": 3, "starts_at": iso(now), "ends_at": iso(now + timedelta(hours=3))})
-    # leave the admin with a password nobody knows: set a fresh one to print
-    admin_final = secrets.token_urlsafe(12)
-    runtime.update("users", "user_id", admin["user_id"], {"password": runtime.hash_password(admin_final)})
-    lines = [f"pilot  {a.pilot_email}  {pilot_pw}", f"admin  {admin['email']}  {admin_final}  (reset by seed-demo)"]
+    lines = [f"pilot  {a.pilot_email}  {pilot_pw}"]
     print("\n".join(lines))
     _save(lines)
     print(f"Demo data created. Saved in {CREDS}.")

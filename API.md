@@ -77,21 +77,29 @@ Response: `{ "drone": {...}, "samples": [{ "lat", "lng", "dist_m", "t_s", "verdi
 
 ## Authentication (built)
 
-Signed-in calls send `Authorization: Bearer <access_token>`. The access token is a JWT valid for 15 minutes. When it expires the API answers 401 `{ "detail": "token_expired" }`, and the client calls `/auth/refresh` once and retries. Roles: `pilot`, `official`, `admin` (an official with no authority). Checking (`/check`, `/simulate/route`, `/zones`, `/drones`, `/notices/active`) needs no sign-in.
+Signed-in calls send `Authorization: Bearer <access_token>`. The access token is a JWT valid for 15 minutes. When it expires the API answers 401 `{ "detail": "token_expired" }`, and the client calls `/auth/refresh` once and retries. Roles: `pilot`, `official`, `admin` (an official with no office). Checking (`/check`, `/simulate/route`, `/zones`, `/drones`, `/notices/active`, `/config`, `/examples`) needs no sign-in. There are no built-in accounts: the first admin comes from `manage.py create-admin`, officials are invited by the admin.
+
+One-time codes are sent to the account's email (`OTP_CHANNEL=email`) or mobile number (`sms`) by the provider in `.env` (`smtp`, `twilio`, or `console` for the server log). The API never returns a code unless `OTP_DEV_ECHO=1`, which is for tests only.
 
 | Endpoint | Purpose |
 |---|---|
-| POST /auth/register | `name, email, phone, password`. Phone is a 10-digit Indian mobile. Sends a one-time code. Returns `{ needs_otp, identifier, dev_code }` (`dev_code` only when `OTP_DEV_ECHO=1`) |
-| POST /auth/otp/verify | `identifier, code`. Confirms the phone and returns tokens. Also the second half of OTP login |
-| POST /auth/otp/request | `identifier` (email or phone). Always answers `{ sent: true }`, so it cannot be used to find out who has an account |
-| POST /auth/login | `identifier` (email or phone), `password`. Returns tokens, or 403 `phone_not_verified`, or 423 when locked after 5 wrong passwords. Officials get `{ mfa_required }` or `{ mfa_setup_required }` with an `mfa_token` when authenticator codes are on |
+| POST /auth/register | `name, email, phone, password`. Phone is a 10-digit Indian mobile. Sends a code. Returns `{ needs_otp, identifier (the email), sent_to (masked) }` |
+| POST /auth/otp/verify | `identifier` (email or phone), `code`. Confirms the account and returns tokens. Also the second half of code login |
+| POST /auth/otp/request | `identifier`. Always answers `{ sent: true }`, so it cannot be used to find out who has an account |
+| POST /auth/login | `identifier` (email or phone), `password`. Returns tokens, or 403 `not_verified`, or 423 when locked after 5 wrong passwords. Officials get `{ mfa_required }` or `{ mfa_setup_required }` with an `mfa_token` when authenticator codes are on |
+| POST /auth/password/forgot, POST /auth/password/reset | Send a reset code (same answer for unknown accounts), then `identifier, code, new_password`. Signs out every other session |
+| POST /auth/password/change | Signed in: `current_password, new_password`. Clears the "must change password" flag of an invited official |
 | POST /auth/totp/setup, POST /auth/totp/verify | Enrol and use an authenticator app. `REQUIRE_OFFICIAL_MFA=1` makes it mandatory for officials |
 | POST /auth/refresh | `refresh_token`. Returns a new pair and the old refresh token stops working. Reusing an old one ends the whole session |
 | POST /auth/logout | `refresh_token`. Ends the session |
 | GET /me | Current user (phone is masked) |
-| POST /admin/officials | Admin only. `name, email, authority_id, password`. Officials are never self-registered |
+| GET, POST /admin/officials | Admin only. Invite: `name, email, authority_id`. Returns a one-time `temporary_password` the admin hands over. The official must change it at first sign-in |
 
 Tokens object: `{ access_token, refresh_token, token (same as access_token), expires_in, user }`. Passwords are stored with argon2id. Auth endpoints are rate limited per address and per identifier.
+
+## Config for the front end (built)
+
+`GET /config.js` sets `window.SKYCLEAR` (city, map centre, zoom, search area, drone classes, code channel) and is loaded before the app code. `GET /config` returns the same as JSON. `GET /examples` returns real spots built from the zones in the database and an example route. The place comes from `data/region.json`.
 
 ## Permits, routing and verification (built)
 
@@ -110,4 +118,3 @@ Tokens object: `{ access_token, refresh_token, token (same as access_token), exp
 | POST /me/verification/pilot, POST /me/drones/{id}/verification | pilot | Send certificate or serial plus documents for review. Duplicate certificate or serial returns 409 |
 | GET /verification/queue, POST /verification/{id}/decision | official | Verify or reject. The badge shows who and when |
 
-Demo officers (password `skyclear-demo`): `official@` sees everything, `police@`, `rgia@`, `begumpet@`, `defence@`, `forest@`, `hq@` (all `skyclear.demo`) see only their office.

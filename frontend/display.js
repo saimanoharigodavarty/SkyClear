@@ -72,6 +72,7 @@ async function follow() {
     $("permitLine").textContent = `Permit ${info.permit.permit_id}: stay inside the dashed area, below ${info.permit.alt_max_m} m.`;
   } else $("permitLine").textContent = "No permit needed here. Restricted zones still apply.";
   map.setView([info.lat, info.lng], 17);
+  miniPermit = info.permit ? info.permit.area : null; miniAt = 0; miniTrail.setLatLngs([]);
   View3D.reset(); View3D.setPermit(info.permit ? info.permit.area : null, info.permit ? info.permit.alt_max_m : 0); View3D.setChase(true);
   ["telepanel", "eventpanel"].forEach(i => $(i).classList.remove("hidden"));
   $("keyhint").classList.toggle("hidden", !pilot);
@@ -109,7 +110,7 @@ async function poll() {
     const s = await api(`/flights/${FID}/live`);
     drawEvents(s.events);
     if (!s.airborne) {
-      clearInterval(timer);
+      clearInterval(timer); sirenStop(); $("minipanel").classList.add("hidden");
       const f = await api(`/flights/${FID}/info`).catch(() => info);
       const log = f.flight_log;
       banner("idle", "LANDED", f.status === "recalled" ? "The drone was recalled" : "Flight ended");
@@ -119,7 +120,7 @@ async function poll() {
       return;
     }
     const d = s.drone, ll = [d.lat, d.lng];
-    View3D.update(d);
+    View3D.update(d); miniUpdate(d); alarmFor(d.status);
     if (!marker) { marker = L.marker(ll, { icon: DRONE_ICON(d), zIndexOffset: 1000, keyboard: false }).addTo(live); trail = L.polyline([], { color: "#f4f7fa", weight: 3, opacity: 0.85 }).addTo(live); }
     marker.setLatLng(ll); marker.setIcon(DRONE_ICON(d));
     trailPts.push(ll); if (trailPts.length > 600) trailPts.shift(); trail.setLatLngs(trailPts);
@@ -146,3 +147,52 @@ setInterval(() => {
 
 setView(is3d);
 if (FID) follow().catch(() => chooser()); else chooser();
+
+
+/* ---------- the map beside the drone view: where the drone is, with the zones, notices and permit around it ---------- */
+const mini = L.map("mini", { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false }).setView(HYD, 16);
+L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxNativeZoom: 19, maxZoom: 19 }).addTo(mini);
+const miniShapes = L.layerGroup().addTo(mini), miniTrail = L.polyline([], { color: "#f4f7fa", weight: 2 }).addTo(mini);
+let miniDot = null, miniAt = 0, miniPermit = null;
+async function miniDraw(lat, lng) {
+  miniAt = Date.now();
+  try {
+    const d = 0.02, [fc, notices] = await Promise.all([api(`/zones?bbox=${lng - d},${lat - d},${lng + d},${lat + d}`, { auth: false }), api("/notices/active", { auth: false })]);
+    miniShapes.clearLayers();
+    fc.features.forEach(f => L.geoJSON(f, { style: zoneStyle(f.properties.zone_type, true), interactive: false }).addTo(miniShapes));
+    notices.forEach(n => { if (n.area) L.geoJSON(n.area, { style: { color: C.notice, weight: 2, dashArray: "6 5", fillColor: C.notice, fillOpacity: 0.2 }, interactive: false }).addTo(miniShapes); });
+    if (miniPermit) L.geoJSON(miniPermit, { style: { color: C.accent, weight: 2, dashArray: "8 6", fillOpacity: 0.1 }, interactive: false }).addTo(miniShapes);
+  } catch (e) { /* the map keeps what it has */ }
+}
+function miniUpdate(d) {
+  const ll = [d.lat, d.lng];
+  $("minipanel").classList.remove("hidden"); mini.invalidateSize();
+  if (!miniDot) { miniDot = L.marker(ll, { icon: DRONE_ICON(d), keyboard: false, interactive: false }).addTo(mini); }
+  miniDot.setLatLng(ll); miniDot.setIcon(L.divIcon({ className: "", html: `<div class="drone-pin ${d.status}" style="width:26px;height:26px"><i style="width:20px;height:24px;transform:rotate(${Math.round(d.heading_deg)}deg)"></i></div>`, iconSize: [26, 26], iconAnchor: [13, 13] }));
+  const pts = miniTrail.getLatLngs(); pts.push(ll); if (pts.length > 400) pts.shift(); miniTrail.setLatLngs(pts);
+  mini.setView(ll, 16, { animate: false });
+  if (Date.now() - miniAt > 15000) miniDraw(d.lat, d.lng);
+}
+
+/* ---------- alarm sound: a siren while the drone is in restricted airspace, a short beep as it nears one ---------- */
+let actx = null, sirenNode = null, beepAt = 0, soundOn = saved("displaySound") !== false;
+function audioReady() {
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state !== "running") actx.resume(); } catch (e) { /* no sound in this browser */ }
+  $("soundhint").classList.toggle("hidden", !actx || actx.state === "running" || !soundOn);
+}
+["click", "keydown", "touchstart"].forEach(ev => window.addEventListener(ev, audioReady, { passive: true }));
+function sirenStart() {
+  if (sirenNode || !actx || actx.state !== "running" || !soundOn) return;
+  const osc = actx.createOscillator(), gain = actx.createGain();
+  osc.type = "square"; gain.gain.value = 0.25; osc.connect(gain).connect(actx.destination); osc.start();
+  let hi = true; const t = setInterval(() => { osc.frequency.setValueAtTime(hi ? 960 : 640, actx.currentTime); hi = !hi; }, 350);
+  osc.frequency.value = 960; sirenNode = { osc, t };
+}
+function sirenStop() { if (!sirenNode) return; clearInterval(sirenNode.t); try { sirenNode.osc.stop(); } catch (e) { /* already stopped */ } sirenNode = null; }
+function beep() {
+  if (!actx || actx.state !== "running" || !soundOn || Date.now() - beepAt < 1500) return;
+  beepAt = Date.now(); const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = 880; g.gain.value = 0.18; o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.15);
+}
+function alarmFor(status) { if (status === "breach") sirenStart(); else { sirenStop(); if (status === "warning") beep(); } }
+$("sndBtn").textContent = soundOn ? "Sound: on" : "Sound: off";
+$("sndBtn").addEventListener("click", () => { soundOn = !soundOn; saved("displaySound", soundOn); $("sndBtn").textContent = soundOn ? "Sound: on" : "Sound: off"; if (!soundOn) sirenStop(); });

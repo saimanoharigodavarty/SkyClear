@@ -14,10 +14,11 @@
 <body class="stage" data-require-auth="1">
 <div id="map" class="stage-map"></div>
 <div id="map3d" class="stage-map hidden"></div>
+<div class="hud hidden" id="minipanel"><div class="minilabel">Where the drone is</div><div id="mini"></div></div>
 
 <div class="hud" id="brandcard"><a class="brand" href="index.html">Sky<b>Clear</b></a><span class="who2" id="whoLine"></span></div>
 <div class="hud idle" id="banner2"><div class="big">Ready</div><div class="sub">Choose a flight to start the demo</div></div>
-<div class="hud" id="viewbar"><button id="viewBtn" type="button">2D map</button><button id="camBtn" type="button">Camera: chase</button><button id="fs" type="button">Full screen</button></div>
+<div class="hud" id="viewbar"><button id="viewBtn" type="button">2D map</button><button id="camBtn" type="button">Camera: chase</button><button id="sndBtn" type="button">Sound: on</button><button id="fs" type="button">Full screen</button></div>
 
 <div class="fpvhud hidden" id="fpvhud">
   <div class="fcross"></div>
@@ -44,6 +45,7 @@
 <div class="hud hidden" id="pairpanel"><h2>Fly it from your phone</h2><div class="qr2" id="qr"></div><div class="small">Scan with the phone camera. Same Wi-Fi.</div><div class="mono" style="font-size:10px;word-break:break-all;margin-top:6px;color:var(--muted)" id="pairUrl"></div></div>
 <div class="hud" id="chooser"><h2>Start the demo</h2><div id="chooseBody">Loading...</div></div>
 <div class="hud hidden" id="endcard"></div>
+<div class="keyhint hidden" id="soundhint">Click anywhere once to turn the alarm sound on</div>
 <div class="keyhint hidden" id="keyhint">Keyboard: W A S D move, Q E turn, R F up and down</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

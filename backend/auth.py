@@ -386,8 +386,10 @@ def invite_official(body: NewOfficial, admin=Depends(require_admin)):
     if any(u["email"] == email for u in runtime.all_("users")):
         raise HTTPException(409, "email already in use")
     temp = secrets.token_urlsafe(9)
-    u = runtime.insert("users", {"user_id": runtime.new_id("U"), "role": "official", "authority_id": body.authority_id or None, "name": body.name.strip(),
-                                 "email": email, "password": runtime.hash_password(temp), "must_change_password": True, "failed_attempts": 0, "created_at": runtime.now_iso()})
+    with runtime.atomic():
+        u = runtime.insert("users", {"user_id": runtime.new_id("U"), "role": "official", "authority_id": body.authority_id or None, "name": body.name.strip(),
+                                     "email": email, "password": runtime.hash_password(temp), "must_change_password": True, "failed_attempts": 0, "created_at": runtime.now_iso()})
+        runtime.audit(admin, "official_invited", u["user_id"], f"{email}, office {body.authority_id or 'administrator'}")
     return {**public_user(u), "temporary_password": temp}
 
 

@@ -14,7 +14,7 @@ import routing
 import runtime
 from geo import circle, point_in_polygon
 from pipeline import evaluate, get_drone, parse_when
-from security import current_user, flight_claims, make_pair_token, require
+from security import current_user, flight_claims, make_pair_token, require, require_admin
 
 router = APIRouter()
 ACTIVE_FLIGHT = ("watching", "requested", "approved", "cleared", "flying")
@@ -159,16 +159,19 @@ def decide_flight(flight_id: str, body: Decision, user=Depends(require("official
         raise HTTPException(422, "give a reason when rejecting")
     changes = {"status": body.decision, "decision": {"by": user["name"], "comment": body.comment.strip(), "at": runtime.now_iso()}}
     permit = None
-    if body.decision == "approved":
-        conditions = [c.strip() for c in body.conditions if c.strip()]
-        permit = permits.issue(f, get_drone(f["drone_id"]), user, body.alt_max_m, conditions)
-        changes["permit_id"] = permit["permit_id"]
-    f = runtime.update("flights", "flight_id", flight_id, changes)
-    word = "approved" if body.decision == "approved" else "rejected"
-    extra = f" Permit {permit['permit_id']}, maximum {permit['alt_max_m']} m." if permit else ""
-    notify(f["pilot_id"], "decision", f"Permission {word}",
-           f"{user['name']} {word} your request {f['flight_id']}.{extra} " + (body.comment.strip() or ""),
-           severity="info" if body.decision == "approved" else "high", flight_id=flight_id)
+    # One transaction: the permit, the new flight status, the pilot's alert and the audit entry are written together or not at all.
+    with runtime.atomic():
+        if body.decision == "approved":
+            conditions = [c.strip() for c in body.conditions if c.strip()]
+            permit = permits.issue(f, get_drone(f["drone_id"]), user, body.alt_max_m, conditions)
+            changes["permit_id"] = permit["permit_id"]
+        f = runtime.update("flights", "flight_id", flight_id, changes)
+        word = "approved" if body.decision == "approved" else "rejected"
+        extra = f" Permit {permit['permit_id']}, maximum {permit['alt_max_m']} m." if permit else ""
+        notify(f["pilot_id"], "decision", f"Permission {word}",
+               f"{user['name']} {word} your request {f['flight_id']}.{extra} " + (body.comment.strip() or ""),
+               severity="info" if body.decision == "approved" else "high", flight_id=flight_id)
+        runtime.audit(user, f"permission_{body.decision}", flight_id, (permit["permit_id"] + ". " if permit else "") + body.comment.strip())
     return {**f, "permit": permits.view(permit)}
 
 
@@ -321,8 +324,10 @@ def recall_flight(flight_id: str, body: Recall, user=Depends(require("official")
         raise HTTPException(403, "this flight belongs to a different authority")
     if f["status"] != "flying" or not _fleet().recall_flight(flight_id):
         raise HTTPException(409, "this flight is not in the air")
-    notify(f["pilot_id"], "recall", "Your drone has been recalled", f"{user['name']} ordered your drone home: {body.reason.strip()}. Land now.", severity="high", flight_id=flight_id)
-    return runtime.update("flights", "flight_id", flight_id, {"status": "recalled", "recalled_by": user["name"], "recall_reason": body.reason.strip()})
+    with runtime.atomic():
+        notify(f["pilot_id"], "recall", "Your drone has been recalled", f"{user['name']} ordered your drone home: {body.reason.strip()}. Land now.", severity="high", flight_id=flight_id)
+        runtime.audit(user, "drone_recalled", flight_id, body.reason.strip())
+        return runtime.update("flights", "flight_id", flight_id, {"status": "recalled", "recalled_by": user["name"], "recall_reason": body.reason.strip()})
 
 
 def complete_flight(flight_id, reason, stats):
@@ -373,12 +378,16 @@ def revoke_permit(permit_id: str, body: Revoke, user=Depends(require("official")
         raise HTTPException(403, "this permit belongs to a different authority")
     if p["status"] != "active":
         raise HTTPException(409, "permit is not active")
-    p = runtime.update("permits", "permit_id", permit_id, {"status": "revoked", "revoked_by": user["name"], "revoked_reason": body.reason.strip(), "revoked_at": runtime.now_iso()})
-    flying = f["status"] == "flying" and _fleet().recall_flight(f["flight_id"])
-    runtime.update("flights", "flight_id", f["flight_id"], {"status": "recalled" if flying else "revoked", "cleared_until": None})
-    notify(f["pilot_id"], "permit", f"Permit {permit_id} revoked",
-           f"{user['name']} revoked your permit: {body.reason.strip()}. " + ("Your drone has been ordered home. Land now." if flying else "You are not cleared to fly."),
-           severity="high", flight_id=f["flight_id"])
+    was_flying = f["status"] == "flying"
+    with runtime.atomic():  # the permit, the flight, the alert and the audit entry change together
+        p = runtime.update("permits", "permit_id", permit_id, {"status": "revoked", "revoked_by": user["name"], "revoked_reason": body.reason.strip(), "revoked_at": runtime.now_iso()})
+        runtime.update("flights", "flight_id", f["flight_id"], {"status": "recalled" if was_flying else "revoked", "cleared_until": None})
+        notify(f["pilot_id"], "permit", f"Permit {permit_id} revoked",
+               f"{user['name']} revoked your permit: {body.reason.strip()}. " + ("Your drone has been ordered home. Land now." if was_flying else "You are not cleared to fly."),
+               severity="high", flight_id=f["flight_id"])
+        runtime.audit(user, "permit_revoked", permit_id, body.reason.strip())
+    if was_flying:
+        _fleet().recall_flight(f["flight_id"])  # the order to the drone goes out only after the records are safely committed
     return permits.view(p)
 
 
@@ -432,20 +441,23 @@ def _window(n):
     return f"{s.astimezone().strftime('%d %b %H:%M')} to {e.astimezone().strftime('%H:%M')}"
 
 
-def create_notice(title, note, lat, lng, radius_km, starts_at, ends_at, published_by):
+def create_notice(title, note, lat, lng, radius_km, starts_at, ends_at, published_by, actor=None):
     """Publish a restriction: store it, alert the pilots whose flights it touches, and list the permits it conflicts with.
     Used by the officer's form and by the simulation's VIP scenario, so both follow exactly the same path."""
-    notice = runtime.insert("notices", {
-        "notice_id": runtime.new_id("RN"), "title": title.strip(), "text": note.strip(),
-        "status": "active", "origin": "official", "starts_at": starts_at, "ends_at": ends_at,
-        "center": {"lat": lat, "lng": lng}, "radius_km": radius_km,
-        "area": circle(lat, lng, radius_km),
-        "source": f"Published by {published_by}", "published_by": published_by, "published_at": runtime.now_iso()})
-    hit = _affected(notice)
-    for f in hit:
-        notify(f["pilot_id"], "notice", f"Restriction: {notice['title']}",
-               f"A restriction overlaps your flight {f['flight_id']} ({_window(notice)}). Do not fly in this area during this time unless the authority says otherwise.",
-               severity="high", flight_id=f["flight_id"])
+    with runtime.atomic():  # the notice, every pilot's alert and the audit entry are one unit
+        notice = runtime.insert("notices", {
+            "notice_id": runtime.new_id("RN"), "title": title.strip(), "text": note.strip(),
+            "status": "active", "origin": "official", "starts_at": starts_at, "ends_at": ends_at,
+            "center": {"lat": lat, "lng": lng}, "radius_km": radius_km,
+            "area": circle(lat, lng, radius_km),
+            "source": f"Published by {published_by}", "published_by": published_by, "published_at": runtime.now_iso()})
+        hit = _affected(notice)
+        for f in hit:
+            notify(f["pilot_id"], "notice", f"Restriction: {notice['title']}",
+                   f"A restriction overlaps your flight {f['flight_id']} ({_window(notice)}). Do not fly in this area during this time unless the authority says otherwise.",
+                   severity="high", flight_id=f["flight_id"])
+        if actor is not None:
+            runtime.audit(actor, "notice_published", notice["notice_id"], f"{notice['title']}, {radius_km} km, {len(hit)} flights alerted")
     return {**notice, "affected_flights": len(hit), "conflicting_permits": permits.conflicting_permits(notice)}
 
 
@@ -453,7 +465,7 @@ def create_notice(title, note, lat, lng, radius_km, starts_at, ends_at, publishe
 def publish_notice(body: NoticeIn, user=Depends(require("official"))):
     if parse_when(body.ends_at) <= parse_when(body.starts_at):
         raise HTTPException(422, "end must be after start")
-    return create_notice(body.title, body.note, body.lat, body.lng, body.radius_km, body.starts_at, body.ends_at, user["name"])
+    return create_notice(body.title, body.note, body.lat, body.lng, body.radius_km, body.starts_at, body.ends_at, user["name"], actor=user)
 
 
 @router.post("/notices/{notice_id}/cancel")
@@ -464,11 +476,13 @@ def cancel_notice(notice_id: str, user=Depends(require("official"))):
     if n["status"] != "active":
         raise HTTPException(409, "notice is not active")
     hit = _affected(n)
-    n = runtime.update("notices", "notice_id", notice_id, {"status": "cancelled"})
-    for f in hit:
-        notify(f["pilot_id"], "notice", f"Cancelled: {n['title']}",
-               f"The restriction that overlapped your flight {f['flight_id']} was cancelled. Re-check before you fly.",
-               severity="info", flight_id=f["flight_id"])
+    with runtime.atomic():
+        n = runtime.update("notices", "notice_id", notice_id, {"status": "cancelled"})
+        for f in hit:
+            notify(f["pilot_id"], "notice", f"Cancelled: {n['title']}",
+                   f"The restriction that overlapped your flight {f['flight_id']} was cancelled. Re-check before you fly.",
+                   severity="info", flight_id=f["flight_id"])
+        runtime.audit(user, "notice_cancelled", notice_id, n["title"])
     return {**n, "affected_flights": len(hit)}
 
 
@@ -493,6 +507,13 @@ def active_notices():
         if parse_when(n["ends_at"]) >= now:
             out.append({k: n.get(k) for k in ("notice_id", "title", "starts_at", "ends_at", "source")} | {"area": n["area"]})
     return out
+
+
+@router.get("/audit")
+def audit_log(limit: int = 50, admin=Depends(require_admin)):
+    """What officials did, newest first. Administrators only. Entries are only ever added, never changed."""
+    rows = sorted(runtime.all_("audit_log"), key=lambda a: a["ts"], reverse=True)
+    return rows[: max(1, min(limit, 200))]
 
 
 @router.get("/overview")

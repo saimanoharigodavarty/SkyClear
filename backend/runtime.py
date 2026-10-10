@@ -2,6 +2,7 @@
 
 Two backends behind the same functions: MongoDB when config.USE_MONGO, otherwise a JSON file.
 """
+import contextlib
 import hashlib
 import json
 import secrets
@@ -9,6 +10,7 @@ import threading
 from datetime import datetime, timezone
 
 import config
+import events
 
 
 def _mongo():
@@ -17,7 +19,36 @@ def _mongo():
 
 _lock = threading.RLock()
 _EMPTY = {"users": [], "sessions": {}, "drones": [], "flights": [], "notices": [], "notifications": [],
-          "permits": [], "verifications": [], "files": [], "authorities": [], "refresh_tokens": [], "otps": []}
+          "permits": [], "verifications": [], "files": [], "authorities": [], "refresh_tokens": [], "otps": [],
+          "breaches": [], "audit_log": []}
+_tls = threading.local()  # the MongoDB session of the transaction this thread is inside, if any
+
+
+def _kw():
+    s = getattr(_tls, "session", None)
+    return {"session": s} if s is not None else {}
+
+
+@contextlib.contextmanager
+def atomic():
+    """Everything written inside this block succeeds together or not at all (a MongoDB multi-document transaction).
+    With the JSON file store there is one writer, so it simply runs the block."""
+    if not config.USE_MONGO:
+        yield
+        return
+    with _mongo().client.start_session() as session:
+        with session.start_transaction():  # commits when the block ends, aborts if it raises
+            _tls.session = session
+            try:
+                yield
+            finally:
+                _tls.session = None
+
+
+def audit(actor, action, target, detail=None):
+    """An append-only record of what an official did, who did it and when. Written inside the same transaction as the action."""
+    return insert("audit_log", {"audit_id": new_id("AU"), "ts": now_iso(), "actor_id": actor["user_id"], "actor": actor["name"],
+                                "role": actor["role"], "authority_id": actor.get("authority_id"), "action": action, "target": target, "detail": detail or ""})
 
 
 def _load():
@@ -54,32 +85,34 @@ def all_(coll):
 
 def insert(coll, doc):
     if config.USE_MONGO:
-        _mongo()[coll].insert_one(dict(doc))
+        _mongo()[coll].insert_one(dict(doc), **_kw())  # the change stream publishes it, after any transaction commits
         return doc
     with _lock:
         data = _load()
         data[coll].append(doc)
         _save(data)
+    events.publish(coll, "insert", doc)
     return doc
 
 
 def update(coll, key, value, changes):
     """Merge `changes` into the first doc where doc[key] == value. Returns the doc or None."""
     if config.USE_MONGO:
-        return _mongo()[coll].find_one_and_update({key: value}, {"$set": changes}, projection={"_id": 0}, return_document=True)
+        return _mongo()[coll].find_one_and_update({key: value}, {"$set": changes}, projection={"_id": 0}, return_document=True, **_kw())
     with _lock:
         data = _load()
         for d in data[coll]:
             if d.get(key) == value:
                 d.update(changes)
                 _save(data)
+                events.publish(coll, "update", d)
                 return d
     return None
 
 
 def mark_read(user_id):
     if config.USE_MONGO:
-        _mongo().notifications.update_many({"user_id": user_id}, {"$set": {"read": True}})
+        _mongo().notifications.update_many({"user_id": user_id}, {"$set": {"read": True}}, **_kw())
         return
     with _lock:
         data = _load()

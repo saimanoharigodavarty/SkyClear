@@ -6,6 +6,7 @@
   python backend/manage.py seed-demo                                                 a verified demo pilot, a drone, flights and a notice
   python backend/manage.py logins                                                    show the saved logins
   python backend/manage.py set-password --email x@y.z                                set a known password for an account
+  python backend/manage.py seed-showcase                                             fill the platform with believable demo data (pilots, flights in every state, notices)
   python backend/manage.py prepare-demo                                              get a presentation ready: a demo pilot with two approved flights (phone control demo)
   python backend/manage.py list-users
   python backend/manage.py has-admin                                                 exit code 0 when an admin exists
@@ -229,6 +230,28 @@ def cmd_prepare_demo(a):
     print(f"\nSign in on the presentation computer as the demo pilot:\n  {a.pilot_email}   {pw}\nThen open http://localhost:8000/display.html")
 
 
+def cmd_seed_showcase(a):
+    """Fill the platform with believable demo data: fictional pilots and flights in every state, a verification queue, three notices, history.
+    Safe to run once on a fresh database. Run prepare-demo afterwards for the flights you fly live."""
+    from fastapi.testclient import TestClient
+    from main import app
+    import auth
+    import showcase
+    client = TestClient(app)
+    admin = next((u for u in runtime.all_("users") if u["role"] == "official" and not u.get("authority_id")), None)
+    if admin is None:
+        raise SystemExit("Create an admin first: python backend/manage.py create-admin --email you@example.com --generate")
+    if any(u["email"] == "aarav.mehta@example.com" for u in runtime.all_("users")):
+        raise SystemExit("Showcase data is already there. (Start from a fresh database to seed it again.)")
+    if not any(u.get("authority_id") for u in runtime.all_("users")):
+        cmd_seed_officers(argparse.Namespace(domain="officers.skyclear.local"))
+    def officer_for(authority_id):
+        u = next((x for x in runtime.all_("users") if x.get("authority_id") == authority_id), None) or admin
+        return {"Authorization": f"Bearer {auth.access_token(u)}"}
+    out = showcase.run(client, officer_for, None, admin, create_user, _save)
+    print(f"Showcase data created: {out['pilots']} pilots, {out['requests_waiting']} requests waiting for officers. Pilot logins are in {CREDS}.")
+
+
 def cmd_list_users(a):
     for u in runtime.all_("users"):
         print(f"{u['role']:9} {u['email']:45} {u.get('authority_id') or '-'}")
@@ -283,6 +306,7 @@ def main(argv=None):
     s.add_argument("--password"); s.add_argument("--generate", action="store_true"); s.set_defaults(fn=cmd_create_admin)
     s = sub.add_parser("seed-officers"); s.add_argument("--domain", default="officers.skyclear.local"); s.set_defaults(fn=cmd_seed_officers)
     s = sub.add_parser("seed-demo"); s.add_argument("--pilot-email", default="demo.pilot@example.com"); s.set_defaults(fn=cmd_seed_demo)
+    s = sub.add_parser("seed-showcase"); s.set_defaults(fn=cmd_seed_showcase)
     s = sub.add_parser("prepare-demo"); s.add_argument("--pilot-email", default="demo.pilot@example.com"); s.set_defaults(fn=cmd_prepare_demo)
     s = sub.add_parser("list-users"); s.set_defaults(fn=cmd_list_users)
     s = sub.add_parser("logins"); s.set_defaults(fn=cmd_logins)

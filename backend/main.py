@@ -15,6 +15,7 @@ from auth import router as auth_router, setup_indexes as auth_indexes
 import bridge
 from bridge import router as bridge_router
 from config_api import router as config_router
+from events_api import router as events_router
 from live import router as live_router, sim_router
 from mappls_api import router as mappls_router
 from verification import router as verification_router
@@ -25,6 +26,12 @@ import runtime
 from sim import sample_route, summarize_route
 
 app = FastAPI(title="SkyClear")
+
+
+@app.on_event("startup")
+def _start_change_streams():
+    import events
+    events.start_watchers()  # MongoDB change streams feed the live event channel (does nothing without MongoDB)
 
 
 @app.on_event("startup")
@@ -42,6 +49,7 @@ def _warm_up_model():
 # Bearer tokens, no cookies, so a page opened from a file can still talk to the API in development.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(config_router)
+app.include_router(events_router)
 app.include_router(ask_router)
 from simulator.fleet import get_fleet_simulator as _fleet_sim  # noqa: E402
 _fleet_sim().on_landed = bridge.complete_flight

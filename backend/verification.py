@@ -134,13 +134,15 @@ def decide(verification_id: str, body: VDecision, user=Depends(require("official
         raise HTTPException(422, "give a reason when rejecting")
     status = "verified" if body.decision == "approved" else "rejected"
     stamp = {"status": status, "by": user["name"], "at": runtime.now_iso(), "comment": body.comment.strip()}
-    if v["kind"] == "pilot":
-        runtime.update("users", "user_id", v["user_id"], {"verification": stamp})
-    else:
-        runtime.update("drones", "drone_id", v["drone_id"], {"verification": stamp})
     from bridge import notify
     what = "pilot certificate" if v["kind"] == "pilot" else f"drone {v.get('drone_name')}"
-    notify(v["user_id"], "verification", f"Verification {body.decision}", f"{user['name']} {body.decision} your {what}. {body.comment.strip()}",
-           severity="info" if body.decision == "approved" else "high")
-    return runtime.update("verifications", "verification_id", verification_id,
-                          {"status": body.decision, "decided_by": user["name"], "decided_at": runtime.now_iso(), "comment": body.comment.strip()})
+    with runtime.atomic():  # the badge, the review record, the alert and the audit entry change together
+        if v["kind"] == "pilot":
+            runtime.update("users", "user_id", v["user_id"], {"verification": stamp})
+        else:
+            runtime.update("drones", "drone_id", v["drone_id"], {"verification": stamp})
+        notify(v["user_id"], "verification", f"Verification {body.decision}", f"{user['name']} {body.decision} your {what}. {body.comment.strip()}",
+               severity="info" if body.decision == "approved" else "high")
+        runtime.audit(user, f"verification_{body.decision}", verification_id, f"{what}. {body.comment.strip()}")
+        return runtime.update("verifications", "verification_id", verification_id,
+                              {"status": body.decision, "decided_by": user["name"], "decided_at": runtime.now_iso(), "comment": body.comment.strip()})

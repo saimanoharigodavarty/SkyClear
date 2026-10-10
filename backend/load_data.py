@@ -18,7 +18,7 @@ RULES_SEARCH_DEFINITION = {
     "mappings": {
         "dynamic": False,
         "fields": {
-            "text": {"type": "string"},
+            "text": {"type": "string", "analyzer": "lucene.english"},
             "zone_type": {"type": "token"},
             "drone_classes": {"type": "token"},
         },
@@ -141,7 +141,6 @@ def load(verbose=True, search_indexes=("rules", "zones"), embeddings=True):
         ensure_search_index(db.rules, RULES_SEARCH_INDEX, RULES_SEARCH_DEFINITION, log)
     if "zones" in search_indexes:
         ensure_search_index(db.zones, ZONES_SEARCH_INDEX, ZONES_SEARCH_DEFINITION, log)
-
     if vectors:
         _vector_index(db, log)
     else:
@@ -153,6 +152,25 @@ def load(verbose=True, search_indexes=("rules", "zones"), embeddings=True):
         f"{db.drones.count_documents({'origin': 'seed'})} drones, {db.notices.count_documents({'origin': 'seed'})} sample notices, "
         f"{db.eval_cases.count_documents({})} eval cases")
     return db
+
+
+def _search_index(db, log):
+    """Atlas Search (Lucene) index on the rule text. The English analyzer drops filler words (is, in, the) and handles
+    word forms, so an off-topic question matches nothing and Ask can say it has no answer."""
+    from pymongo.operations import SearchIndexModel
+    definition = {"mappings": {"dynamic": False, "fields": {"text": {"type": "string", "analyzer": "lucene.english"}, "zone_type": {"type": "string"}}}}
+    if any(i["name"] == "rules_search" for i in db.rules.list_search_indexes()):
+        db.rules.update_search_index("rules_search", definition)
+        time.sleep(2)
+    else:
+        db.rules.create_search_index(SearchIndexModel(name="rules_search", definition=definition))
+    for _ in range(40):
+        idx = next((i for i in db.rules.list_search_indexes() if i["name"] == "rules_search"), None)
+        if idx and idx.get("queryable") and idx.get("status") == "READY":
+            log("search index ready")
+            return
+        time.sleep(1)
+    log("search index still building, it will be ready shortly")
 
 
 def _vector_index(db, log):

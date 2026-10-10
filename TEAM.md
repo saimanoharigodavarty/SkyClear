@@ -24,7 +24,7 @@ Files: backend/search.py, load_data.py, zones_api.py, analytics.py, embeddings.p
 The MongoDB showpiece stream. Verified on our local MongoDB 8.3: Atlas Search (`$search`) and `$rankFusion` work. See the feature map in ARCHITECTURE.md.
 
 - P0: Real zones: ingest OpenStreetMap for Telangana (Geofabrik extract, osmium or Overpass): aeroways, military land, prisons, government sites, power plants, stadiums. Keep source and ODbL attribution. Aim for 300 or more Hyderabad zones. Add JSON schema validation and the right indexes to `zones`.
-- P0: Hybrid search done the MongoDB way: create an Atlas Search index on `rules.text` and use `$rankFusion` over `$vectorSearch` and `$search` instead of the hand-written merge in `search_rules`. Keep the metadata filters. Fall back to `$search` alone when embeddings are missing.
+- P0 (done by Nikhil): Hybrid search with `$rankFusion` over `$vectorSearch` and Atlas Search, with a keyword fallback, is in `search_rules`, tested on MongoDB. Remaining for you: connect the Ollama laptop (docs/OLLAMA.md), then tune ranking with the real embeddings and add metadata filters if they help the eval numbers.
 - P0: Atlas Search autocomplete with fuzzy matching on `zones.name` for the search box (contract 8). The endpoint already exists with a plain name match, keep the response shape.
 - P0: Geo queries done properly: viewport `$geoIntersects`, `$geoNear` for nearest zones, flights stored as GeoJSON with a time range and a geo plus time overlap query. Prove index use with `explain()` and note it in docs/SCALING.md.
 - P0: Real rules: replace placeholder text with the actual regulation (section and date for each). Decide the notices source (authority entry only).

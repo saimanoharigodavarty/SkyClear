@@ -49,6 +49,14 @@ def health():
     return {"ok": True, "mongo": config.USE_MONGO, "llm": config.USE_LLM, "ollama_url": config.OLLAMA_URL if config.USE_LLM else None}
 
 
+@app.get("/health/llm")
+def health_llm():
+    """For the UI: is the language model connected? Never fails, a missing model just means plain answers."""
+    import llm
+    s = llm.status()
+    return {k: s[k] for k in ("enabled", "reachable", "llm_model_ready", "embed_model_ready")}
+
+
 @app.get("/drones")
 def drones():
     return store.all_drones()

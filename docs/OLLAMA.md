@@ -4,14 +4,38 @@ SkyClear works without it. Connecting it adds: wording of the check explanation 
 
 ## On the Ollama laptop (once)
 
+Run these on that laptop, not on the one running SkyClear. Nothing from this project is needed there.
+
+### Windows (PowerShell)
+
+1. Install Ollama for Windows from ollama.com/download.
+2. Pull the models. Use `qwen2.5:3b` if the laptop has 8 GB of RAM:
+   ```
+   ollama pull qwen2.5:7b
+   ollama pull nomic-embed-text
+   ```
+3. Listen on the network, then quit Ollama from the system tray and start it again so it reads the setting:
+   ```
+   setx OLLAMA_HOST "0.0.0.0"
+   ```
+4. Open the firewall. In PowerShell run as Administrator:
+   ```
+   New-NetFirewallRule -DisplayName "Ollama" -Direction Inbound -Protocol TCP -LocalPort 11434 -Action Allow
+   ```
+   If Windows asks to allow access, say yes for the private network.
+5. Find the address with `ipconfig` (IPv4 Address of the Wi-Fi adapter).
+6. Check on that laptop: `curl http://localhost:11434/api/tags` lists both models.
+
+### macOS or Linux
+
 ```
 ollama pull qwen2.5:7b            # qwen2.5:3b if it has 8 GB of RAM
 ollama pull nomic-embed-text
 OLLAMA_HOST=0.0.0.0 ollama serve  # listen on the network, not only on itself
-ipconfig getifaddr en0            # note this IP address (macOS). Windows: ipconfig
+ipconfig getifaddr en0            # its IP address (macOS). Linux: hostname -I
 ```
 
-Both laptops must be on the same network. If the venue Wi-Fi blocks laptop to laptop traffic, use a phone hotspot. If a firewall asks, allow port 11434.
+Both laptops must be on the same network. If the venue Wi-Fi blocks laptop to laptop traffic, use a phone hotspot.
 
 ## On this laptop
 

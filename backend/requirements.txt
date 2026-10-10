@@ -10,3 +10,4 @@ python-multipart
 PyJWT
 argon2-cffi
 pyotp
+google-auth

@@ -254,5 +254,141 @@
   "expected_rule_ids": [
    "R-004"
   ]
+ },
+ {
+  "case_id": "E-21",
+  "input": {
+   "lat": 17.445,
+   "lng": 78.385,
+   "drone_id": "micro-800",
+   "datetime": "2026-10-12T20:00:00+05:30"
+  },
+  "expected_verdict": "prohibited",
+  "expected_rule_ids": ["R-004"],
+  "query": "Does a temporary flight restriction still apply at its exact end time?"
+ },
+ {
+  "case_id": "E-22",
+  "input": {
+   "lat": 17.445,
+   "lng": 78.385,
+   "drone_id": "micro-800",
+   "datetime": "2026-10-12T15:59:59+05:30"
+  },
+  "expected_verdict": "can_fly",
+  "expected_rule_ids": []
+ },
+ {
+  "case_id": "E-23",
+  "input": {
+   "lat": 17.445,
+   "lng": 78.385,
+   "drone_id": "micro-800",
+   "datetime": "2026-10-12T20:00:01+05:30"
+  },
+  "expected_verdict": "can_fly",
+  "expected_rule_ids": []
+ },
+ {
+  "case_id": "E-24",
+  "input": {
+   "lat": 17.43614,
+   "lng": 78.54031,
+   "drone_id": "small-1800",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "cannot_determine",
+  "expected_rule_ids": []
+ },
+ {
+  "case_id": "E-25",
+  "input": {
+   "lat": 17.38408,
+   "lng": 78.47825,
+   "drone_id": "small-1800",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "cannot_determine",
+  "expected_rule_ids": []
+ },
+ {
+  "case_id": "E-26",
+  "input": {
+   "lat": 17.4412,
+   "lng": 78.48756,
+   "drone_id": "small-1800",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "cannot_determine",
+  "expected_rule_ids": []
+ },
+ {
+  "case_id": "E-27",
+  "input": {
+   "lat": 17.55432,
+   "lng": 78.5249,
+   "drone_id": "nano-200",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "prohibited",
+  "expected_rule_ids": ["R-002"],
+  "query": "Which rule applies where mapped military areas overlap?"
+ },
+ {
+  "case_id": "E-28",
+  "input": {
+   "lat": 17.2761850878125,
+   "lng": 78.42985999531251,
+   "drone_id": "small-1800",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "permission_needed",
+  "expected_rule_ids": ["R-001"],
+  "query": "Does the airport permission rule apply just inside the zone edge?"
+ },
+ {
+  "case_id": "E-29",
+  "input": {
+   "lat": 17.276274912187503,
+   "lng": 78.4298600046875,
+   "drone_id": "small-1800",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "can_fly",
+  "expected_rule_ids": []
+ },
+ {
+  "case_id": "E-30",
+  "input": {
+   "lat": 6.5,
+   "lng": 68.0,
+   "drone_id": "small-1800",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "can_fly",
+  "expected_rule_ids": []
+ },
+ {
+  "case_id": "E-31",
+  "input": {
+   "lat": 6.4999,
+   "lng": 68.0,
+   "drone_id": "small-1800",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "cannot_determine",
+  "expected_rule_ids": []
+ },
+ {
+  "case_id": "E-32",
+  "input": {
+   "lat": 17.427,
+   "lng": 78.4225,
+   "drone_id": "medium-20000",
+   "datetime": "2026-10-12T10:00:00+05:30"
+  },
+  "expected_verdict": "permission_needed",
+  "expected_rule_ids": ["R-003"],
+  "query": "Does a medium drone need permission over a protected park?"
  }
 ]

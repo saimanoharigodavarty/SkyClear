@@ -41,6 +41,16 @@ def test_unverified_point_site_uses_a_labelled_derived_buffer():
     assert feature["properties"]["legal_status"] == "unverified_context"
 
 
+def test_unverified_government_sites_do_not_inherit_the_placeholder_government_rule():
+    payload = {"elements": [{
+        "type": "node", "id": 8, "lat": 17.4, "lon": 78.4,
+        "tags": {"office": "government", "name": "Example Office"},
+    }]}
+    feature = osm_zones.convert(payload, fetched_at="2026-10-10")["features"][0]
+    assert feature["properties"]["zone_type"] == "government_context"
+    assert feature["properties"]["rule_ids"] == []
+
+
 def test_airport_and_military_keep_existing_rule_mappings():
     payload = {"elements": [
         {"type": "node", "id": 1, "lat": 17.4, "lon": 78.4, "tags": {"aeroway": "aerodrome"}},

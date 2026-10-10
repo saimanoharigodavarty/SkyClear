@@ -32,7 +32,7 @@ CATEGORIES = {
     "airport": {"rule_ids": ["R-001", "R-001B"], "point_radius_km": 3.0},
     "military": {"rule_ids": ["R-002"], "point_radius_km": 0.5},
     "prison": {"rule_ids": [], "point_radius_km": 0.25},
-    "government": {"rule_ids": [], "point_radius_km": 0.15},
+    "government_context": {"rule_ids": [], "point_radius_km": 0.15},
     "power": {"rule_ids": [], "point_radius_km": 0.30},
     "stadium": {"rule_ids": [], "point_radius_km": 0.25},
 }
@@ -78,7 +78,7 @@ def category(tags):
     if tags.get("leisure") == "stadium":
         return "stadium"
     if tags.get("office") == "government" or "government" in tags:
-        return "government"
+        return "government_context"
     return None
 
 

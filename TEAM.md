@@ -75,6 +75,7 @@ Do these in order, each is a clear step with a visible result:
 3. Load test in `locust/`: a user that checks random Hyderabad spots (`POST /check`), loads zones by viewport and logs in. Run it with 50, 200 and 500 users. Put the real numbers (requests per second, p95, errors) in docs/RESULTS.md with the date and the machine.
 4. Email alerts: `backend/notify_email.py` sending a notification by SMTP (test with MailHog or Mailpit in the compose file). Nikhil wires it into the alert listener, you provide `send_alert(to, subject, body)` and a test.
 5. Demo material: docs/DEMO.md with a 3 minute script (what to click, what to say, which numbers to quote) and docs/SLIDES.md with the slide outline for the Track 2 pitch. Use PRODUCT.md for the honest limits and judge questions. Record a backup screen video once the app is ready.
+6. Stretch, only after steps 1 to 5: MongoDB Charts on an Atlas free cluster. First check the free-tier limits (time series collections, change streams, geo, vector). Then copy a snapshot of flights and breaches to Atlas, build 3 or 4 charts (flights by area, breaches per zone, decision times) and link or embed them on the authority page as a second view. Keep our own dashboard as the default, because Charts needs the internet and cannot run on the local Docker MongoDB. Take a screenshot as a backup for the demo.
 - Done when: the prod compose runs from a clean clone, the Grafana dashboard moves during a load test, RESULTS.md has real load numbers, and the demo script has been rehearsed once end to end.
 
 ## Order of work

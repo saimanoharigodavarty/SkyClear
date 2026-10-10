@@ -43,6 +43,112 @@ Target design for a high-scale platform. Everything is open source, and MongoDB 
 | analytics | Aggregation pipelines: flights per grid cell (heatmap), breaches per zone, median time to decision |
 | decisions | Multi-document transaction: update the flight and insert the notification together |
 
+## What we are building
+
+SkyClear is an airspace platform with two sides and a live simulation, backed by MongoDB.
+
+- Pilot side: check a spot, route or drone before flying, see the exact rules behind the answer, register drones, watch a flight, request permission, get alerted when a restriction appears.
+- Authority side: review and decide permission requests, publish restrictions such as VIP movements, see live airspace and analytics.
+- Simulation: a fleet of simulated drones flies over Hyderabad, is checked live against zones and notices, and breaches show up on both sides in seconds.
+
+## System diagram
+
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+flowchart LR
+  subgraph Clients["Browsers"]
+    P["Pilot app<br/>map, check, flights, alerts"]
+    A["Authority console<br/>requests, notices, live airspace, dashboard"]
+  end
+  LB["Nginx<br/>TLS, gzip, cache"]
+  subgraph API["FastAPI replicas, stateless, N copies"]
+    AUTH["Auth and roles<br/>JWT, refresh, TOTP"]
+    CHECK["Check engine<br/>geo search plus rule engine"]
+    FLOW["Flights, permissions, notices"]
+    LIVE["Live feed, server-sent events"]
+    EXP["Explain, RAG"]
+  end
+  subgraph DB["MongoDB replica set"]
+    ZN[("zones<br/>2dsphere")]
+    NT[("notices<br/>2dsphere, change stream")]
+    FL[("flights<br/>geo and time")]
+    TM[("telemetry<br/>time series")]
+    BR[("breaches")]
+    RL[("rules<br/>vector and text")]
+    US[("users, tokens, notifications, audit_log")]
+  end
+  SIM["Fleet simulator<br/>100 to 1000 drones"]
+  GF["Geofence engine<br/>detect and predict breaches"]
+  OL["Ollama laptop<br/>qwen2.5, nomic-embed-text"]
+  OSM["OpenStreetMap, OurAirports<br/>ingestion"]
+  MON["Prometheus and Grafana"]
+
+  P --> LB
+  A --> LB
+  LB --> API
+  AUTH --> US
+  CHECK --> ZN
+  CHECK --> NT
+  CHECK --> RL
+  FLOW --> FL
+  FLOW --> NT
+  EXP --> OL
+  EXP --> RL
+  SIM -->|bulk telemetry| TM
+  GF -->|reads| TM
+  GF -->|reads| ZN
+  GF -->|reads| NT
+  GF -->|writes| BR
+  BR -.->|change stream| LIVE
+  NT -.->|change stream| FLOW
+  LIVE --> LB
+  OSM -->|load| ZN
+  API --> MON
+```
+
+## One check, step by step
+
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+flowchart TD
+  IN["Pilot picks spot, drone, time"] --> G1["1. Zones: geoIntersects on the spot"]
+  G1 --> G2["2. Notices: geoIntersects plus time window"]
+  G2 --> R1["3. Rules: filter by zone type and drone class"]
+  R1 --> E["4. Rule engine in Python decides the verdict"]
+  E --> V{"Verdict"}
+  V --> X["5. Retrieve passages: vector plus text search, merged"]
+  X --> L["6. LLM writes a short explanation"]
+  L --> C["7. Checks: citation ids valid, no contradiction, never says safe"]
+  C -->|fails or LLM down| T["Template explanation"]
+  C -->|passes| O["Answer: verdict, zones, cited rules, next steps"]
+  T --> O
+```
+
+## The demo story: a VIP movement
+
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+sequenceDiagram
+  participant Pilot
+  participant API
+  participant Mongo as MongoDB
+  participant Official
+  participant Sim as Simulator and geofence
+  Pilot->>API: watch flight near Begumpet, 4 pm
+  API->>Mongo: store flight with route and time range
+  Sim->>Mongo: drones stream telemetry
+  Official->>API: publish VIP notice, 3 km, 4 pm to 7 pm
+  API->>Mongo: insert notice
+  Mongo-->>API: change stream event
+  API->>Mongo: find flights by geo and time overlap
+  API->>Mongo: write notifications
+  Mongo-->>Pilot: alert pushed live
+  Sim->>Mongo: drone enters notice area, write breach
+  Mongo-->>Official: breach on live map
+  Pilot->>API: check the same spot
+  API-->>Pilot: Prohibited, citing the notice
+```
+
 ## Request flow
 
 ```

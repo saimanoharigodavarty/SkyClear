@@ -148,6 +148,30 @@ def load(verbose=True, search_indexes=("rules", "zones"), embeddings=True):
 
     db.eval_cases.delete_many({})
     db.eval_cases.insert_many(_read("eval_cases.json"))
+
+    # telemetry time series collection (contract 5): TTL and 2dsphere index
+    if "telemetry" not in db.list_collection_names():
+        try:
+            db.create_collection(
+                "telemetry",
+                timeseries={"timeField": "ts", "metaField": "drone_id", "granularity": "seconds"},
+                expireAfterSeconds=86400
+            )
+        except Exception:
+            pass
+    try:
+        db.telemetry.create_index([("position", "2dsphere")])
+        db.telemetry.create_index([("drone_id", 1), ("ts", -1)])
+    except Exception:
+        pass
+
+    # breaches collection index
+    try:
+        db.breaches.create_index([("ts", -1)])
+        db.breaches.create_index("drone_id")
+    except Exception:
+        pass
+
     log(f"loaded: {db.zones.count_documents({})} zones, {db.rules.count_documents({})} rules, "
         f"{db.drones.count_documents({'origin': 'seed'})} drones, {db.notices.count_documents({'origin': 'seed'})} sample notices, "
         f"{db.eval_cases.count_documents({})} eval cases")

@@ -1,5 +1,5 @@
 """Shared pipeline pieces: the store and the single-point evaluation used by /check, simulation and flights."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 
@@ -8,10 +8,16 @@ from verdict import decide
 
 store = get_store()
 
+# Local timezone for coverage area (IST, UTC+05:30) (A6 fix)
+LOCAL_TZ = timezone(timedelta(hours=5, minutes=30))
+
 
 def parse_when(value):
-    when = datetime.fromisoformat(value.replace("Z", "+00:00")) if value else datetime.now(timezone.utc)
-    return when if when.tzinfo else when.replace(tzinfo=timezone.utc)
+    """Parse datetime. When timezone offset is missing, defaults to local timezone (A6 fix)."""
+    if not value:
+        return datetime.now(LOCAL_TZ)
+    when = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return when if when.tzinfo else when.replace(tzinfo=LOCAL_TZ)
 
 
 def get_drone(drone_id):
@@ -21,7 +27,7 @@ def get_drone(drone_id):
     return drone
 
 
-def evaluate(lat, lng, drone, when):
+def evaluate(lat, lng, drone, when, alt_m=None):
     """Run the whole pipeline for one point. Returns (verdict, near, notices, used_rules)."""
     near = store.zones_near(lat, lng)
     notices = store.notices_at(lat, lng, when)
@@ -30,5 +36,5 @@ def evaluate(lat, lng, drone, when):
     by_type = {}
     for r in rules:
         by_type.setdefault(r["zone_type"], []).append(r)
-    verdict, used = decide(lat, lng, drone["class"], near, notices, by_type)
+    verdict, used = decide(lat, lng, drone["class"], near, notices, by_type, alt_m=alt_m, when=when)
     return verdict, near, notices, used

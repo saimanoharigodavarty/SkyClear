@@ -14,7 +14,7 @@ from ask import router as ask_router
 from auth import router as auth_router, setup_indexes as auth_indexes
 from bridge import router as bridge_router
 from config_api import router as config_router
-from live import router as live_router
+from live import router as live_router, sim_router
 from verification import router as verification_router
 from zones_api import router as zones_router
 from pipeline import evaluate, get_drone, parse_when, store
@@ -31,6 +31,7 @@ app.include_router(auth_router)
 app.include_router(bridge_router)
 app.include_router(zones_router)
 app.include_router(live_router)
+app.include_router(sim_router)
 app.include_router(analytics_router)
 app.include_router(verification_router)
 routing.setup()
@@ -102,7 +103,9 @@ def simulate_route(req: RouteRequest):
         raise HTTPException(422, "need at least 2 waypoints")
     drone = get_drone(req.drone_id)
     start = parse_when(req.datetime)
-    pts = sample_route([(w.lat, w.lng) for w in req.waypoints], req.speed_mps)
+    active_geoms = [z["geometry"] for z in store.all_zones_geojson().get("features", [])] + \
+                   [n.get("geometry") or n.get("area") for n in store.active_notices() if n.get("geometry") or n.get("area")]
+    pts = sample_route([(w.lat, w.lng) for w in req.waypoints], req.speed_mps, geometries=active_geoms)
     for p in pts:
         verdict, near, notices, used = evaluate(p["lat"], p["lng"], drone, start + timedelta(seconds=p["t_s"]))
         p["verdict"] = verdict
@@ -114,3 +117,9 @@ def simulate_route(req: RouteRequest):
 
 # Must be last: serves the frontend at the same origin as the API.
 app.mount("/", StaticFiles(directory=config.FRONTEND_DIR, html=True), name="frontend")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+

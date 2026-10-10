@@ -34,3 +34,4 @@ routing.setup()
 manage.create_user(ADMIN_EMAIL, "Test Admin", "official", PASSWORD)
 for _a in routing.all_authorities():
     manage.create_user(officer_email(_a["authority_id"]), _a["name"], "official", PASSWORD, authority_id=_a["authority_id"])
+

@@ -5,7 +5,7 @@ About 9 minutes. Every step maps to one of the six judging components. Do the se
 ## Setup (15 minutes before)
 
 1. Docker running, then `./run.sh` in the project folder.
-2. `cd backend && ../.venv/bin/python manage.py prepare-demo` makes two flights that are ready to fly for the next 6 hours and prints the demo pilot's password.
+2. `cd backend && ../.venv/bin/python manage.py prepare-demo --password 'a password you choose'` makes two flights that are ready to fly for the next 6 hours and sets the demo pilot's password to the one you chose (without `--password` a random one is printed and the old one stops working). Run it again on the morning of the demo, the flights last 6 hours.
 3. Run `.venv/bin/python scripts/demo_check.py`. Every line must say PASS. It tells you the fix for each FAIL, and prints the two links you need.
 4. Presentation computer: sign in as the demo pilot, open `/display.html` full screen.
 5. Second window or second laptop: officer console, signed in as the administrator. In one browser you can stay signed in as both: use the account menu at the top right ("Add another account...", then switch). Each tab keeps its own account, so a pilot tab and an officer tab can sit side by side.

@@ -7,7 +7,7 @@
   python backend/manage.py logins                                                    show the saved logins
   python backend/manage.py set-password --email x@y.z                                set a known password for an account
   python backend/manage.py seed-showcase                                             fill the platform with believable demo data (pilots, flights in every state, notices)
-  python backend/manage.py prepare-demo                                              get a presentation ready: a demo pilot with two approved flights (phone control demo)
+  python backend/manage.py prepare-demo [--password '...']                              get a presentation ready: a demo pilot with two approved flights (phone control demo)
   python backend/manage.py list-users
   python backend/manage.py has-admin                                                 exit code 0 when an admin exists
 
@@ -198,7 +198,9 @@ def cmd_prepare_demo(a):
         raise SystemExit("Create an admin first: python backend/manage.py create-admin --email you@example.com --generate")
     ha = {"Authorization": f"Bearer {auth.access_token(admin)}"}
     pilot = next((u for u in runtime.all_("users") if u["email"] == a.pilot_email), None)
-    pw = secrets.token_urlsafe(12)
+    pw = a.password or secrets.token_urlsafe(12)
+    if len(pw) < 10:
+        raise SystemExit("Use at least 10 characters")
     if pilot is None:
         pilot = create_user(a.pilot_email, "Demo Pilot", "pilot", pw, verified=True, phone="+919" + str(secrets.randbelow(10**9)).zfill(9))
     else:
@@ -331,7 +333,7 @@ def main(argv=None):
     s = sub.add_parser("seed-demo"); s.add_argument("--pilot-email", default="demo.pilot@example.com"); s.set_defaults(fn=cmd_seed_demo)
     s = sub.add_parser("create-tracker"); s.add_argument("--name", required=True); s.set_defaults(fn=cmd_create_tracker)
     s = sub.add_parser("seed-showcase"); s.set_defaults(fn=cmd_seed_showcase)
-    s = sub.add_parser("prepare-demo"); s.add_argument("--pilot-email", default="demo.pilot@example.com"); s.set_defaults(fn=cmd_prepare_demo)
+    s = sub.add_parser("prepare-demo"); s.add_argument("--pilot-email", default="demo.pilot@example.com"); s.add_argument("--password", help="a password you choose for the demo pilot (default: a random one is printed)"); s.set_defaults(fn=cmd_prepare_demo)
     s = sub.add_parser("list-users"); s.set_defaults(fn=cmd_list_users)
     s = sub.add_parser("logins"); s.set_defaults(fn=cmd_logins)
     s = sub.add_parser("set-password"); s.add_argument("--email", required=True); s.add_argument("--password"); s.set_defaults(fn=cmd_set_password)

@@ -288,3 +288,16 @@ async function loadInsights() {
       <div class="section"><h3>Audit log, latest first</h3>${(audit || []).map(r => `<div class="item"><div class="head"><span class="title">${esc(r.action.replace(/_/g, " "))}</span><span class="meta">${esc(fmtTime(r.ts))}</span></div><div class="meta">${esc(r.actor)}, ${esc(r.target)}${r.detail ? ", " + esc(r.detail) : ""}</div></div>`).join("") || '<div class="hint">Nothing recorded yet.</div>'}<div class="meta">Append-only: written in the same MongoDB transaction as the action it records.</div></div>` : ""}`;
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
+
+
+/* ---------- guard alerts: a link and QR for the devices in the protected area, and a test siren ---------- */
+(async function guardLink() {
+  try {
+    const lan = await api("/lan", { auth: false }), base = (lan.urls && lan.urls[0]) || location.origin;
+    $("guardQr").innerHTML = qrSvg(base + "/guard.html"); $("guardUrl").textContent = base + "/guard.html";
+  } catch (e) { $("guardUrl").textContent = location.origin + "/guard.html"; }
+})();
+$("guardTest").addEventListener("click", async () => {
+  try { const r = await api("/guard/test", { method: "POST" }); $("guardMsg").textContent = r.listeners ? `Siren sent to ${r.listeners} listening device${r.listeners === 1 ? "" : "s"}.` : "No device is listening yet. Open the link above on a phone and tap Turn alerts on."; }
+  catch (e) { $("guardMsg").textContent = e.message; }
+});

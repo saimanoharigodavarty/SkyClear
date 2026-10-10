@@ -47,6 +47,11 @@ def unsubscribe(push):
 def publish(coll, op, doc):
     if coll not in WATCHED:
         return
+    emit(coll, op, doc)
+
+
+def emit(coll, op, doc):
+    """Deliver an event to every subscriber, whether or not the collection is watched (used for the guard test signal)."""
     status["events"] += 1
     status["last_event"] = f"{coll} {op}"
     ev = {"coll": coll, "op": op, "doc": {k: v for k, v in doc.items() if k != "_id"}}

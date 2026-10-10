@@ -537,3 +537,17 @@ body.pad { overflow: hidden; touch-action: none; user-select: none; -webkit-user
 .barrow b { text-align: right; } .n2 { font-size: 28px; font-weight: 800; }
 .livedot { position: fixed; z-index: 900; right: 14px; bottom: 14px; font-size: 11px; padding: 3px 8px; border-radius: var(--r); background: var(--panel); border: 1px solid var(--rule-strong); color: var(--muted); }
 .livedot.on { color: var(--green); }
+
+/* ---------- guard alerts page ---------- */
+body.guard { min-height: 100vh; background: var(--bg); }
+.guardbox { max-width: 460px; margin: 0 auto; padding: 24px 16px; }
+.guardbox h1 { margin: 14px 0 6px; font-size: 26px; }
+.gstatus { margin: 14px 0; padding: 12px 14px; border-radius: var(--r-lg); border: 1px solid var(--rule-strong); background: var(--panel); }
+.gstatus.ok { background: var(--green); color: var(--on-fill); border-color: var(--green); }
+.gstatus.warning { background: var(--amber); color: var(--on-fill); border-color: var(--amber); }
+.gstatus.breach { background: var(--red); color: var(--on-fill); border-color: var(--red); }
+.galarm { position: fixed; inset: 0; z-index: 5000; background: var(--red); color: var(--on-fill); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; gap: 10px; }
+.galarm.hidden { display: none; }
+.galarm .gbig { font-size: clamp(34px, 9vw, 72px); font-weight: 800; line-height: 1.05; }
+.galarm .gsub { font-size: clamp(18px, 4vw, 28px); }
+.galarm button { width: auto; margin-top: 18px; padding: 14px 32px; font-size: 18px; background: var(--on-fill); color: var(--red); border: 0; }

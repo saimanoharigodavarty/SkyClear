@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SkyClear, guard alerts</title>
+<script>try{var t=localStorage.getItem("skyclear.theme");t=t&&JSON.parse(t);if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="guard">
+<main class="guardbox">
+  <a class="brand" href="index.html">Sky<b>Clear</b></a>
+  <h1>Guard alerts</h1>
+  <p>Keep this page open on a phone or laptop inside the protected area. When a drone enters the area, this device sounds a siren, vibrates and flashes red.</p>
+  <label for="gArea">Area to watch</label>
+  <select id="gArea"><option value="">Every declared area</option></select>
+  <button id="gOn" type="button">Turn alerts on</button>
+  <div class="gstatus idle" id="gStatus">Alerts are off. Tap the button once, the browser needs a tap before it may play sound.</div>
+  <button class="ghost" id="gTest" type="button" disabled>Play a test siren on this device</button>
+  <p class="small" id="gNote">Same Wi-Fi as the SkyClear server. The screen stays awake while alerts are on. Nothing identifying the pilot is sent to this page.</p>
+</main>
+<div id="gAlarm" class="galarm hidden" role="alertdialog" aria-live="assertive">
+  <div class="gbig">DRONE IN THE AREA</div>
+  <div class="gsub" id="gWhere"></div>
+  <div class="gsub" id="gWhen"></div>
+  <button id="gQuiet" type="button">Silence</button>
+</div>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script src="guard.js"></script>
+</body>
+</html>

@@ -17,6 +17,7 @@ import bridge
 from bridge import router as bridge_router
 from config_api import router as config_router
 from events_api import router as events_router
+from guard_api import router as guard_router
 from live import router as live_router, sim_router
 from mappls_api import router as mappls_router
 from verification import router as verification_router
@@ -63,6 +64,7 @@ app.include_router(metrics.router)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(config_router)
 app.include_router(events_router)
+app.include_router(guard_router)
 app.include_router(ask_router)
 from simulator.fleet import get_fleet_simulator as _fleet_sim  # noqa: E402
 _fleet_sim().on_landed = bridge.complete_flight

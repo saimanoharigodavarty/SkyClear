@@ -80,3 +80,38 @@ def test_a_drone_seen_inside_a_declared_area_raises_one_breach_and_a_guard_alert
     finally:
         events.unsubscribe(push)
         client.post(f"/notices/{n['notice_id']}/cancel", headers=auth(admin))
+
+
+def test_tracker_drones_show_on_the_officers_live_map_only():
+    key, _ = make_key()
+    post(key, ref="RID-MAP", **OUTSIDE)
+    mine = lambda r: [d for d in r.json()["drones"] if d["drone_id"] == "RID-MAP"]  # noqa: E731
+    seen = mine(client.get("/live/drones", headers=auth(official())))
+    assert len(seen) == 1 and seen[0]["kind"] == "tracker" and seen[0]["lat"] == OUTSIDE["lat"]
+    assert not mine(client.get("/live/drones"))                                    # a visitor does not see it
+    assert not mine(client.get("/live/drones", headers=auth(pilot("tk2@example.com"))))  # nor does a pilot
+
+
+def test_a_tracker_drone_that_stops_reporting_leaves_the_map():
+    import ingest_api
+    key, _ = make_key()
+    post(key, ref="RID-GONE", **OUTSIDE)
+    ingest_api.EXTERNAL["RID-GONE"]["_seen"] -= 120
+    assert not [d for d in client.get("/live/drones", headers=auth(official())).json()["drones"] if d["drone_id"] == "RID-GONE"]
+
+
+def test_the_guard_is_warned_once_as_a_drone_approaches_a_declared_area():
+    import guard_api
+    guard_api._warned.clear()
+    q, push = events.subscribe_queue()
+    try:
+        notices = [{"title": "Campus"}]
+        assert guard_api.announce_warning("D-1", "Campus (ETA 12.0s)", notices) is True
+        assert guard_api.announce_warning("D-1", "Campus (ETA 8.0s)", notices) is False       # not again within 20 seconds
+        assert guard_api.announce_warning("D-1", "Begumpet Airport (ETA 5s)", notices) is False  # ordinary zones are not announced here
+        assert guard_api.announce_warning("D-2", "Campus (ETA 3s)", notices) is True            # another drone is its own signal
+        a = alert_for(q.get(timeout=2))
+        assert a == {"area": "Campus", "kind": "approaching", "ts": a["ts"]}
+        assert alert_for({"coll": "guard_warning", "op": "insert", "doc": {"area": "Campus", "ts": "t"}}, area="Another") is None
+    finally:
+        events.unsubscribe(push)

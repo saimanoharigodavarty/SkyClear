@@ -45,3 +45,11 @@ def _clear_ask_cache():
     import ask
     ask._cache.clear()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _clear_tracker_drones():
+    import ingest_api
+    ingest_api.EXTERNAL.clear()
+    yield
+    ingest_api.EXTERNAL.clear()

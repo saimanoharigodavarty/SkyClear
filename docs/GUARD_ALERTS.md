@@ -18,6 +18,10 @@ Draw the real boundary first: Publish tab, "Draw the boundary", click the corner
 
 Officer console, Notices tab, "Drill": type the area name, press "Use my location" (works when the page is opened as localhost on a laptop; otherwise type latitude and longitude), press "Start the drill". The area is declared as a restriction and one simulated drone starts about 600 m away and flies at it, arriving in under a minute. Every device with the guard page open sounds. "End the drill" cancels the restriction and removes the drone.
 
+## Warning before entry
+
+When the geofence look-ahead sees a drone heading into a declared area, the guard devices get a softer first signal: three short beeps, a short vibration and an amber line. It is sent once every 20 seconds per drone and area, and only for declared areas, not for ordinary restricted zones. The red screen and the siren come on entry.
+
 ## Honest limits
 
 - A web page cannot make a device beep without the person opening it once. The browser blocks sound until a tap, and a closed or locked page cannot receive anything. The page asks for a screen wake lock, so a phone that is kept awake and left open works.

@@ -22,6 +22,8 @@ from security import require_admin
 from simulator.geofence import GeofenceEngine
 
 router = APIRouter()
+EXTERNAL = {}  # drone_ref -> the latest position a tracker reported, shown on the officers' live map for 30 seconds
+SEEN_FOR_S = 30
 _last = {}  # (tracker_id, drone_ref, breach name) -> time, one breach per entry, not one per position report
 DEDUPE_S = 60
 
@@ -95,8 +97,17 @@ def ingest_position(body: PositionIn, x_tracker_key: Optional[str] = Header(defa
         from db import get_db
         db = get_db()
     engine = GeofenceEngine(db=db, store=store)
-    status, zone, breach = engine.evaluate_drone(drone, store.all_zones_geojson().get("features", []), store.active_notices(), now_dt=now)
+    notices = store.active_notices()
+    status, zone, breach = engine.evaluate_drone(drone, store.all_zones_geojson().get("features", []), notices, now_dt=now)
     recorded = False
+    if status == "warning":
+        import guard_api
+        guard_api.announce_warning(body.drone_ref, zone, notices)
+    EXTERNAL[body.drone_ref] = {"drone_id": body.drone_ref, "flight_id": drone.flight_id, "lat": round(body.lat, 5), "lng": round(body.lng, 5), "alt_m": round(body.alt_m, 1),
+                                "speed_mps": round(body.speed_mps, 1), "heading_deg": round(body.heading_deg, 1), "battery_pct": None, "status": status, "zone": zone, "phase": "flying",
+                                "mode": "tracker", "alt_limit_m": None, "kind": "tracker", "ts": now.isoformat(timespec="seconds"), "_seen": time.monotonic()}
+    if len(EXTERNAL) > 2000:
+        EXTERNAL.clear()
     if breach:
         key = (tracker["tracker_id"], body.drone_ref, breach["name"])
         if time.monotonic() - _last.get(key, 0) > DEDUPE_S:
@@ -113,3 +124,16 @@ def ingest_position(body: PositionIn, x_tracker_key: Optional[str] = Header(defa
         except Exception:
             pass  # a failed history write must not hide the breach
     return {"status": status, "zone": zone, "breach_recorded": recorded}
+
+
+def tracker_drones(bbox=None):
+    """Drones that trackers reported in the last 30 seconds, in the same shape as the simulator's, for officials."""
+    now = time.monotonic()
+    out = []
+    for d in list(EXTERNAL.values()):
+        if now - d["_seen"] > SEEN_FOR_S:
+            continue
+        if bbox and len(bbox) == 4 and not (bbox[0] <= d["lng"] <= bbox[2] and bbox[1] <= d["lat"] <= bbox[3]):
+            continue
+        out.append({k: v for k, v in d.items() if k != "_seen"})
+    return out

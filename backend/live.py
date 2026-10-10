@@ -69,7 +69,11 @@ async def live_drones(bbox: str = Query(default=""), authorization: Optional[str
             bbox_list = None
 
     user = get_current_user(authorization)
-    return sim.get_drones(bbox=bbox_list, user=user)
+    out = sim.get_drones(bbox=bbox_list, user=user)
+    if user and user.get("role") == "official":  # drones seen by real trackers, for officials only
+        from ingest_api import tracker_drones
+        out["drones"] = [*out["drones"], *tracker_drones(bbox_list)]
+    return out
 
 
 @router.get("/stream")

@@ -58,4 +58,4 @@ Logins are in `data/demo_credentials.txt` (not in git). Never read passwords out
 | Does the guard page leak who is flying? | No. Only the area name, the kind and the time are sent. |
 | Is the regulation text real? | No, seven marked sample passages. Retrieval numbers need the real corpus. |
 | Where does it slow down? | About 390 checks per second on one process. The zone map and live list queue at 200 users. Numbers and the fix are in `docs/RESULTS.md`. |
-| Warning before entering? | The drone view and the display screen beep as the drone nears an area. The guard devices sound on entry only. |
+| Warning before entering? | Yes. The drone view and the display screen beep as the drone nears an area, and the guard devices get three short beeps first, then the siren on entry. |

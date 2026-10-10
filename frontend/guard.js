@@ -21,6 +21,11 @@ function stopSiren() {
   if (!siren) return;
   clearInterval(siren.t); clearInterval(siren.buzz); try { siren.osc.stop(); } catch (e) { /* already stopped */ } siren = null; navigator.vibrate && navigator.vibrate(0);
 }
+function approaching(a) {  // a softer first signal: the drone is about to enter the area
+  status("A drone is about to enter " + a.area + ".", "warning");
+  if (ctx) for (let i = 0; i < 3; i++) setTimeout(() => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 880; g.gain.value = 0.2; o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.18); }, i * 350);
+  navigator.vibrate && navigator.vibrate([150, 80, 150]);
+}
 function alarm(a) {
   $("gAlarm").classList.remove("hidden");
   $("gWhere").textContent = a.kind === "test" ? "Test alert: " + a.area : a.area;
@@ -35,7 +40,7 @@ function connect() {
   const area = $("gArea").value;
   es = new EventSource(API_BASE + "/guard/stream" + (area ? "?area=" + encodeURIComponent(area) : ""));
   es.addEventListener("ready", () => status("Listening" + (area ? " for " + area : " for every declared area") + ". Keep this page open.", "ok"));
-  es.addEventListener("alert", ev => { try { alarm(JSON.parse(ev.data)); } catch (e) { /* ignore a bad event */ } });
+  es.addEventListener("alert", ev => { try { const a = JSON.parse(ev.data); if (a.kind === "approaching") approaching(a); else alarm(a); } catch (e) { /* ignore a bad event */ } });
   es.onerror = () => status("Lost the connection to SkyClear, trying again...", "warning");
 }
 

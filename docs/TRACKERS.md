@@ -30,4 +30,4 @@ Answer: `{"status":"breach","zone":"KLH Aziznagar campus","breach_recorded":true
 
 - It trusts the tracker. A tracker that lies, or a key that leaks, can report false positions. Keys can be revoked, and every use is traceable to a tracker, but positions are not cross-checked against a second source.
 - It does not decode the Remote ID radio broadcast itself. A receiver does that and calls this endpoint.
-- Drones reported this way are not drawn on the live map yet. The breach, the officer feed and the guard alert work.
+- Drones reported this way show on the officers' live map (a blue ring) for 30 seconds after the last report, and only to officials. They are not drawn in the 3D view.

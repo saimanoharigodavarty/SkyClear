@@ -7,6 +7,8 @@ OWNER: Nikhil (stream 2A).
 """
 import asyncio
 import json
+import re
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -23,8 +25,33 @@ PER_ADDRESS = 25  # one device or one Wi-Fi network cannot use up every listener
 _by_ip = {}
 
 
+_warned = {}  # (drone, area) -> time of the last "approaching" signal
+WARN_EVERY_S = 20
+
+
+def announce_warning(drone_key, zone_text, notices):
+    """A drone is about to enter a declared area (the geofence look-ahead): tell the guard devices once every 20 seconds per drone and area.
+    Only declared areas (notices) are announced, not ordinary restricted zones."""
+    name = re.sub(r"\s*\(ETA.*\)\s*$", "", zone_text or "").strip()
+    if not name or name not in {n.get("title") for n in notices or []}:
+        return False
+    k = (drone_key, name)
+    if time.monotonic() - _warned.get(k, 0) < WARN_EVERY_S:
+        return False
+    if len(_warned) > 2000:
+        _warned.clear()
+    _warned[k] = time.monotonic()
+    events.emit("guard_warning", "insert", {"area": name, "ts": runtime.now_iso()})
+    return True
+
+
 def alert_for(ev, area=None):
     """The public form of an event, or None. `area` limits it to one declared area by name."""
+    if ev["coll"] == "guard_warning":
+        d = ev["doc"]
+        if area and d.get("area", "").strip().lower() != area.strip().lower():
+            return None
+        return {"area": d.get("area"), "kind": "approaching", "ts": d.get("ts")}
     if ev["coll"] == "guard_test":
         d = ev["doc"]
         return {"area": d.get("area") or "Test", "kind": "test", "ts": d.get("ts")}

@@ -331,11 +331,12 @@ function createLive(map, layer, onData, everyMs = 2000) {
         const flight = d.kind === "flight";
         let m = markers.get(key);
         if (!m) {
-          m = flight ? L.marker(ll, { icon: droneIcon(d), keyboard: false, zIndexOffset: 1000 }) : L.circleMarker(ll, { radius: 3.5, weight: 1, color: C.grey, fillColor: C.grey, fillOpacity: 0.7 });
+          m = flight ? L.marker(ll, { icon: droneIcon(d), keyboard: false, zIndexOffset: 1000 }) : L.circleMarker(ll, d.kind === "tracker" ? { radius: 7, weight: 3, color: C.accent, fillColor: C.accent, fillOpacity: 0.9 } : { radius: 3.5, weight: 1, color: C.grey, fillColor: C.grey, fillOpacity: 0.7 });
           m.addTo(layer); markers.set(key, m);
         }
         m.setLatLng(ll);
         if (flight) m.setIcon(droneIcon(d));
+        else if (d.kind === "tracker") m.setStyle({ color: d.status === "breach" ? C.red : d.status === "warning" ? C.amber : C.accent, fillColor: d.status === "breach" ? C.red : d.status === "warning" ? C.amber : C.accent });
         else m.setStyle({ color: d.status === "breach" ? C.red : d.status === "warning" ? C.amber : C.grey, fillColor: d.status === "breach" ? C.red : d.status === "warning" ? C.amber : C.grey });
         m.bindTooltip(`${esc(d.drone_id)}, ${Math.round(d.alt_m)} m, ${d.speed_mps} m/s${d.zone ? ", " + esc(d.zone) : ""}`, { direction: "top", className: "zlabel", sticky: true });
       });

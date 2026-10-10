@@ -166,6 +166,9 @@ def load(verbose=True, search_indexes=("rules", "zones"), embeddings=True):
             )
         except Exception:
             pass
+    kind = db.command("listCollections", filter={"name": "telemetry"})["cursor"]["firstBatch"]
+    if kind and kind[0].get("type") != "timeseries":
+        log("warning: telemetry exists but is an ordinary collection (something wrote to it before it was created). Rename it and run this again to get a time-series collection.")
     try:
         db.telemetry.create_index([("position", "2dsphere")])
         db.telemetry.create_index([("drone_id", 1), ("ts", -1)])

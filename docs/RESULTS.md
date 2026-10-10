@@ -72,3 +72,34 @@ The model is a small one. The rule is: it may only reword what the rules and the
 - Keyword retrieval: recall@1 8/12 and recall@3 12/12.
 - The remote Ollama endpoint was unreachable in this run, so vector and true `$rankFusion` hybrid results were not measured. The fallback used keyword search only.
 - Automated local suite: 130 passed, 7 skipped. MongoDB integration had previously passed 133 with 1 expected autocomplete-index skip; rerun it after loading an official geometry export.
+
+
+## Load test (10 Oct 2026, after the geofence speed-up)
+
+Run with `.venv/bin/python scripts/loadtest.py`. One uvicorn process, MongoDB in Docker, the load generator on the same Mac, so the generator takes CPU from the server. 8 seconds per row. No AI calls in these runs (`explain: false`).
+
+Machine: macOS-26.6.2-arm64-arm-64bit-Mach-O, 8 CPUs, Python 3.14.8, server http://localhost:8000, 8 s per row
+
+| Endpoint | Concurrent users | Requests per second | p50 (ms) | p95 (ms) | p99 (ms) | Errors |
+|---|---|---|---|---|---|---|
+| POST /check (zone + rules, no AI) | 10 | 468 | 20 | 32 | 45 | 0 |
+| POST /check (zone + rules, no AI) | 50 | 464 | 107 | 142 | 165 | 0 |
+| POST /check (zone + rules, no AI) | 200 | 106 | 1341 | 6487 | 8409 | 0 |
+| GET /zones?bbox (2dsphere) | 10 | 835 | 11 | 19 | 26 | 0 |
+| GET /zones?bbox (2dsphere) | 50 | 240 | 105 | 713 | 1187 | 0 |
+| GET /zones?bbox (2dsphere) | 200 | 116 | 1201 | 5691 | 7782 | 0 |
+| GET /live/drones | 10 | 1690 | 5 | 6 | 17 | 0 |
+| GET /live/drones | 50 | 387 | 63 | 482 | 912 | 0 |
+| GET /live/drones | 200 | 171 | 592 | 5149 | 5856 | 0 |
+
+| Simulator drones | Tick time (ms), median of 20 | Worst of 20 (ms) |
+|---|---|---|
+| 100 | 27.5 | 60.6 |
+| 500 | 123.5 | 174.8 |
+| 1000 | 244.6 | 375.5 |
+
+How to read it:
+
+- Up to about 50 concurrent users the server answers every kind of request in well under 150 ms at the 95th percentile for the check, with no errors.
+- At 200 concurrent users on one process the latency grows into seconds. Nothing failed, requests queue. The fix is more worker processes behind a reverse proxy (see docs/SCALING.md). That has not been run or measured here.
+- The simulator tick was 207 ms for 100 drones and 2.1 s for 1000 before the change. Skipping zones by bounding box and reading zones every 5 seconds instead of every tick brought 1000 drones to about 245 ms per tick. A tick must stay under the 1 second step, so 1000 drones fits, 2000 would not.

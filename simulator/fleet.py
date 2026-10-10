@@ -240,7 +240,7 @@ class FleetSimulator:
         self._tick_n += 1
         t_m = time.monotonic()
         try:
-            if fast and self._zones_cache[1] and t_m - self._zones_cache[0] < 5.0:
+            if self._zones_cache[1] and t_m - self._zones_cache[0] < 5.0:  # zones change rarely: read them every 5 s, not every tick
                 active_zones = self._zones_cache[1]
             else:
                 active_zones = store.all_zones_geojson().get("features", [])

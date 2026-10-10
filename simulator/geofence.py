@@ -22,6 +22,37 @@ import backend.config as config
 import backend.runtime as runtime
 
 
+_BBOX = {}  # geometry id -> (min_lng, min_lat, max_lng, max_lat), so most zones are ruled out by four comparisons
+
+
+def _bbox(geom):
+    key = id(geom)
+    if len(_BBOX) > 4000:
+        _BBOX.clear()
+    b = _BBOX.get(key)
+    if b is None or b[0] is not geom:
+        pts = []
+        def walk(c):
+            if c and isinstance(c[0], (int, float)):
+                pts.append(c)
+            else:
+                for x in c:
+                    walk(x)
+        walk(geom.get("coordinates", []))
+        xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+        b = (geom, (min(xs), min(ys), max(xs), max(ys))) if pts else (geom, (0, 0, 0, 0))
+        _BBOX[key] = b
+    return b[1]
+
+
+def _near(geom, x0, y0, x1=None, y1=None):
+    """False when the point (or the segment x0,y0 to x1,y1) is certainly outside the geometry's bounding box."""
+    a, b, c, d = _bbox(geom)
+    if x1 is None:
+        return a <= x0 <= c and b <= y0 <= d
+    return not (max(x0, x1) < a or min(x0, x1) > c or max(y0, y1) < b or min(y0, y1) > d)
+
+
 def _is_notice_active_at(notice: dict, now: datetime) -> bool:
     """Return True if notice starts_at <= now <= ends_at."""
     starts = notice.get("starts_at")
@@ -105,7 +136,7 @@ class GeofenceEngine:
             if zone_type not in ("military", "airport", "government", "prohibited", "restricted"):
                 continue
 
-            if point_in_polygon(drone.lng, drone.lat, geom):
+            if _near(geom, drone.lng, drone.lat) and point_in_polygon(drone.lng, drone.lat, geom):
                 # If flight is approved, it has clearance to fly unless prohibited
                 if zone_type not in ("military", "prohibited") and _covered_by_permit(drone, now):
                     continue
@@ -164,6 +195,8 @@ class GeofenceEngine:
             if zone_type not in ("military", "prohibited") and _covered_by_permit(drone, now):
                 continue
 
+            if not _near(geom, drone.lng, drone.lat, ahead_lng, ahead_lat):
+                continue
             ts = segment_polygon_intersections(drone.lng, drone.lat, ahead_lng, ahead_lat, geom)
             if ts:
                 t = min(ts)

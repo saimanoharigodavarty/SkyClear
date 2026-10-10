@@ -1,0 +1,83 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "zone_id": "Z-002",
+    "name": "Sample Military Area",
+    "zone_type": "military",
+    "rule_ids": [
+     "R-002"
+    ],
+    "source": "Sample zone, not real (replace with official data)"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       77.55,
+       13.0
+      ],
+      [
+       77.57,
+       13.0
+      ],
+      [
+       77.57,
+       13.02
+      ],
+      [
+       77.55,
+       13.02
+      ],
+      [
+       77.55,
+       13.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "zone_id": "Z-003",
+    "name": "Sample Park",
+    "zone_type": "park",
+    "rule_ids": [
+     "R-003"
+    ],
+    "source": "Sample zone, not real (replace with official data)"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       77.58,
+       12.92
+      ],
+      [
+       77.6,
+       12.92
+      ],
+      [
+       77.6,
+       12.94
+      ],
+      [
+       77.58,
+       12.94
+      ],
+      [
+       77.58,
+       12.92
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

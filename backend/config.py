@@ -16,7 +16,7 @@ EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 USE_LLM = os.getenv("USE_LLM", "0") == "1"
 
 # Area our data covers: (min_lng, min_lat, max_lng, max_lat). Outside it the verdict is cannot_determine.
-COVERAGE_BBOX = (77.40, 12.80, 77.80, 13.20)
+COVERAGE_BBOX = (68.0, 6.5, 97.5, 37.0)  # India; airport zones come from OurAirports
 NEARBY_KM = 5.0
 DATA_LAST_UPDATED = "2026-10-10"
 DISCLAIMER = "Decision support only, not legal permission."

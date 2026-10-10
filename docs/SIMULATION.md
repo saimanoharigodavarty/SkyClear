@@ -1,6 +1,6 @@
 # Simulation plan
 
-How the MVP simulation works, how it is proper without being heavy, and how it grows. Contracts 3 to 5 in [CONTRACTS.md](CONTRACTS.md). Owner: Thanvi.
+How the MVP simulation works, how it is proper without being heavy, and how it grows. Contracts 3 to 5 in [CONTRACTS.md](CONTRACTS.md). Owner: Thanvi. Permit-aware arming (scenarios A to C) is optional and comes after the core fleet, geofence and live feed. Nikhil provides the permit and preflight API.
 
 ## What the simulation must show
 

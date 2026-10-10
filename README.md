@@ -62,9 +62,13 @@ Data caveats:
 - Zones are built from open data (OurAirports, OpenStreetMap) and labeled as derived.
 - Notices are sample data and are labeled as such.
 
+## Two sides of one platform
+
+Pilots and the authority use the same rules and the same map. Pilot app (`/`): check a spot, simulate a flight, register drones, watch a flight or request permission, receive alerts. Authority console (`/official.html`): review and decide permission requests, publish and cancel restrictions such as VIP movements, and see how many flights each one affects. Accounts and flights are stored in `data/runtime.json` (gitignored) in this prototype. Endpoints are in [API.md](API.md). Run `python scripts/seed_demo.py` for demo data.
+
 ## Prototype scope
 
-Two parts: real airport zones for India on the map (built by `backend/build_zones.py` from OurAirports), and a simulated drone. In the "Simulate flight" tab the pilot clicks waypoints, the backend checks the route every 100 m with the same engine as a single check (`POST /simulate/route`), and the drone flies the route on the map with a live verdict and a summary of the first issue.
+Two parts: real airport zones for India (demo city: Hyderabad) on the map (built by `backend/build_zones.py` from OurAirports), and a simulated drone. In the "Simulate flight" tab the pilot clicks waypoints, the backend checks the route every 100 m with the same engine as a single check (`POST /simulate/route`), and the drone flies the route on the map with a live verdict and a summary of the first issue.
 
 ## Tech stack (all free / open source)
 
@@ -117,9 +121,9 @@ If the venue Wi-Fi blocks laptop-to-laptop traffic, use a phone hotspot.
 
 ```
 data/       rules.json, zones.geojson, drones.json, notices.json, eval_cases.json
-backend/    config.py, geo.py, build_zones.py, sim.py, search.py, verdict.py, explain.py, main.py, load_data.py, eval.py, tests/
-frontend/   index.html, terms.html, privacy.html
-scripts/    check_design.sh
+backend/    config.py, geo.py, build_zones.py, sim.py, runtime.py, bridge.py, pipeline.py, search.py, verdict.py, explain.py, main.py, load_data.py, eval.py, tests/
+frontend/   index.html + pilot.js, official.html + official.js, account.html, common.js, app.css, terms.html, privacy.html
+scripts/    check_design.sh, seed_demo.py
 ```
 
 ## Status
@@ -128,6 +132,7 @@ scripts/    check_design.sh
 - [x] Design rules (CLAUDE.md, DESIGN_RULES.md, scripts/check_design.sh), skeleton loader, Terms and Privacy pages
 - [x] Base: sample data, local search, rule engine, template explanation, API, map page, tests (runs without MongoDB or Ollama)
 - [x] Airport zones for India (derived, 5 km / 3 km circles), simulated drone route check and playback
+- [x] Hyderabad demo data, accounts, permission requests, official notices, pilot alerts, redesigned UI
 - [ ] Real rules and notices, military and park zones
 - [ ] load_data.py and MongoStore (geo, vector, hybrid search, embeddings)
 - [ ] LLM explanation and citation validation

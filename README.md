@@ -2,6 +2,8 @@
 
 Track 2: RAG Engine (MongoDB hackathon)
 
+Product spec, accounts, notifications and the loophole list: [PRODUCT.md](PRODUCT.md).
+
 ## Problem statement
 
 Before every flight, a drone pilot must answer one question: "Can I fly here, today, with this drone?"

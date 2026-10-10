@@ -23,7 +23,7 @@ const LAUNCHABLE = ["approved", "watching", "cleared", "flying"];
 async function chooser() {
   $("chooser").classList.remove("hidden");
   try {
-    const flights = (await api("/flights")).filter(f => LAUNCHABLE.includes(f.status) || f.status === "recalled");
+    const flights = (await api("/flights")).filter(f => (LAUNCHABLE.includes(f.status) || f.status === "recalled") && new Date(f.end) > new Date());  // expired windows cannot take off
     if (!flights.length) {
       $("chooseBody").innerHTML = `<p>No flight is ready to fly. Sign in as the demo pilot and get a flight approved first: request permission in a yellow zone, or save a flight in a green area.</p><a class="btn-sm" href="index.html">Open the pilot app</a>`;
       return;

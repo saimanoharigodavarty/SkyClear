@@ -205,6 +205,9 @@ def cmd_prepare_demo(a):
         pilot = next(u for u in runtime.all_("users") if u["user_id"] == pilot["user_id"])
     hp = {"Authorization": f"Bearer {auth.access_token(pilot)}"}
     drone = _demo_drone(client, ha, hp, pilot)
+    for old in runtime.all_("flights"):  # clear last time's demo flights so the screen shows only fresh ones
+        if old["pilot_id"] == pilot["user_id"] and old.get("purpose", "").startswith("Presentation demo") and old["status"] in ("approved", "watching", "cleared"):
+            runtime.update("flights", "flight_id", old["flight_id"], {"status": "cancelled"})
     now = datetime.now(timezone.utc)
     iso = lambda d: d.isoformat(timespec="seconds")
     zones = client.get("/zones").json()["features"]

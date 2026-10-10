@@ -1,52 +1,62 @@
 # Demo script
 
-About 8 minutes. Every step maps to one of the six judging components. Do the setup once, before the judges arrive.
+About 9 minutes. Every step maps to one of the six judging components. Do the setup once, before the judges arrive.
 
-## Setup (10 minutes before)
+## Setup (15 minutes before)
 
-1. Docker running, then `./run.sh` in the project folder. Open `http://localhost:8000`.
-2. `cd backend && ../.venv/bin/python manage.py prepare-demo` creates two flights that are ready to fly for the next 6 hours and prints the demo pilot's password.
-3. Presentation computer: sign in as the demo pilot, open `/display.html` full screen (satellite 3D).
-4. Phone on the same Wi-Fi. Second window: officer console, signed in as an officer or the admin.
-5. Check once: `/health` shows `"mongo": true` and `"llm": true`.
+1. Docker running, then `./run.sh` in the project folder.
+2. `cd backend && ../.venv/bin/python manage.py prepare-demo` makes two flights that are ready to fly for the next 6 hours and prints the demo pilot's password.
+3. Run `.venv/bin/python scripts/demo_check.py`. Every line must say PASS. It tells you the fix for each FAIL, and prints the two links you need.
+4. Presentation computer: sign in as the demo pilot, open `/display.html` full screen.
+5. Second window or second laptop: officer console, signed in as the administrator.
+6. Your phone and one teammate's phone: same Wi-Fi (or a phone hotspot for everything). Open the guard link, choose "Every declared area", tap "Turn alerts on", volume up.
+7. In the officer console, Notices tab, press "Sound a test siren now". Both phones must go red and sound. If not, fix this first.
+8. Draw the real campus as a boundary: Publish tab, "Draw the boundary", click the corners, publish with an end time several hours ahead.
 
-Logins are in `data/demo_credentials.txt` (not in git). Never read passwords out loud in the demo.
+Logins are in `data/demo_credentials.txt` (not in git). Do not read passwords out loud.
 
 ## The story, in order
 
 | Min | What you do | What you say | Component |
 |---|---|---|---|
-| 0:00 | Open the pilot map, click a green spot, then a red zone | "A pilot asks: can I fly here? Code decides the answer from MongoDB geo data. The model only explains and cites the rule." | Technology stack |
-| 1:00 | Same check, show the rule cards and the sentence the AI wrote | "Hybrid retrieval: Atlas Search keywords plus Atlas Vector Search, fused inside MongoDB with $rankFusion. If the model is off, the plain explanation still works." | AI/ML |
-| 2:00 | Ask tab: "Do I need permission near an airport?", then "best pizza" | "A relevance gate refuses questions the rules do not cover. Citations are validated, the model cannot invent a rule." | AI/ML |
-| 3:00 | Request permission in a yellow zone as the demo pilot | "The request is routed to the right office by zone type and distance." | Backend and API |
-| 3:30 | Officer console, Requests: approve it with conditions | "One MongoDB transaction writes the permit, the flight status, the alert and the audit entry. All of it or none of it." | MongoDB |
-| 4:00 | Pilot window: the permit with QR appears with no reload | "That arrived through a change stream, pushed to the browser." | MongoDB, Advanced |
-| 4:30 | Display screen: preflight, take off. Scan the QR with the phone, fly with the sticks | "The phone gets a scoped 45 minute token. It can fly this one drone and nothing else." | Security |
-| 5:30 | Fly out of the permit area, then past the height limit. Switch the camera to drone view | "Permit-aware geofence: yellow zones are fine inside the permit, a breach outside it. Drone view shows the distance to the nearest zone and the time to reach it." | Advanced |
-| 6:30 | Officer: Live tab shows the breach. Press Recall | "The drone returns home by itself. The pilot is told why." | Backend and API |
-| 7:00 | Officer: Insights tab | "Aggregations materialised with $merge. Audit log is append-only. Change stream status is live." | MongoDB |
-| 7:30 | Show `docs/RESULTS.md`: accuracy, retrieval, load test | "These numbers come from runs, with the machine written next to them." | Performance |
+| 0:00 | Pilot map: click a green spot, then a red zone | "A pilot asks: can I fly here? Code decides from MongoDB geo data. The AI only explains and cites the rule." | Technology stack |
+| 1:00 | Same check: rule cards, the sentence the AI writes | "Hybrid retrieval: Atlas Search plus Atlas Vector Search, fused inside MongoDB with $rankFusion. If the model is off, the plain explanation still works." | AI/ML |
+| 1:45 | Ask tab: "Do I need permission near an airport?", then "best pizza" | "The rules appear at once, the AI wording fills in after. A relevance gate refuses what the rules do not cover. Citations are checked." | AI/ML |
+| 2:30 | Request permission in a yellow zone as the demo pilot | "The request is routed to the right office by zone type and distance." | Backend and API |
+| 3:00 | Officer, Requests: approve with conditions. Pilot window shows the permit with no reload | "One MongoDB transaction writes the permit, the flight, the alert and the audit entry. It reached the pilot through a change stream." | MongoDB |
+| 3:45 | Display screen: take off. Show chase view, then drone view with the map beside it | "A modelled drone in 3D. Drone view shows the distance to the nearest zone and the time to reach it. The map beside it shows where it is." | Advanced |
+| 4:30 | Fly out of the permit area or over the height limit (keyboard or phone) | "Permit-aware geofence. Inside the permit a yellow zone is fine, outside it is a breach. The screen sounds a siren." | Advanced, Security |
+| 5:15 | Officer Live tab: breach appears, press Recall | "The officer sees it at once and recalls. The drone returns home by itself. The pilot is told why." | Backend and API |
+| 6:00 | Officer, Notices tab: "Start the drill" with "Use the boundary I drew". Watch the guard phones | "The area is declared on the real campus boundary. A drone flies at it. First a warning beep on every device in the area, then the siren and a red screen on entry. Only the area name and the time are sent, never who is flying." | MongoDB, Security |
+| 7:15 | End the drill. Insights tab | "Aggregations materialised with $merge, an append-only audit log, change stream status." | MongoDB |
+| 8:00 | Show `docs/RESULTS.md` and `docs/RUBRIC_COVERAGE.md` | "Numbers come from runs, with the machine named. The coverage table lists what is not done." | Performance |
 
-## Mock data that is already there
+## Who does what (with three people)
 
-`manage.py seed-showcase` created 10 fictional pilots (some verified, some waiting for documents), 4 pending requests, approved and rejected permits, 20 or so past flights with breaches and a recall, and 3 notices (one active, one scheduled, one cancelled). The Insights tab and the officer queues are therefore not empty.
+- Presenter: speaks and drives the pilot screen.
+- Second person: officer console, publishes, approves, recalls, starts the drill.
+- Third person: holds the guard phone up so the judges see and hear it.
+
+## What is real and what is simulated, say it first
+
+"The drone is simulated. The alert path after a breach is real: MongoDB, change stream, the officer feed and the guard devices. A real Remote ID receiver or radar can feed the same path through `POST /ingest/position`, tested with a script."
 
 ## If something fails
 
 | Problem | Do this |
 |---|---|
-| Model answer is slow | The verdict is already on screen. Say "the explanation fills in when the model answers". |
-| Phone cannot open the QR link | Fly with the keyboard: W A S D, Q E, R F. |
-| Wi-Fi blocks phones | Use a phone hotspot for both laptop and phone. |
+| Model answer is slow | The verdict and the rules are already on screen. Say the explanation fills in when the model answers. |
+| Phone cannot open the guard or controller link | Use a phone hotspot for laptop and phones. Fly with the keyboard: W A S D, Q E, R F. |
+| A guard phone does not sound | Silent switch on, volume down, or "Turn alerts on" was not tapped. Press "Sound a test siren now" to find out. |
 | Display shows no flights | Run `prepare-demo` again. |
+| Drill drone never arrives | End the drill and start it again. Check the guard page says Listening. |
+| Everything is red on `demo_check.py` | Docker is not running. Start it, run `./run.sh`. |
 
-## Questions judges may ask
+## Do not say
 
-- Why MongoDB? One database for geo, text search, vector search, time series, files, TTL and transactions.
-- Is the LLM deciding if a flight is allowed? No. Code decides, the model explains.
-- Is the rule text real? No, it is a clearly marked sample paraphrase. Loading the real regulation is the next step and the retrieval numbers must be re-run then.
-- What is not done? See `docs/RUBRIC_COVERAGE.md`.
+- "It detects real drones." It detects the simulated drone and anything a tracker reports.
+- "Every phone on the Wi-Fi beeps." People open the guard page once.
+- "The rules are official." They are marked sample passages.
 
 ## Honest answers to the awkward questions
 

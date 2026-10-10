@@ -232,7 +232,8 @@ async function refreshLive() {
     $("airList").innerHTML = airborne.length ? airborne.map(f => {
       const d = inAir[f.flight_id], state = f.status === "recalled" ? '<span class="pill-bad">Recalled, returning</span>' : !d ? "starting" : d.status === "breach" ? '<span class="pill-bad">Inside ' + esc(d.zone || "restricted airspace") + "</span>" : d.status === "warning" ? '<span class="pill-warn">' + esc(d.zone || "Restricted area ahead") + "</span>" : '<span class="pill-ok">All clear</span>';
       return `<div class="item air-item"><div><b class="mono">${esc(f.flight_id)}</b> ${esc(f.pilot_name)}<div class="meta">${esc(f.drone_name)}${d ? `, ${Math.round(d.alt_m)} m, ${d.speed_mps} m/s, battery ${Math.round(d.battery_pct)}%` : ""}</div><div class="meta">${state}</div></div>
-        <div>${f.status === "flying" ? `<button class="danger" type="button" data-air-recall="${esc(f.flight_id)}">Recall</button>` : ""}<button class="ghost" type="button" data-air-show="${esc(f.flight_id)}" style="margin-top:6px">Show</button></div></div>`;
+        <div>${f.status === "flying" ? `<button class="danger" type="button" data-air-recall="${esc(f.flight_id)}">Recall</button>` : ""}<button class="ghost" type="button" data-air-show="${esc(f.flight_id)}" style="margin-top:6px">Show</button>
+          <a class="btn-sm" href="display.html?flight=${encodeURIComponent(f.flight_id)}" target="_blank" rel="noopener" style="display:block;margin-top:6px;text-align:center">Watch in 3D</a></div></div>`;
     }).join("") : '<div class="hint">No pilot flights in the air. When a pilot takes off after preflight, it appears here at once.</div>';
     $("airList").querySelectorAll("[data-air-recall]").forEach(b => b.addEventListener("click", async () => {
       const reason = prompt("Reason for recalling this drone (the pilot is told):");

@@ -157,3 +157,12 @@ def test_a_flight_in_a_green_area_can_launch_without_a_permit():
     assert client.post(f"/flights/{fid}/launch", headers=auth(p)).status_code == 200
     d = sim.get_flight_drone(fid)
     assert d.permit_area is None and d.kind == "flight"
+
+
+def test_flights_left_flying_by_a_restart_are_closed():
+    import main
+    import runtime
+    runtime.insert("flights", {"flight_id": "F-STALE1", "status": "flying", "pilot_id": "U-X"})
+    main._close_interrupted_flights()
+    f = next(x for x in runtime.all_("flights") if x["flight_id"] == "F-STALE1")
+    assert f["status"] == "completed" and f["flight_log"]["interrupted"] is True

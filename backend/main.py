@@ -36,6 +36,14 @@ def _start_change_streams():
 
 
 @app.on_event("startup")
+def _close_interrupted_flights():
+    """The simulator lives in memory, so after a restart no drone is really flying. End those flights instead of leaving them 'flying' forever."""
+    for f in runtime.all_("flights"):
+        if f.get("status") == "flying":
+            runtime.update("flights", "flight_id", f["flight_id"], {"status": "completed", "flight_log": {**(f.get("flight_log") or {}), "interrupted": True, "ended_at": runtime.now_iso()}})
+
+
+@app.on_event("startup")
 async def _attach_simulator():
     """Give the simulator the server's event loop, so a flight launched from any request can start the 1 Hz loop."""
     import asyncio

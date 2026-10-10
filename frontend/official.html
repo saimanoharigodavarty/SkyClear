@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyClear, authority</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top" id="top"></header>
+<main class="app">
+  <div class="mapwrap">
+    <div id="map"></div>
+    <div class="legend">
+      <div><i style="border-color:#b3261e"></i>Airport, defence</div>
+      <div><i style="border-color:#a15c00"></i>Park, government</div>
+      <div><i style="border-color:#1f4e79;border-style:dashed"></i>Active notice</div>
+    </div>
+  </div>
+  <aside class="side">
+    <nav class="tabs">
+      <button data-tab="requests" class="on" type="button">Requests<span id="reqCount" class="count hidden">0</span></button>
+      <button data-tab="publish" type="button">Publish notice</button>
+      <button data-tab="notices" type="button">Notices</button>
+    </nav>
+    <section class="pane">
+      <table class="stats" id="stats"></table>
+    </section>
+
+    <section class="pane" id="tab-requests" style="padding-top:0">
+      <div class="btnrow" style="margin-bottom:10px">
+        <button class="inline" id="fPending" type="button">Pending</button>
+        <button class="ghost inline" id="fAll" type="button">All flights</button>
+      </div>
+      <div id="reqList"></div>
+    </section>
+
+    <section class="pane hidden" id="tab-publish" style="padding-top:0">
+      <p class="hint" style="margin-top:0">Click the map to set the centre of the restricted area. Pilots with a watched or requested flight that overlaps are alerted at once.</p>
+      <form id="noticeForm">
+        <label for="nTitle">Title</label><input id="nTitle" required minlength="3" maxlength="100" placeholder="VIP movement, Begumpet">
+        <label for="nNote">Public note (what pilots will read)</label><textarea id="nNote" maxlength="300" placeholder="Do not publish route details."></textarea>
+        <div class="row2">
+          <div><label for="nStart">From</label><input id="nStart" type="datetime-local" required></div>
+          <div><label for="nEnd">Until</label><input id="nEnd" type="datetime-local" required></div>
+        </div>
+        <label for="nRadius">Radius (km)</label><input id="nRadius" type="number" min="0.2" max="25" step="0.1" value="2" required>
+        <div class="hint" id="nCenter">No centre chosen. Click the map.</div>
+        <button id="nGo" type="submit" disabled>Publish notice</button>
+        <div id="nMsg"></div>
+      </form>
+    </section>
+
+    <section class="pane hidden" id="tab-notices" style="padding-top:0">
+      <div id="noticeList"></div>
+    </section>
+  </aside>
+</main>
+<footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a>Authority console, prototype. Actions are recorded with your name.</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="common.js"></script>
+<script src="official.js"></script>
+</body>
+</html>

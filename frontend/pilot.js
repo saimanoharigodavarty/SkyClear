@@ -1,5 +1,6 @@
 // Pilot app: check a spot, simulate a flight, manage flights and drones, read alerts.
 header("pilot");
+if (session() && session().user.role === "official") roleBanner("You are signed in as an official. This is the pilot view, you can check spots here.", "official.html", "Open the Authority console");
 if (session() && session().user.must_change_password) location.href = "account.html?change=1";
 const { map, layers } = makeMap();
 const VCOLOR = { get can_fly() { return C.green; }, get permission_needed() { return C.amber; }, get prohibited() { return C.red; }, get cannot_determine() { return C.grey; } };
@@ -20,7 +21,7 @@ document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click
 /* ---------- drones ---------- */
 async function loadDrones() {
   try { catalog = await api("/drones", { auth: false }); } catch (e) { catalog = []; }
-  mine = me() ? await api("/me/drones").catch(() => []) : [];
+  mine = me() && me().role === "pilot" ? await api("/me/drones").catch(() => []) : [];
   const opt = d => `<option value="${esc(d.drone_id)}">${esc(d.name)} (${esc(d.class)})</option>`;
   const options = (mine.length ? `<optgroup label="My drones">${mine.map(opt).join("")}</optgroup>` : "") +
     `<optgroup label="Sample drones, for trying the app">${catalog.map(opt).join("")}</optgroup>`;
@@ -473,7 +474,7 @@ $("bannerBtn").addEventListener("click", () => showTab("alerts"));
 $("when").value = toLocalInput(new Date()); $("simWhen").value = $("when").value;
 drawZones(layers); drawNotices(layers.notices); loadDrones();
 window.addEventListener("skyclear:theme", () => { drawZones(layers); drawNotices(layers.notices); });
-if (me()) { api("/flights").then(watchAir).catch(() => {}); refreshMe().catch(() => {}); pollAlerts(); setInterval(() => { pollAlerts(); drawNotices(layers.notices); }, 15000);
+if (me() && me().role === "pilot") { api("/flights").then(watchAir).catch(() => {}); refreshMe().catch(() => {}); pollAlerts(); setInterval(() => { pollAlerts(); drawNotices(layers.notices); }, 15000);
   liveEvents({
     alert: () => { pollAlerts().then(a => { if (a && tab === "alerts") renderAlerts(a); }); },
     flight: () => { if (tab === "flights") loadFlights(); },
@@ -530,3 +531,5 @@ $("askForm").addEventListener("submit", async e => {
   } catch (err) { $("askResult").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
   finally { btn.disabled = false; btn.textContent = "Ask"; }
 });
+
+{ const t = location.hash.slice(1); if (["check", "sim", "ask", "flights", "alerts"].includes(t)) showTab(t); }  // a link from the workspace opens the right tab

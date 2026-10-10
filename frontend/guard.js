@@ -2,11 +2,14 @@
 let es = null, ctx = null, siren = null, wake = null, on = false;
 const status = (text, kind) => { $("gStatus").textContent = text; $("gStatus").className = "gstatus " + kind; };
 
-(async function areas() {
-  try { (await api("/notices/active", { auth: false })).forEach(n => { const o = document.createElement("option"); o.value = n.title; o.textContent = n.title; $("gArea").appendChild(o); }); } catch (e) { /* the list stays with "every area" */ }
+async function loadAreas() {
+  try { (await api("/notices/active", { auth: false })).forEach(n => { if (![...$("gArea").options].some(o => o.value === n.title)) { const o = document.createElement("option"); o.value = n.title; o.textContent = n.title; $("gArea").appendChild(o); } }); } catch (e) { /* the list stays as it is */ }
+}
+loadAreas().then(() => {
   const want = new URLSearchParams(location.search).get("area");
   if (want) { if (![...$("gArea").options].some(o => o.value === want)) { const o = document.createElement("option"); o.value = want; o.textContent = want; $("gArea").appendChild(o); } $("gArea").value = want; }
-})();
+});
+setInterval(loadAreas, 20000);  // an area declared after this page was opened shows up in the list
 
 function startSiren() {
   stopSiren();

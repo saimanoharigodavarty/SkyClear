@@ -120,17 +120,26 @@ const toISO = v => new Date(v).toISOString();
 function skeleton() { return '<div class="skel big"></div><div class="skel"></div><div class="skel w80"></div><div class="skel w50"></div>'; }
 
 /* ---------- header ---------- */
+// The menu shows what the signed-in person can use, in the order of the work: pilots fly, officials decide.
+function navLinks(role) {
+  if (role === "official") return [["home", "home.html", "Workspace"], ["official", "official.html", "Authority"], ["display", "display.html", "3D screen"], ["guard", "guard.html", "Guard alerts"], ["guide", "guide.html", "Guide"], ["about", "about.html", "About Us"]];
+  if (role === "pilot") return [["home", "home.html", "Workspace"], ["pilot", "index.html", "Pilot map"], ["display", "display.html", "3D screen"], ["guard", "guard.html", "Guard alerts"], ["guide", "guide.html", "Guide"], ["about", "about.html", "About Us"]];
+  return [["home", "home.html", "Home"], ["pilot", "index.html", "Check a spot"], ["guard", "guard.html", "Guard alerts"], ["guide", "guide.html", "Guide"], ["about", "about.html", "About Us"]];
+}
+
+// A line under the menu when the person is on the page for the other role.
+function roleBanner(text, href, label) {
+  const b = document.createElement("div"); b.className = "rolebanner"; b.setAttribute("role", "status");
+  b.innerHTML = `${esc(text)} <a href="${esc(href)}">${esc(label)}</a>`;
+  const top = $("top"); top.parentNode.insertBefore(b, top.nextSibling);
+}
+
 function header(active) {
   const s = session();
   $("top").innerHTML = `
     <a class="brand" href="home.html">Sky<b>Clear</b>${CFG.city ? `<small>${esc(CFG.city)}</small>` : ""}</a>
     <nav class="nav">
-      <a href="home.html" class="${active === "home" ? "on" : ""}">Home</a>
-      <a href="index.html" class="${active === "pilot" ? "on" : ""}">Pilot Map</a>
-      <a href="official.html" class="${active === "official" ? "on" : ""}">Authority</a>
-      <a href="about.html" class="${active === "about" ? "on" : ""}">About Us</a>
-      <a href="guide.html" class="${active === "guide" ? "on" : ""}">Guide</a>
-      <a href="display.html" class="${active === "display" ? "on" : ""}">Demo screen</a>
+      ${navLinks(s ? s.user.role : null).map(([key, href, text]) => `<a href="${href}" class="${active === key ? "on" : ""}">${text}</a>`).join("")}
     </nav>
     <div class="who">
       <div class="seg" role="group" aria-label="Theme">${THEMES.map(t => `<button type="button" data-theme="${t}" class="${themeChoice() === t ? "on" : ""}" aria-pressed="${themeChoice() === t}">${{ system: "Auto", light: "Light", dark: "Dark" }[t]}</button>`).join("")}</div>

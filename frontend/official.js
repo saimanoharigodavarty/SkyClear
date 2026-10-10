@@ -1,6 +1,7 @@
 // Authority console: review permission requests, publish and cancel notices, see the overview.
 const sess = session();
-if (!sess || sess.user.role !== "official") { location.href = "account.html"; }
+if (!sess) { location.href = "account.html?next=official.html"; }
+else if (sess.user.role !== "official") { location.href = "index.html"; }  // a pilot has no business in the authority console
 else if (sess.user.must_change_password) { location.href = "account.html?change=1"; }
 header("official");
 const { map, layers } = makeMap();
@@ -347,6 +348,7 @@ $("drGo").addEventListener("click", async () => {
     $("drMsg").innerHTML = `<div class="msg">Drill started. <b>${esc(r.title)}</b> is declared. The drone ${esc(r.drone_id)} reaches it in about ${esc(r.arrives_in_s)} seconds. Devices with the guard page open will sound.</div>`;
   } catch (e) { $("drMsg").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 });
+$("drUse").addEventListener("change", () => { if ($("drUse").checked && $("nTitle").value.trim()) $("drTitle").value = $("nTitle").value.trim(); });  // the drill uses the name of the area just drawn, so guard pages watching that name hear it
 $("drEnd").addEventListener("click", async () => {
   try {
     if (drillNotice) await api(`/notices/${drillNotice}/cancel`, { method: "POST" }).catch(() => {});
@@ -354,3 +356,5 @@ $("drEnd").addEventListener("click", async () => {
     $("drMsg").innerHTML = '<div class="msg">Drill ended. The restriction is cancelled and the test drone is gone.</div>';
   } catch (e) { $("drMsg").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 });
+
+{ const t = location.hash.slice(1); if (["requests", "live", "verify", "publish", "notices", "insights", "team"].includes(t) && (t !== "team" || !sess.user.authority_id)) showTab(t); }  // a link from the workspace opens the right tab

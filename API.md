@@ -63,3 +63,11 @@ Returns all zones as a GeoJSON FeatureCollection for drawing on the map. Each fe
 ## GET /drones
 
 Returns a list of `{ drone_id, name, weight_g, class }` for the dropdown.
+
+## POST /simulate/route
+
+Simulated flight. The backend samples the route about every 100 m and runs the same checks as `/check` at each sample, with time moving forward at the drone speed.
+
+Request: `{ "drone_id": "small-1800", "speed_mps": 10, "datetime": "2026-10-12T10:00:00+05:30", "waypoints": [{ "lat": 12.90, "lng": 77.668 }, { "lat": 13.00, "lng": 77.668 }] }`
+
+Response: `{ "drone": {...}, "samples": [{ "lat", "lng", "dist_m", "t_s", "verdict", "zones": ["name"], "rule_ids": ["R-001"] }], "summary": { "worst_verdict", "first_issue": { "verdict", "dist_m", "t_s", "zones", "rule_ids" } or null, "length_m", "duration_s" }, "data_last_updated", "disclaimer" }`

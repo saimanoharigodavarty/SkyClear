@@ -12,6 +12,7 @@ from explain import NEXT_STEPS, explain
 from analytics import router as analytics_router
 from auth import router as auth_router, setup_indexes as auth_indexes
 from bridge import router as bridge_router
+from config_api import router as config_router
 from live import router as live_router
 from verification import router as verification_router
 from zones_api import router as zones_router
@@ -23,13 +24,13 @@ from sim import sample_route, summarize_route
 app = FastAPI(title="SkyClear")
 # Bearer tokens, no cookies, so a page opened from a file can still talk to the API in development.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.include_router(config_router)
 app.include_router(auth_router)
 app.include_router(bridge_router)
 app.include_router(zones_router)
 app.include_router(live_router)
 app.include_router(analytics_router)
 app.include_router(verification_router)
-runtime.seed_official()
 routing.setup()
 auth_indexes()
 

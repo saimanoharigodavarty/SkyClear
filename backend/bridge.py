@@ -23,13 +23,10 @@ ACTIVE_FLIGHT = ("watching", "requested", "approved")
 # ---- auth ----
 # ---- pilot drones ----
 def drone_class(weight_g):
-    if weight_g <= 250:
-        return "nano"
-    if weight_g <= 2000:
-        return "micro"
-    if weight_g <= 25000:
-        return "small"
-    return "medium"
+    for c in config.DRONE_CLASSES:
+        if weight_g <= c["max_g"]:
+            return c["name"]
+    return config.DRONE_CLASSES[-1]["name"]
 
 
 class DroneIn(BaseModel):

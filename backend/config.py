@@ -1,5 +1,7 @@
 """All settings in one place. Override with environment variables (see .env.example)."""
+import json
 import os
+import secrets
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -18,6 +20,26 @@ def _load_dotenv():
 
 
 _load_dotenv()
+
+
+def _secret(name):
+    """Secrets are never written in code. Use the environment, or one generated for this install and kept in data/.secrets.json (git-ignored)."""
+    if os.getenv(name):
+        return os.environ[name]
+    path = DATA_DIR / ".secrets.json"
+    try:
+        store = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        store = {}
+    if name not in store:
+        store[name] = secrets.token_hex(32)
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(store), encoding="utf-8")
+        try:
+            path.chmod(0o600)
+        except OSError:
+            pass
+    return store[name]
 DATA_DIR = ROOT / "data"
 FRONTEND_DIR = ROOT / "frontend"
 
@@ -31,20 +53,22 @@ EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 USE_LLM = os.getenv("USE_LLM", "0") == "1"
 
 # Area our data covers: (min_lng, min_lat, max_lng, max_lat). Outside it the verdict is cannot_determine.
-COVERAGE_BBOX = (68.0, 6.5, 97.5, 37.0)  # India; airport zones come from OurAirports
+def _region():
+    with open(DATA_DIR / "region.json", encoding="utf-8") as f:
+        return json.load(f)
+
+
+REGION = _region()
+COVERAGE_BBOX = tuple(REGION["coverage_bbox"])  # outside it the verdict is cannot_determine
 NEARBY_KM = 5.0
 DATA_LAST_UPDATED = "2026-10-10"
 DISCLAIMER = "Decision support only, not legal permission."
 
 # Runtime data (accounts, flights, official notices, alerts). JSON file for the prototype.
 RUNTIME_PATH = Path(os.getenv("RUNTIME_PATH", str(DATA_DIR / "runtime.json")))
-# Demo official account, seeded on startup. Change for any shared deployment.
-OFFICIAL_EMAIL = os.getenv("OFFICIAL_EMAIL", "official@skyclear.demo")
-OFFICIAL_PASSWORD = os.getenv("OFFICIAL_PASSWORD", "skyclear-demo")
-OFFICIAL_NAME = os.getenv("OFFICIAL_NAME", "Hyderabad Airspace Desk")
 
 # Permits and verification
-PERMIT_SECRET = os.getenv("PERMIT_SECRET", "dev-only-change-me")
+PERMIT_SECRET = _secret("PERMIT_SECRET")
 REQUIRE_VERIFICATION = os.getenv("REQUIRE_VERIFICATION", "1") == "1"   # verified pilot and drone before a permission request
 PERMIT_RADIUS_KM = 0.3
 PREFLIGHT_VALID_MIN = 15
@@ -52,13 +76,26 @@ PREFLIGHT_EARLY_MIN = 15      # preflight opens this long before the flight wind
 UPLOAD_MAX_BYTES = 5 * 1024 * 1024
 
 # Authentication
-JWT_SECRET = os.getenv("JWT_SECRET", "dev-only-change-me-too")
+JWT_SECRET = _secret("JWT_SECRET")
 ACCESS_TTL_MIN = int(os.getenv("ACCESS_TTL_MIN", "15"))
 REFRESH_TTL_DAYS = int(os.getenv("REFRESH_TTL_DAYS", "7"))
 OTP_TTL_MIN = 5
 OTP_MAX_ATTEMPTS = 5
-OTP_DEV_ECHO = os.getenv("OTP_DEV_ECHO", "1") == "1"   # DEV ONLY: return the code in the response so the demo works without SMS
+OTP_DEV_ECHO = os.getenv("OTP_DEV_ECHO", "0") == "1"   # tests only: return the code in the API response. Never on a real deployment
+OTP_CHANNEL = os.getenv("OTP_CHANNEL", "email")        # email or sms: where one-time codes are sent
+OTP_PROVIDER = os.getenv("OTP_PROVIDER", "console")    # console (server log), smtp (email), twilio (sms)
+SMTP_HOST = os.getenv("SMTP_HOST", "localhost")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "1025"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM = os.getenv("SMTP_FROM", "SkyClear <no-reply@skyclear.local>")
+TWILIO_SID = os.getenv("TWILIO_SID", "")
+TWILIO_TOKEN = os.getenv("TWILIO_TOKEN", "")
+TWILIO_FROM = os.getenv("TWILIO_FROM", "")
 REQUIRE_OFFICIAL_MFA = os.getenv("REQUIRE_OFFICIAL_MFA", "0") == "1"
 MAX_FAILED_LOGINS = 5
 LOCK_MINUTES = 15
 RATE_LIMITS = os.getenv("RATE_LIMITS", "1") == "1"
+
+# Drone weight classes come from data/region.json so the API and the UI use one source.
+DRONE_CLASSES = REGION["drone_classes"]

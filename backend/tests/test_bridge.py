@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 import config
 from main import app
+from tests.support import ADMIN_EMAIL, PASSWORD, officer_email
 
 client = TestClient(app)
 WINDOW = {"start": "2026-10-20T10:00:00+05:30", "end": "2026-10-20T11:00:00+05:30"}
@@ -27,7 +28,7 @@ def pilot(email):
 
 
 def official():
-    r = client.post("/auth/login", json={"identifier": config.OFFICIAL_EMAIL, "password": config.OFFICIAL_PASSWORD})
+    r = client.post("/auth/login", json={"identifier": ADMIN_EMAIL, "password": PASSWORD})
     assert r.status_code == 200
     return r.json()["token"]
 
@@ -69,7 +70,7 @@ def iso(dt):
 
 
 def officer(email):
-    r = client.post("/auth/login", json={"identifier": email, "password": config.OFFICIAL_PASSWORD})
+    r = client.post("/auth/login", json={"identifier": email, "password": PASSWORD})
     assert r.status_code == 200, r.text
     return r.json()["token"]
 
@@ -129,9 +130,9 @@ def test_permission_routed_approved_permit_preflight_and_revoke():
     # preflight before approval: not cleared
     assert client.post(f"/flights/{flight['flight_id']}/preflight", headers=auth(p)).json()["cleared"] is False
     # the airport officer cannot decide a police request, the police officer can
-    wrong = client.post(f"/flights/{flight['flight_id']}/decision", headers=auth(officer("rgia@skyclear.demo")), json={"decision": "approved"})
+    wrong = client.post(f"/flights/{flight['flight_id']}/decision", headers=auth(officer(officer_email("A-RGIA"))), json={"decision": "approved"})
     assert wrong.status_code == 403
-    done = client.post(f"/flights/{flight['flight_id']}/decision", headers=auth(officer("police@skyclear.demo")),
+    done = client.post(f"/flights/{flight['flight_id']}/decision", headers=auth(officer(officer_email("A-POL"))),
                        json={"decision": "approved", "alt_max_m": 50, "conditions": ["Daylight only"]})
     assert done.status_code == 200
     permit = done.json()["permit"]
@@ -139,7 +140,7 @@ def test_permission_routed_approved_permit_preflight_and_revoke():
     pre = client.post(f"/flights/{flight['flight_id']}/preflight", headers=auth(p)).json()
     assert pre["cleared"] is True and pre["conditions"] == ["Daylight only"] and pre["cleared_until"]
     # revoke, then preflight fails and the pilot is alerted
-    rev = client.post(f"/permits/{permit['permit_id']}/revoke", headers=auth(officer("police@skyclear.demo")), json={"reason": "VIP movement"})
+    rev = client.post(f"/permits/{permit['permit_id']}/revoke", headers=auth(officer(officer_email("A-POL"))), json={"reason": "VIP movement"})
     assert rev.json()["status"] == "revoked"
     after = client.post(f"/flights/{flight['flight_id']}/preflight", headers=auth(p)).json()
     assert after["cleared"] is False and any("revoked" in r.lower() for r in after["reasons"])
@@ -163,9 +164,9 @@ def test_airport_request_goes_to_airport_desk_and_preview_matches():
     assert prev["authority"]["authority_id"] == "A-RGIA"
     flight = client.post("/flights", headers=auth(p), json={"drone_id": drone_id, "kind": "permission", **AIRPORT_SPOT, **window()}).json()
     assert flight["authority_id"] == "A-RGIA"
-    mine = client.get("/flights?status=requested", headers=auth(officer("rgia@skyclear.demo"))).json()
+    mine = client.get("/flights?status=requested", headers=auth(officer(officer_email("A-RGIA")))).json()
     assert flight["flight_id"] in {f["flight_id"] for f in mine}
-    other = client.get("/flights?status=requested", headers=auth(officer("forest@skyclear.demo"))).json()
+    other = client.get("/flights?status=requested", headers=auth(officer(officer_email("A-FOR")))).json()
     assert flight["flight_id"] not in {f["flight_id"] for f in other}
 
 

@@ -54,5 +54,5 @@ def mask_phone(phone):
 
 def public_user(u):
     out = {k: u[k] for k in ("user_id", "role", "name", "email", "authority_id") if k in u}
-    return out | {"pilot_cert": u.get("pilot_cert"), "phone": mask_phone(u.get("phone")), "mfa_enabled": bool(u.get("totp_secret")),
+    return out | {"pilot_cert": u.get("pilot_cert"), "phone": mask_phone(u.get("phone")), "mfa_enabled": bool(u.get("totp_secret")), "must_change_password": bool(u.get("must_change_password")),
                   "verification": u.get("verification") or {"status": "unverified"}}

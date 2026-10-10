@@ -7,3 +7,5 @@ __pycache__/
 data/runtime.json
 data/runtime.tmp
 data/uploads/
+data/.secrets.json
+data/demo_credentials.txt

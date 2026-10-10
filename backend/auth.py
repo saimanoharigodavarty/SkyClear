@@ -1,7 +1,7 @@
-"""Authentication: registration with phone OTP, password login, OTP login, TOTP for officials, JWT and rotating refresh tokens.
+"""Authentication: registration with a one-time code, password and code login, password reset and change, TOTP for officials, JWT and rotating refresh tokens.
 
 OWNER: Nikhil (stream 2A). Contract 2 in docs/CONTRACTS.md.
-Prototype notes: the OTP is shown in the response when OTP_DEV_ECHO=1 (dev only). Real SMS is a one-function swap in deliver_otp().
+Codes are sent by otp_delivery.py (email or SMS). Nothing is shown on screen unless OTP_DEV_ECHO=1, which is for tests only.
 """
 import hashlib
 import hmac
@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 import config
+import otp_delivery
 import runtime
 from security import current_user, public_user, require_admin
 
@@ -110,23 +111,23 @@ def revoke_family(family):
         runtime._save(data)
 
 
-# ---- OTP ----
-def deliver_otp(identifier, code):
-    """Swap this for an SMS or email provider. Console only for development, never print codes in production."""
-    print(f"[dev] OTP for {identifier}: {code}")
-
-
-def send_otp(identifier, purpose):
-    last = [o for o in runtime.all_("otps") if o["identifier"] == identifier]
+# ---- OTP (codes belong to an account, not to a phone number) ----
+def send_otp(user, purpose):
+    uid = user["user_id"]
+    last = [o for o in runtime.all_("otps") if o["identifier"] == uid]
     if last and (time.time() - datetime.fromisoformat(last[-1]["created_at"]).timestamp()) < 20:
         raise HTTPException(429, "Wait 20 seconds before asking for another code")
     code = f"{secrets.randbelow(10**6):06d}"
-    _drop_otps(identifier)
-    runtime.insert("otps", {"identifier": identifier, "purpose": purpose, "code_hash": _hash(code + config.JWT_SECRET), "attempts": 0,
+    _drop_otps(uid)
+    runtime.insert("otps", {"identifier": uid, "purpose": purpose, "code_hash": _hash(code + config.JWT_SECRET), "attempts": 0,
                             "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=config.OTP_TTL_MIN)).isoformat(timespec="seconds"),
                             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds")})
-    deliver_otp(identifier, code)
-    return code
+    try:
+        sent_to = otp_delivery.deliver(user, code, purpose)
+    except otp_delivery.DeliveryError as e:
+        print(f"[otp] delivery failed: {e}")
+        raise HTTPException(502, "We could not send the code right now. Try again in a moment.")
+    return code, sent_to
 
 
 def _drop_otps(identifier):
@@ -139,16 +140,17 @@ def _drop_otps(identifier):
         runtime._save(data)
 
 
-def check_otp(identifier, code):
-    rec = next((o for o in runtime.all_("otps") if o["identifier"] == identifier), None)
+def check_otp(user, code, purposes):
+    uid = user["user_id"]
+    rec = next((o for o in runtime.all_("otps") if o["identifier"] == uid), None)
     if rec is None or datetime.fromisoformat(rec["expires_at"]) < datetime.now(timezone.utc):
         raise HTTPException(400, "That code expired. Ask for a new one.")
     if rec["attempts"] >= config.OTP_MAX_ATTEMPTS:
         raise HTTPException(429, "Too many wrong codes. Ask for a new one.")
-    if not hmac.compare_digest(rec["code_hash"], _hash(code.strip() + config.JWT_SECRET)):
-        runtime.update("otps", "identifier", identifier, {"attempts": rec["attempts"] + 1})
+    if rec["purpose"] not in purposes or not hmac.compare_digest(rec["code_hash"], _hash(code.strip() + config.JWT_SECRET)):
+        runtime.update("otps", "identifier", uid, {"attempts": rec["attempts"] + 1})
         raise HTTPException(400, "That code is not right")
-    _drop_otps(identifier)
+    _drop_otps(uid)
     return rec["purpose"]
 
 
@@ -175,8 +177,9 @@ def register(body: Register, request: Request):
     runtime.insert("users", {"user_id": runtime.new_id("U"), "role": "pilot", "name": body.name.strip(), "email": email, "phone": phone,
                              "phone_verified": False, "pilot_cert": body.pilot_cert, "password": runtime.hash_password(body.password),
                              "failed_attempts": 0, "created_at": runtime.now_iso()})
-    code = send_otp(phone, "register")
-    return {"needs_otp": True, "identifier": phone, **({"dev_code": code} if config.OTP_DEV_ECHO else {})}
+    user = next(u for u in runtime.all_("users") if u["email"] == email)
+    code, sent_to = send_otp(user, "register")
+    return {"needs_otp": True, "identifier": email, "sent_to": sent_to, **({"dev_code": code} if config.OTP_DEV_ECHO else {})}
 
 
 class OtpRequest(BaseModel):
@@ -189,11 +192,10 @@ def otp_request(body: OtpRequest, request: Request):
     user = find_user(body.identifier)
     # Same answer whether or not the account exists, so nobody can probe for accounts.
     result = {"sent": True}
-    if user and user.get("phone"):
-        code = send_otp(user["phone"], "login" if user.get("phone_verified") else "register")
+    if user and user["role"] == "pilot":
+        code, _ = send_otp(user, "login" if user.get("phone_verified") else "register")
         if config.OTP_DEV_ECHO:
             result["dev_code"] = code
-        result["identifier"] = user["phone"]
     return result
 
 
@@ -206,13 +208,11 @@ class OtpVerify(BaseModel):
 def otp_verify(body: OtpVerify, request: Request):
     rate_limit("otpv:" + body.identifier, 10, 60)
     user = find_user(body.identifier)
-    if user is None or not user.get("phone"):
+    if user is None or user["role"] != "pilot":
         raise HTTPException(400, "That code is not right")
-    check_otp(user["phone"], body.code)
+    check_otp(user, body.code, ("register", "login"))
     if not user.get("phone_verified"):
         user = runtime.update("users", "user_id", user["user_id"], {"phone_verified": True})
-    if user["role"] == "official":
-        raise HTTPException(403, "Officials sign in with email and password")
     return issue_tokens(user)
 
 
@@ -236,7 +236,7 @@ def login(body: Login, request: Request):
         raise HTTPException(401, "Wrong email, mobile number or password")
     runtime.update("users", "user_id", user["user_id"], {"failed_attempts": 0, "locked_until": None})
     if user["role"] == "pilot" and not user.get("phone_verified"):
-        raise HTTPException(403, "phone_not_verified")  # the app then asks for a code with /auth/otp/request
+        raise HTTPException(403, "not_verified")  # the app then asks for a code with /auth/otp/request
     if user["role"] == "official" and (config.REQUIRE_OFFICIAL_MFA or user.get("totp_secret")):
         step = "mfa_required" if user.get("totp_secret") else "mfa_setup_required"
         return {step: True, "mfa_token": short_token(user, "mfa")}
@@ -308,25 +308,87 @@ def me(user=Depends(current_user)):
     return public_user(user)
 
 
+class Forgot(BaseModel):
+    identifier: str
+
+
+@router.post("/auth/password/forgot")
+def password_forgot(body: Forgot, request: Request):
+    rate_limit("forgot:" + body.identifier, 3, 60)
+    user = find_user(body.identifier)
+    result = {"sent": True}  # same answer for unknown accounts
+    if user:
+        code, _ = send_otp(user, "reset")
+        if config.OTP_DEV_ECHO:
+            result["dev_code"] = code
+    return result
+
+
+def _strong(password):
+    if len(password) < 8:
+        raise HTTPException(422, "Use at least 8 characters")
+    return password
+
+
+class Reset(BaseModel):
+    identifier: str
+    code: str = Field(min_length=4, max_length=8)
+    new_password: str = Field(min_length=8, max_length=100)
+
+
+@router.post("/auth/password/reset")
+def password_reset(body: Reset, request: Request):
+    rate_limit("reset:" + body.identifier, 10, 60)
+    user = find_user(body.identifier)
+    if user is None:
+        raise HTTPException(400, "That code is not right")
+    check_otp(user, body.code, ("reset",))
+    runtime.update("users", "user_id", user["user_id"], {"password": runtime.hash_password(_strong(body.new_password)), "failed_attempts": 0,
+                                                         "locked_until": None, "must_change_password": False})
+    for t in [t for t in runtime.all_("refresh_tokens") if t["user_id"] == user["user_id"]]:
+        revoke_family(t["family"])  # everyone signed in with the old password is signed out
+    return {"ok": True}
+
+
+class Change(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=100)
+
+
+@router.post("/auth/password/change")
+def password_change(body: Change, user=Depends(current_user)):
+    if not runtime.check_password(body.current_password, user["password"]):
+        raise HTTPException(401, "Your current password is not right")
+    if body.current_password == body.new_password:
+        raise HTTPException(422, "Choose a different password")
+    user = runtime.update("users", "user_id", user["user_id"], {"password": runtime.hash_password(_strong(body.new_password)), "must_change_password": False})
+    return issue_tokens(user)
+
+
 class NewOfficial(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     email: str = Field(min_length=5, max_length=120)
-    authority_id: str
-    password: str = Field(min_length=10, max_length=100)
+    authority_id: Optional[str] = None
+
+
+@router.get("/admin/officials")
+def list_officials(admin=Depends(require_admin)):
+    return [public_user(u) for u in runtime.all_("users") if u["role"] == "official"]
 
 
 @router.post("/admin/officials")
 def invite_official(body: NewOfficial, admin=Depends(require_admin)):
-    """Officials are created by an admin, never self-registered."""
+    """Officials are created by an admin, never self-registered. The admin gets a one-time password to hand over, and the official must change it at first sign-in."""
     import routing
-    if routing.get(body.authority_id) is None:
+    if body.authority_id and routing.get(body.authority_id) is None:
         raise HTTPException(422, "unknown authority_id")
     email = body.email.strip().lower()
     if any(u["email"] == email for u in runtime.all_("users")):
         raise HTTPException(409, "email already in use")
-    u = runtime.insert("users", {"user_id": runtime.new_id("U"), "role": "official", "authority_id": body.authority_id, "name": body.name.strip(),
-                                 "email": email, "password": runtime.hash_password(body.password), "failed_attempts": 0, "created_at": runtime.now_iso()})
-    return public_user(u)
+    temp = secrets.token_urlsafe(9)
+    u = runtime.insert("users", {"user_id": runtime.new_id("U"), "role": "official", "authority_id": body.authority_id or None, "name": body.name.strip(),
+                                 "email": email, "password": runtime.hash_password(temp), "must_change_password": True, "failed_attempts": 0, "created_at": runtime.now_iso()})
+    return {**public_user(u), "temporary_password": temp}
 
 
 def setup_indexes():

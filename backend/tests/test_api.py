@@ -65,3 +65,19 @@ def test_zone_search_box():
     hits = client.get("/zones/search?q=begum").json()
     assert hits and hits[0]["name"] == "Begumpet Airport" and {"lat", "lng"} <= set(hits[0]["center"])
     assert client.get("/zones/search?q=x").json() == []
+
+
+def test_config_comes_from_the_server_not_the_page():
+    c = client.get("/config").json()
+    assert c["city"] and len(c["center"]) == 2 and c["droneClasses"][0]["name"] == "nano"
+    js = client.get("/config.js")
+    assert js.headers["content-type"].startswith("application/javascript") and js.text.startswith("window.SKYCLEAR = ")
+
+
+def test_examples_are_built_from_real_zones():
+    ex = client.get("/examples").json()
+    kinds = {s["kind"] for s in ex["spots"]}
+    assert {"airport", "military", "park", "government"} <= kinds and "clear" in kinds
+    zones = {f["properties"]["name"] for f in client.get("/zones").json()["features"]}
+    assert all(s["label"] in zones for s in ex["spots"] if s["kind"] != "clear")
+    assert len(ex["route"]) == 2

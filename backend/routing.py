@@ -32,22 +32,14 @@ def _build():
 
 
 def setup():
-    """Idempotent: load authorities (MongoDB mode) and make sure each has an officer account."""
-    auths = _build()
+    """Idempotent: load the authorities (MongoDB mode builds the geo indexes). Accounts are created with manage.py, never here."""
     if config.USE_MONGO:
         from db import get_db
         db = get_db()
-        for a in auths:
+        for a in _build():
             db.authorities.replace_one({"authority_id": a["authority_id"]}, a, upsert=True)
         db.authorities.create_index([("jurisdiction", "2dsphere")])
         db.authorities.create_index([("office", "2dsphere")])
-    existing = {u["email"] for u in runtime.all_("users")}
-    for a in auths:
-        email = a.get("officer_email")
-        if email and email not in existing:
-            runtime.insert("users", {"user_id": runtime.new_id("U"), "role": "official", "authority_id": a["authority_id"],
-                                     "name": a["name"], "email": email, "password": runtime.hash_password(config.OFFICIAL_PASSWORD),
-                                     "created_at": runtime.now_iso()})
 
 
 def all_authorities():

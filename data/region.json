@@ -1,0 +1,14 @@
+{
+  "name": "Hyderabad",
+  "center": [17.385, 78.4867],
+  "zoom": 11,
+  "coverage_bbox": [68.0, 6.5, 97.5, 37.0],
+  "search_viewbox": [77.9, 17.8, 78.9, 17.0],
+  "country_code": "in",
+  "drone_classes": [
+    {"name": "nano", "max_g": 250, "label": "Nano: up to 250 g"},
+    {"name": "micro", "max_g": 2000, "label": "Micro: 250 g to 2 kg"},
+    {"name": "small", "max_g": 25000, "label": "Small: 2 kg to 25 kg"},
+    {"name": "medium", "max_g": 150000, "label": "Medium: 25 kg to 150 kg"}
+  ]
+}

@@ -130,15 +130,3 @@ def user_for_token(token):
         data = _load()
         uid = data["sessions"].get(token)
         return next((u for u in data["users"] if u["user_id"] == uid), None)
-
-
-def seed_official():
-    if config.USE_MONGO:
-        _mongo().users.create_index("email", unique=True)
-        _mongo().sessions.create_index("token", unique=True)
-    with _lock:
-        if any(u["email"] == config.OFFICIAL_EMAIL for u in all_("users")):
-            return
-        insert("users", {"user_id": new_id("U"), "role": "official", "name": config.OFFICIAL_NAME,
-                         "email": config.OFFICIAL_EMAIL, "password": hash_password(config.OFFICIAL_PASSWORD),
-                         "created_at": now_iso()})

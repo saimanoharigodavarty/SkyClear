@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyClear, sign in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top" id="top"></header>
+<main class="auth">
+  <h1>One platform for pilots and the authority</h1>
+  <p class="lead">Pilots check a flight, register their drones, request permission and get alerted. Officials review requests and publish restrictions such as VIP movements. Both sides see the same rules and the same map.</p>
+  <div class="authgrid">
+    <section class="authbox">
+      <h2>Sign in</h2>
+      <p class="small">Pilots and officials use the same form.</p>
+      <form id="loginForm">
+        <label for="lEmail">Email</label><input id="lEmail" type="email" required autocomplete="username">
+        <label for="lPass">Password</label><input id="lPass" type="password" required autocomplete="current-password">
+        <button type="submit">Sign in</button>
+        <div id="lMsg"></div>
+      </form>
+      <div class="msg" style="margin-top:16px"><b>Demo authority account</b><br><span class="mono">official@skyclear.demo</span><br><span class="mono">skyclear-demo</span><br><span class="small">Prototype only. Change it before any shared deployment.</span></div>
+    </section>
+    <section class="authbox">
+      <h2>Register as a pilot</h2>
+      <p class="small">Free. Needed for alerts, saved flights and permission requests. Checking a spot never needs an account.</p>
+      <form id="regForm">
+        <label for="rName">Full name</label><input id="rName" required minlength="2" maxlength="80" autocomplete="name">
+        <label for="rEmail">Email</label><input id="rEmail" type="email" required autocomplete="email">
+        <label for="rPass">Password (8 or more characters)</label><input id="rPass" type="password" required minlength="8" autocomplete="new-password">
+        <label for="rCert">Remote pilot certificate no. (optional)</label><input id="rCert" maxlength="40" placeholder="Self-declared, not verified">
+        <button type="submit">Create pilot account</button>
+        <div id="rMsg"></div>
+      </form>
+    </section>
+  </div>
+</main>
+<footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a>Registration on SkyClear is not government registration of your drone or licence.</footer>
+<script src="common.js"></script>
+<script>
+header(null);
+function done(r) { saved("skyclear.session", r); location.href = r.user.role === "official" ? "official.html" : "index.html"; }
+$("loginForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try { done(await api("/auth/login", { method: "POST", auth: false, body: { email: $("lEmail").value, password: $("lPass").value } })); }
+  catch (err) { $("lMsg").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+});
+$("regForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try { done(await api("/auth/register", { method: "POST", auth: false, body: { name: $("rName").value, email: $("rEmail").value, password: $("rPass").value, pilot_cert: $("rCert").value || null } })); }
+  catch (err) { $("rMsg").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+});
+</script>
+</body>
+</html>

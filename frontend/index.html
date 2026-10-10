@@ -3,296 +3,87 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SkyClear</title>
+<title>SkyClear, pilot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>
-  :root {
-    --bg: #f4f2ee; --card: #faf9f6; --text: #1b1f24; --muted: #555d66; --border: #cfcac0;
-    --accent: #1f4e79; --green: #1a7f37; --yellow: #a15c00; --red: #b3261e; --grey: #5b6570;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #14171a; --card: #1b1f23; --text: #e8eaed; --muted: #9aa4af; --border: #2c3238; --accent: #6fa3d6; }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
-  header { padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--card); }
-  header h1 { margin: 0; font-size: 18px; }
-  header p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
-  main { display: grid; grid-template-columns: 1fr 380px; gap: 12px; padding: 12px; }
-  @media (max-width: 800px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
-  #map { height: 70vh; min-height: 320px; border-radius: 0; border: 1px solid var(--border); }
-  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 0; padding: 14px; }
-  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
-  select, input, button { width: 100%; padding: 9px; font-size: 14px; border-radius: 2px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
-  button { background: var(--accent); color: #faf9f6; border: 0; margin-top: 14px; cursor: pointer; font-weight: 600; }
-  button:disabled { opacity: .6; cursor: wait; }
-  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
-  .badge { display: inline-block; padding: 6px 12px; border-radius: 2px; color: #faf9f6; font-weight: 700; margin: 14px 0 8px; }
-  .can_fly { background: var(--green); } .permission_needed { background: var(--yellow); }
-  .prohibited { background: var(--red); } .cannot_determine { background: var(--grey); }
-  .cite { border: 1px solid var(--border); padding: 6px 10px; margin: 8px 0; font-size: 13px; }
-  .cite b { display: block; }
-  .small { font-size: 12px; color: var(--muted); }
-  ul { padding-left: 18px; margin: 6px 0; }
-  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 4px; }
-  .tabs button { margin-top: 0; background: var(--bg); color: var(--text); border: 1px solid var(--border); }
-  .tabs button.on { background: var(--accent); color: #faf9f6; border-color: var(--accent); }
-  button.plain { background: var(--bg); color: var(--text); border: 1px solid var(--border); margin-top: 8px; }
-  .live { border: 1px solid var(--border); padding: 8px 10px; margin-top: 10px; font-size: 13px; }
-  .hidden { display: none; }
-  footer { padding: 12px 16px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--border); }
-  footer a { color: var(--accent); margin-right: 14px; }
-  .skel { background: var(--border); height: 14px; margin: 10px 0; opacity: .6; }
-  .skel.badge-s { height: 32px; width: 60%; margin-top: 14px; }
-  .skel.w80 { width: 80%; } .skel.w50 { width: 50%; }
-</style>
+<link rel="stylesheet" href="app.css">
 </head>
 <body>
-<header>
-  <h1>SkyClear</h1>
-  <p>Explainable drone flight check. Decision support only, not legal permission.</p>
-</header>
-<main>
-  <div id="map"></div>
-  <section class="panel">
-    <div class="tabs">
-      <button id="tabCheck" class="on" type="button">Check a spot</button>
-      <button id="tabSim" type="button">Simulate flight</button>
+<header class="top" id="top"></header>
+<div id="banner" class="banner hidden"><span id="bannerText"></span><button id="bannerBtn" type="button">View alerts</button></div>
+<main class="app">
+  <div class="mapwrap">
+    <div id="map"></div>
+    <div class="legend">
+      <div><i style="border-color:#b3261e"></i>Airport, defence</div>
+      <div><i style="border-color:#a15c00"></i>Park, government</div>
+      <div><i style="border-color:#1f4e79;border-style:dashed"></i>Official notice</div>
     </div>
-    <label for="drone">Drone</label>
-    <select id="drone"></select>
-    <label for="when">Date and time</label>
-    <input id="when" type="datetime-local">
-    <div id="checkBox">
-      <div class="hint" id="picked">Click the map to choose a location.</div>
-      <button id="go" disabled>Check</button>
-    </div>
-    <div id="simBox" class="hidden">
-      <div class="hint" id="wpHint">Click the map to add waypoints (at least 2).</div>
-      <label for="speed">Drone speed (m/s)</label>
-      <input id="speed" type="number" min="1" max="30" value="10">
-      <label for="playback">Playback speed</label>
-      <select id="playback"><option value="10">10x</option><option value="30" selected>30x</option><option value="100">100x</option></select>
-      <button id="run" disabled>Run simulation</button>
-      <button id="clearRoute" class="plain" type="button">Clear route</button>
+  </div>
+  <aside class="side">
+    <nav class="tabs">
+      <button data-tab="check" class="on" type="button">Check</button>
+      <button data-tab="sim" type="button">Simulate</button>
+      <button data-tab="flights" type="button">My flights</button>
+      <button data-tab="alerts" type="button">Alerts<span id="alertCount" class="count hidden">0</span></button>
+    </nav>
+
+    <section class="pane" id="shared">
+      <label for="drone">Drone</label>
+      <select id="drone"></select>
+      <label for="when">Date and time</label>
+      <input id="when" type="datetime-local">
+    </section>
+
+    <section class="pane" id="tab-check" style="padding-top:0">
+      <div class="hint" id="picked">Click the map to choose where you want to fly.</div>
+      <button id="go" type="button" disabled>Check this spot</button>
+      <div id="result" class="section"></div>
+      <div id="actions"></div>
+    </section>
+
+    <section class="pane hidden" id="tab-sim" style="padding-top:0">
+      <div class="hint" id="wpHint">Click the map to add waypoints, at least 2.</div>
+      <div class="row2">
+        <div><label for="speed">Drone speed (m/s)</label><input id="speed" type="number" min="1" max="30" value="10"></div>
+        <div><label for="playback">Playback</label><select id="playback"><option value="10">10x</option><option value="30" selected>30x</option><option value="100">100x</option></select></div>
+      </div>
+      <div class="btnrow"><button id="run" type="button" disabled>Run simulation</button><button id="clearRoute" class="ghost" type="button">Clear</button></div>
       <div id="live" class="live hidden"></div>
-    </div>
-    <div id="result"></div>
-  </section>
+      <div id="simResult" class="section"></div>
+    </section>
+
+    <section class="pane hidden" id="tab-flights">
+      <div id="flightsGate"></div>
+      <div id="flightsBody" class="hidden">
+        <div class="section" style="margin-top:0"><h3>My drones</h3><div id="myDrones"></div>
+          <form id="droneForm">
+            <div class="row2">
+              <div><label for="dName">Name</label><input id="dName" required maxlength="60" placeholder="DJI Mavic 3"></div>
+              <div><label for="dWeight">Weight (g)</label><input id="dWeight" type="number" min="1" required placeholder="895"></div>
+            </div>
+            <label for="dUin">Registration number (optional)</label><input id="dUin" maxlength="40" placeholder="Self-declared, not verified">
+            <button type="submit" class="ghost">Add drone</button>
+          </form>
+        </div>
+        <div class="section"><h3>My flights</h3><div id="flightList"></div></div>
+      </div>
+    </section>
+
+    <section class="pane hidden" id="tab-alerts">
+      <div id="alertsGate"></div>
+      <div id="alertsBody" class="hidden">
+        <button id="markRead" class="ghost inline" type="button">Mark all as read</button>
+        <div id="alertList" class="section"></div>
+      </div>
+    </section>
+  </aside>
 </main>
-<footer>
-  <a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a>
-  Zones and rules are sample data until verified against the official regulation.
-</footer>
+<footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a>Decision support only, not legal permission. Zones and rules are sample or derived data until verified.</footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-// Set to the backend address, e.g. "http://192.168.1.10:8000". Empty string = same origin.
-const API_BASE = "";
-// When the backend is unreachable, fall back to the sample data below so the UI can be built early.
-const USE_MOCK_ON_FAILURE = true;
-
-const MOCK_DRONES = [
-  { drone_id: "nano-200", name: "Sample Nano 200 g", weight_g: 200, class: "nano" },
-  { drone_id: "small-1800", name: "Sample Small 1.8 kg", weight_g: 1800, class: "small" }
-];
-const MOCK_RESULT = {
-  verdict: "permission_needed",
-  summary: "Sample answer. This spot is inside a sample airport zone, so permission is needed.",
-  zones: [{ zone_id: "Z-001", name: "Sample Airport", zone_type: "airport", distance_km: 3.2,
-    geometry: { type: "Polygon", coordinates: [[[77.60,12.95],[77.62,12.95],[77.62,12.97],[77.60,12.97],[77.60,12.95]]] } }],
-  notices: [{ notice_id: "N-001", title: "Sample VIP movement", starts_at: "2026-10-12T16:00:00+05:30",
-    ends_at: "2026-10-12T20:00:00+05:30",
-    geometry: { type: "Polygon", coordinates: [[[77.58,12.97],[77.60,12.97],[77.60,12.99],[77.58,12.99],[77.58,12.97]]] } }],
-  citations: [{ rule_id: "R-012", text: "Sample rule passage used for this answer.", source: "Sample source (verify against official regulation)" }],
-  next_steps: ["Apply for permission on the official portal."],
-  data_last_updated: "2026-10-10",
-  disclaimer: "Decision support only, not legal permission."
-};
-const VERDICT_LABEL = {
-  can_fly: "No restriction found in our data",
-  permission_needed: "Permission needed",
-  prohibited: "Prohibited",
-  cannot_determine: "Can't determine"
-};
-const ZONE_COLOR = { airport: "#b3261e", military: "#b3261e", park: "#a15c00", default: "#a15c00" };
-
-const map = L.map("map").setView([12.97, 77.59], 11);
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors" }).addTo(map);
-const zoneLayer = L.layerGroup().addTo(map);
-const resultLayer = L.layerGroup().addTo(map);
-let marker = null, picked = null, mode = "check";
-
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
-async function getJSON(path, options) {
-  const res = await fetch(API_BASE + path, options);
-  if (!res.ok) throw new Error(path + " returned " + res.status);
-  return res.json();
-}
-
-async function loadDrones() {
-  let drones;
-  try { drones = await getJSON("/drones"); }
-  catch (e) { if (!USE_MOCK_ON_FAILURE) throw e; drones = MOCK_DRONES; }
-  $("drone").innerHTML = drones.map(d => `<option value="${esc(d.drone_id)}">${esc(d.name)}</option>`).join("");
-}
-
-async function loadZones() {
-  try {
-    const fc = await getJSON("/zones");
-    L.geoJSON(fc, {
-      style: f => ({ color: ZONE_COLOR[f.properties.zone_type] || ZONE_COLOR.default, weight: 2, fillOpacity: 0.15 }),
-      onEachFeature: (f, layer) => layer.bindPopup(`<b>${esc(f.properties.name)}</b><br>${esc(f.properties.zone_type)}`)
-    }).addTo(zoneLayer);
-  } catch (e) { /* zones are drawn from the check result when /zones is unavailable */ }
-}
-
-function setDefaultTime() {
-  const d = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
-  $("when").value = d.toISOString().slice(0, 16);
-}
-
-map.on("click", e => {
-  if (mode === "sim") { addWaypoint(e.latlng); return; }
-  picked = e.latlng;
-  if (marker) marker.setLatLng(picked); else marker = L.marker(picked).addTo(map);
-  $("picked").textContent = `Selected: ${picked.lat.toFixed(4)}, ${picked.lng.toFixed(4)}`;
-  $("go").disabled = false;
-});
-
-function drawResult(r) {
-  resultLayer.clearLayers();
-  (r.zones || []).forEach(z => L.geoJSON(z.geometry, { style: { color: ZONE_COLOR[z.zone_type] || ZONE_COLOR.default, weight: 3, fillOpacity: 0.25 } })
-    .bindPopup(`<b>${esc(z.name)}</b><br>${esc(z.zone_type)}`).addTo(resultLayer));
-  (r.notices || []).forEach(n => L.geoJSON(n.geometry, { style: { color: "#1f4e79", weight: 3, dashArray: "6 6", fillOpacity: 0.15 } })
-    .bindPopup(`<b>${esc(n.title)}</b><br>${esc(n.starts_at)} to ${esc(n.ends_at)}`).addTo(resultLayer));
-}
-
-function renderResult(r, usedMock) {
-  drawResult(r);
-  const zones = (r.zones || []).map(z => `<li>${esc(z.name)} (${esc(z.zone_type)}${z.distance_km != null ? ", " + esc(z.distance_km) + " km" : ""})</li>`).join("");
-  const notices = (r.notices || []).map(n => `<li>${esc(n.title)}: ${esc(n.starts_at)} to ${esc(n.ends_at)}</li>`).join("");
-  const cites = (r.citations || []).map(c => `<div class="cite"><b>${esc(c.rule_id)}</b>${esc(c.text)}<div class="small">${esc(c.source)}</div></div>`).join("");
-  const steps = (r.next_steps || []).map(s => `<li>${esc(s)}</li>`).join("");
-  $("result").innerHTML = `
-    ${usedMock ? '<div class="small">Backend not reachable. Showing sample data.</div>' : ""}
-    <div class="badge ${esc(r.verdict)}">${esc(VERDICT_LABEL[r.verdict] || r.verdict)}</div>
-    <p>${esc(r.summary)}</p>
-    ${zones ? `<b>Zones</b><ul>${zones}</ul>` : ""}
-    ${notices ? `<b>Active notices</b><ul>${notices}</ul>` : ""}
-    ${cites ? `<b>Sources</b>${cites}` : ""}
-    ${steps ? `<b>Next steps</b><ul>${steps}</ul>` : ""}
-    <div class="small">Data last updated: ${esc(r.data_last_updated)}. ${esc(r.disclaimer)}</div>`;
-}
-
-$("go").addEventListener("click", async () => {
-  if (!picked) return;
-  const btn = $("go");
-  btn.disabled = true; btn.textContent = "Checking...";
-  $("result").innerHTML = '<div class="skel badge-s"></div><div class="skel"></div><div class="skel w80"></div><div class="skel w50"></div>';
-  const body = { lat: picked.lat, lng: picked.lng, drone_id: $("drone").value, datetime: new Date($("when").value).toISOString() };
-  try {
-    let result, usedMock = false;
-    try { result = await getJSON("/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); }
-    catch (e) { if (!USE_MOCK_ON_FAILURE) throw e; result = MOCK_RESULT; usedMock = true; }
-    renderResult(result, usedMock);
-  } catch (e) {
-    $("result").innerHTML = `<p class="small">Something went wrong: ${esc(e.message)}</p>`;
-  } finally {
-    btn.disabled = false; btn.textContent = "Check";
-  }
-});
-
-// ---- Simulated drone flight ----
-const VERDICT_COLOR = { can_fly: "#1a7f37", permission_needed: "#a15c00", prohibited: "#b3261e", cannot_determine: "#5b6570" };
-const simLayer = L.layerGroup().addTo(map);
-let waypoints = [], routeLine = null, playTimer = null;
-
-function setMode(m) {
-  mode = m;
-  $("tabCheck").classList.toggle("on", m === "check");
-  $("tabSim").classList.toggle("on", m === "sim");
-  $("checkBox").classList.toggle("hidden", m !== "check");
-  $("simBox").classList.toggle("hidden", m !== "sim");
-  $("result").innerHTML = "";
-}
-$("tabCheck").addEventListener("click", () => setMode("check"));
-$("tabSim").addEventListener("click", () => setMode("sim"));
-
-function addWaypoint(latlng) {
-  stopPlayback();
-  waypoints.push(latlng);
-  L.circleMarker(latlng, { radius: 5, color: "#1f4e79", fillColor: "#1f4e79", fillOpacity: 1 }).addTo(simLayer);
-  if (routeLine) routeLine.setLatLngs(waypoints); else routeLine = L.polyline(waypoints, { color: "#1f4e79", weight: 2, dashArray: "4 4" }).addTo(simLayer);
-  $("wpHint").textContent = waypoints.length + " waypoint(s). " + (waypoints.length < 2 ? "Add at least 2." : "Ready to run.");
-  $("run").disabled = waypoints.length < 2;
-}
-
-function clearRoute() {
-  stopPlayback(); simLayer.clearLayers(); waypoints = []; routeLine = null;
-  $("run").disabled = true; $("live").classList.add("hidden"); $("result").innerHTML = "";
-  $("wpHint").textContent = "Click the map to add waypoints (at least 2).";
-}
-$("clearRoute").addEventListener("click", clearRoute);
-
-function stopPlayback() { if (playTimer) { clearInterval(playTimer); playTimer = null; } }
-
-function fmtTime(s) { return Math.floor(s / 60) + " min " + Math.round(s % 60) + " s"; }
-
-function renderSimSummary(out) {
-  const sm = out.summary, fi = sm.first_issue;
-  $("result").innerHTML = `
-    <div class="badge ${esc(sm.worst_verdict)}">${esc(VERDICT_LABEL[sm.worst_verdict])}</div>
-    <p>Route length ${(sm.length_m / 1000).toFixed(2)} km, about ${esc(fmtTime(sm.duration_s))} at ${esc($("speed").value)} m/s.</p>
-    ${fi ? `<p>First issue after ${(fi.dist_m / 1000).toFixed(2)} km (${esc(fmtTime(fi.t_s))}): <b>${esc(VERDICT_LABEL[fi.verdict])}</b> in ${esc(fi.zones.join(", "))}. Rules: ${esc(fi.rule_ids.join(", "))}.</p>`
-          : "<p>No restriction found in our data along this route.</p>"}
-    <div class="small">Simulated flight. Data last updated: ${esc(out.data_last_updated)}. ${esc(out.disclaimer)}</div>`;
-}
-
-function play(out) {
-  stopPlayback();
-  const s = out.samples, rate = Number($("playback").value);
-  const dot = L.circleMarker([s[0].lat, s[0].lng], { radius: 8, color: "#1b1f24", weight: 2, fillColor: VERDICT_COLOR[s[0].verdict], fillOpacity: 1 }).addTo(simLayer);
-  let i = 0, simT = 0;
-  $("live").classList.remove("hidden");
-  playTimer = setInterval(() => {
-    simT += rate * 0.1;
-    while (i < s.length - 1 && s[i + 1].t_s <= simT) {
-      i++;
-      L.polyline([[s[i - 1].lat, s[i - 1].lng], [s[i].lat, s[i].lng]], { color: VERDICT_COLOR[s[i].verdict], weight: 5 }).addTo(simLayer);
-    }
-    const p = s[i];
-    dot.setLatLng([p.lat, p.lng]).setStyle({ fillColor: VERDICT_COLOR[p.verdict] });
-    $("live").innerHTML = `<div class="badge ${esc(p.verdict)}" style="margin:0 0 6px">${esc(VERDICT_LABEL[p.verdict])}</div>
-      <div>Time ${esc(fmtTime(p.t_s))}, distance ${(p.dist_m / 1000).toFixed(2)} km</div>
-      <div>${p.zones.length ? "Inside: " + esc(p.zones.join(", ")) : "Not inside any known zone"}</div>`;
-    if (i >= s.length - 1) { stopPlayback(); renderSimSummary(out); }
-  }, 100);
-}
-
-$("run").addEventListener("click", async () => {
-  const btn = $("run");
-  btn.disabled = true; btn.textContent = "Checking route...";
-  $("live").classList.add("hidden");
-  $("result").innerHTML = '<div class="skel badge-s"></div><div class="skel"></div><div class="skel w80"></div><div class="skel w50"></div>';
-  simLayer.eachLayer(l => { if (l instanceof L.Polyline && l !== routeLine && !(l instanceof L.CircleMarker)) simLayer.removeLayer(l); });
-  const body = { drone_id: $("drone").value, speed_mps: Number($("speed").value) || 10,
-    datetime: new Date($("when").value).toISOString(), waypoints: waypoints.map(w => ({ lat: w.lat, lng: w.lng })) };
-  try {
-    play(await getJSON("/simulate/route", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
-    $("result").innerHTML = '<div class="small">Simulating flight...</div>';
-  } catch (e) {
-    $("result").innerHTML = `<p class="small">Simulation needs the backend. ${esc(e.message)}</p>`;
-  } finally {
-    btn.disabled = waypoints.length < 2; btn.textContent = "Run simulation";
-  }
-});
-
-setDefaultTime();
-loadDrones();
-loadZones();
-</script>
+<script src="common.js"></script>
+<script src="pilot.js"></script>
 </body>
 </html>

@@ -28,8 +28,8 @@ The MongoDB showpiece stream. Verified on our local MongoDB 8.3: Atlas Search (`
 - P0: Atlas Search autocomplete with fuzzy matching on `zones.name` for the search box (contract 8). The endpoint already exists with a plain name match, keep the response shape.
 - P0: Geo queries done properly: viewport `$geoIntersects`, `$geoNear` for nearest zones, flights stored as GeoJSON with a time range and a geo plus time overlap query. Prove index use with `explain()` and note it in docs/SCALING.md.
 - P0: Real rules: replace placeholder text with the actual regulation (section and date for each). Decide the notices source (authority entry only).
-- P0: RAG with the remote Ollama: run `load_data.py`, vector index, tune the prompt on all eval cases, adversarial notice tests for prompt injection.
-- P0: Evaluation: grow to 30 cases including zone edges and overlaps, record real numbers for keyword (`$search`), vector and `$rankFusion` hybrid in docs/RESULTS.md.
+- P0 (connected by Nikhil): the Ollama laptop works (docs/OLLAMA.md) and the vector index is built. Remaining for you: re-embed after loading the real rules, calibrate `ASK_MIN_SCORE` with the eval, tune the prompts, adversarial notice tests for prompt injection.
+- P0: Evaluation: grow to 30 cases including zone edges and overlaps, re-run keyword, vector and hybrid on the real corpus and update docs/RESULTS.md (first numbers are there, on 7 sample rules).
 - P0: Analytics aggregation pipelines (contract 6): `$facet`, `$bucket`, `$group`, heatmap cells, breaches per zone, median decision time. Write results into summary collections with `$merge` so the dashboard and Atlas Charts read fast.
 - P1: Sharding plan in docs/SCALING.md (telemetry by drone_id and time, zones by geohash prefix), test with a larger synthetic dataset.
 - P2 stretch: MongoDB MCP server (open source) so officials can ask the airspace questions in plain language.

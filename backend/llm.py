@@ -30,3 +30,20 @@ def status(force=False):
         out["error"] = type(e).__name__
     _cache.update(t=time.time(), v=out)
     return out
+
+
+def warm_up():
+    """Load the model on the Ollama laptop in the background, so the first real question is not slow."""
+    if not config.USE_LLM:
+        return
+    import threading
+
+    def go():
+        try:
+            import ollama
+            ollama.Client(host=config.OLLAMA_URL, timeout=config.LLM_TIMEOUT_S).chat(
+                model=config.LLM_MODEL, messages=[{"role": "user", "content": "ok"}], options={"num_predict": 1}, keep_alive=config.LLM_KEEP_ALIVE)
+            print(f"[llm] {config.LLM_MODEL} loaded on {config.OLLAMA_URL}")
+        except Exception as e:
+            print(f"[llm] warm-up skipped ({type(e).__name__}), the app works without it")
+    threading.Thread(target=go, daemon=True).start()

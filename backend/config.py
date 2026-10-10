@@ -51,6 +51,8 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5:7b")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 USE_LLM = os.getenv("USE_LLM", "0") == "1"
+LLM_TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", "60"))   # a small model on a laptop CPU needs a few seconds, the first call also loads it
+LLM_KEEP_ALIVE = os.getenv("LLM_KEEP_ALIVE", "30m")      # keep the model loaded on the Ollama laptop between questions
 
 # Area our data covers: (min_lng, min_lat, max_lng, max_lat). Outside it the verdict is cannot_determine.
 def _region():
@@ -99,3 +101,7 @@ RATE_LIMITS = os.getenv("RATE_LIMITS", "1") == "1"
 
 # Drone weight classes come from data/region.json so the API and the UI use one source.
 DRONE_CLASSES = REGION["drone_classes"]
+
+# Ask SkyClear answers only when the question is about the rules: a keyword match, or a vector similarity at least this high.
+# Calibrated on a few real questions (related 0.80 to 0.91, unrelated 0.71 to 0.76). The eval should refine it.
+ASK_MIN_SCORE = float(os.getenv("ASK_MIN_SCORE", "0.78"))

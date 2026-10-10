@@ -39,10 +39,11 @@ Both laptops must be on the same network. If the venue Wi-Fi blocks laptop to la
 
 ## On this laptop
 
-1. In `.env` set:
+1. In `.env` set (use the model you actually pulled, for example `qwen2.5:3b`):
    ```
    USE_LLM=1
    OLLAMA_URL=http://<that-ip>:11434
+   LLM_MODEL=qwen2.5:3b
    ```
 2. Check the connection. It says exactly what to fix:
    ```
@@ -65,3 +66,7 @@ Nothing breaks. Check explanations use the plain template, Ask answers are taken
 - The model only words an explanation or an answer from passages we give it. Every citation id must be a real passage, the text must not call a flight safe, and it must not contradict the decided verdict. Otherwise the plain version is used.
 - Text from notices and from users is treated as data, never as instructions.
 - Hybrid search is one MongoDB aggregation (`$rankFusion` over `$vectorSearch` and Atlas Search), not code in the app.
+
+## Speed and settings
+
+On a laptop CPU a small model needs about 6 to 12 seconds per answer. The app is built around that: the verdict is shown at once and the AI explanation fills in afterwards, the model is kept loaded for 30 minutes (`LLM_KEEP_ALIVE`) and warmed up when the app starts, and calls wait up to 60 seconds (`LLM_TIMEOUT_S`). Measured numbers are in docs/RESULTS.md. A GPU or a smaller question prompt makes it faster.

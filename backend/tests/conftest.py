@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("USE_MONGO", "0")  # tests default to local JSON; run USE_MONGO=1 pytest backend for MongoDB
 os.environ.setdefault("RATE_LIMITS", "0")
+os.environ["USE_LLM"] = "0"          # tests never call a real model, even when .env turns it on
 os.environ["OTP_DEV_ECHO"] = "1"      # tests read the code from the response
 os.environ["OTP_PROVIDER"] = "console"
 os.environ["RUNTIME_PATH"] = str(Path(tempfile.mkdtemp()) / "runtime.json")

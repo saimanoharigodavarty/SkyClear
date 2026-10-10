@@ -46,11 +46,14 @@ Response:
       "source": "Sample source (verify against official regulation)"
     }
   ],
+  "explained_by": "template",
   "next_steps": ["Apply for permission on the official portal."],
   "data_last_updated": "2026-10-10",
   "disclaimer": "Decision support only, not legal permission."
 }
 ```
+
+`explained_by` is `llm` when the summary came from the language model and passed the checks, otherwise `template`. The rules that decided the verdict are always in `citations`.
 
 `verdict` is one of: `can_fly`, `permission_needed`, `prohibited`, `cannot_determine`.
 

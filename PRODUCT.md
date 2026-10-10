@@ -68,8 +68,8 @@ Severity: High means a wrong or unsafe answer, or harm to a person. Medium means
 
 | # | Loophole | Severity | Fix |
 |---|---|---|---|
-| A1 | An active notice with no matching notice rule for the drone class is ignored, so the verdict can be "can fly" during a VIP movement (false-safe). See backend/verdict.py, the notices branch. | High | If a notice is active at the point and no rule matches, return prohibited or at least cannot_determine, and cite the notice itself |
-| A2 | Inside a zone with no matching rule, the function returns cannot_determine immediately, which can hide a prohibited result from another zone at the same point. | High | Collect all hits first, then take the worst. Treat "no rule" as cannot_determine only when nothing stricter was found |
+| A1 | FIXED. An active notice with no matching notice rule was ignored, so the verdict could be "can fly" during a VIP movement. Now the notice itself becomes a prohibiting, cited rule. | High | If a notice is active at the point and no rule matches, return prohibited or at least cannot_determine, and cite the notice itself |
+| A2 | FIXED. Inside a zone with no matching rule, the function returned cannot_determine immediately and could hide a prohibited result from another zone. Now all hits are collected first. | High | Collect all hits first, then take the worst. Treat "no rule" as cannot_determine only when nothing stricter was found |
 | A3 | Route sampling every 100 m can skip a zone or notice narrower than 100 m, such as a motorcade corridor. | High | Sample by geometry intersection (segment against polygon), not by distance steps |
 | A4 | "Nearby" distance uses the nearest vertex, so it is wrong for long edges. | Low | Use true point-to-segment distance |
 | A5 | Polygon holes are ignored. | Medium | Handle inner rings |
@@ -133,11 +133,8 @@ Severity: High means a wrong or unsafe answer, or harm to a person. Medium means
 
 ## Build order for the hackathon
 
-1. Fix A1 and A2 (small, and they are false-safe bugs). Add eval cases that catch them.
-2. Accounts: simple pilot sign-in, drone list on the profile, self-declared numbers.
-3. Notices admin: authority role posts and cancels a notice.
-4. Saved flights, change-stream watcher, in-app live alert. This is the demo moment.
-5. Real rules and notices data, MongoStore (geo, vector, hybrid), Ollama explanation.
-6. Eval with 20 cases and real numbers. Demo rehearsal with a backup recording.
+1. Done: A1 and A2 fixed with tests, accounts, authority notices, saved flights with live alerts, MongoDB, Ollama explanation, 20 eval cases.
+2. Next: verify real rule text, real notices source, run the eval against the remote Ollama and record vector vs hybrid numbers.
+3. Then: change-stream alerting (alerts are sent when the notice is published today), A3 to A6, demo rehearsal with a backup recording.
 
 Later: official registry verification, email and SMS, authority dashboard, route corridor checks, altitude, flight log, live telemetry from a simulator.

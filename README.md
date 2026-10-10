@@ -99,31 +99,41 @@ See [DESIGN_RULES.md](DESIGN_RULES.md). Run `./scripts/check_design.sh` before e
 
 Decision support only, not legal permission. Always confirm with the official portal and local authorities.
 
-## Running it on the shared laptop
-
-Server laptop runs Ollama and MongoDB. Other laptops point to it:
+## Running it
 
 ```
-# on the server laptop
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r backend/requirements.txt
+cp .env.example .env                 # edit: USE_MONGO, OLLAMA_URL, USE_LLM
+docker compose up -d                 # MongoDB with geo, text and vector search (Atlas Local)
+python backend/load_data.py          # zones, rules, drones, notices, embeddings, indexes
+cd backend && uvicorn main:app --reload
+python ../scripts/seed_demo.py       # optional: demo pilot, flights and a VIP notice
+```
+
+Open http://localhost:8000. Without Docker, leave `USE_MONGO=0` and everything runs from the JSON files in data/.
+
+Ollama runs on another laptop, never required on yours. On the Ollama laptop:
+
+```
 OLLAMA_HOST=0.0.0.0 ollama serve
-ollama pull qwen2.5:7b        # use qwen2.5:3b if RAM is 8 GB
+ollama pull qwen2.5:7b        # qwen2.5:3b if RAM is 8 GB
 ollama pull nomic-embed-text
-ipconfig getifaddr en0         # find the server IP
-
-# on other laptops
-export OLLAMA_URL=http://<server-ip>:11434
-export MONGO_URI=mongodb://<server-ip>:27017
+ipconfig getifaddr en0         # its IP address
 ```
 
-If the venue Wi-Fi blocks laptop-to-laptop traffic, use a phone hotspot.
+On your laptop set `OLLAMA_URL=http://<that-ip>:11434` and `USE_LLM=1` in `.env`, then re-run `python backend/load_data.py` once to embed the rules and build the vector index. If Ollama cannot be reached the app keeps working: summaries use a plain template and rule search falls back to keyword search. `/health` shows the current mode. If the venue Wi-Fi blocks laptop-to-laptop traffic, use a phone hotspot.
+
+Tests: `python -m pytest backend` (local JSON) and `USE_MONGO=1 python -m pytest backend` (MongoDB, uses a throwaway database). Evaluation: `cd backend && python eval.py`.
 
 ## Folder layout
 
 ```
 data/       rules.json, zones.geojson, drones.json, notices.json, eval_cases.json
-backend/    config.py, geo.py, build_zones.py, sim.py, runtime.py, bridge.py, pipeline.py, search.py, verdict.py, explain.py, main.py, load_data.py, eval.py, tests/
+backend/    config.py, db.py, embeddings.py, geo.py, build_zones.py, sim.py, runtime.py, bridge.py, pipeline.py, search.py, verdict.py, explain.py, main.py, load_data.py, eval.py, tests/
 frontend/   index.html + pilot.js, official.html + official.js, account.html, common.js, app.css, terms.html, privacy.html
 scripts/    check_design.sh, seed_demo.py
+docker-compose.yml   MongoDB (Atlas Local)
 ```
 
 ## Status
@@ -133,10 +143,12 @@ scripts/    check_design.sh, seed_demo.py
 - [x] Base: sample data, local search, rule engine, template explanation, API, map page, tests (runs without MongoDB or Ollama)
 - [x] Airport zones for India (derived, 5 km / 3 km circles), simulated drone route check and playback
 - [x] Hyderabad demo data, accounts, permission requests, official notices, pilot alerts, redesigned UI
-- [ ] Real rules and notices, military and park zones
-- [ ] load_data.py and MongoStore (geo, vector, hybrid search, embeddings)
-- [ ] LLM explanation and citation validation
-- [ ] 20 eval cases and metrics
+- [x] MongoDB: loader, 2dsphere geo queries, text, vector and hybrid rule search, accounts and flights in MongoDB
+- [x] Ollama explanation with citation validation, consistency checks and fallback
+- [x] False-safe bugs A1 and A2 fixed
+- [x] 20 eval cases and metrics (verdict accuracy, false-safe rate, citation recall, text vs vector vs hybrid)
+- [ ] Real rule text verified against the official regulation, real notices source
+- [ ] Run eval against the remote Ollama and record the vector vs hybrid numbers
 - [ ] Demo rehearsal
 
 Who does what: see [TEAM.md](TEAM.md).

@@ -10,7 +10,6 @@ function showTab(t) {
   tab = t;
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
   ["check", "sim", "flights", "alerts"].forEach(x => $("tab-" + x).classList.toggle("hidden", x !== t));
-  $("shared").classList.toggle("hidden", t === "flights" || t === "alerts");
   if (t === "flights") loadFlights();
   if (t === "alerts") loadAlerts();
 }
@@ -21,8 +20,12 @@ async function loadDrones() {
   try { catalog = await api("/drones", { auth: false }); } catch (e) { catalog = []; }
   mine = me() ? await api("/me/drones").catch(() => []) : [];
   const opt = d => `<option value="${esc(d.drone_id)}">${esc(d.name)} (${esc(d.class)})</option>`;
-  $("drone").innerHTML = (mine.length ? `<optgroup label="My drones">${mine.map(opt).join("")}</optgroup>` : "") +
-    `<optgroup label="Sample drones">${catalog.map(opt).join("")}</optgroup>`;
+  const options = (mine.length ? `<optgroup label="My drones">${mine.map(opt).join("")}</optgroup>` : "") +
+    `<optgroup label="Sample drones, for trying the app">${catalog.map(opt).join("")}</optgroup>`;
+  const keep = $("drone").value;
+  $("drone").innerHTML = options; $("simDrone").innerHTML = options;
+  if (keep) $("drone").value = keep;
+  updateDroneHelp();
   $("myDrones").innerHTML = mine.length
     ? mine.map(d => `<div class="item"><div class="head"><span class="title">${esc(d.name)}</span>${verifyBadge(d.verification)}</div>
         <div class="meta">${esc(d.weight_g)} g, class ${esc(d.class)}${d.serial ? ", serial " + esc(d.serial) : ""}${d.uin ? ", reg. " + esc(d.uin) : ""}</div>
@@ -34,9 +37,25 @@ async function loadDrones() {
     : '<div class="hint">No drones yet. Add one so checks use your real weight class.</div>';
   document.querySelectorAll("form[data-dv]").forEach(f => f.addEventListener("submit", e => submitDroneVerification(e, f.dataset.dv)));
   renderPilotVerify();
+  if (me() && $("checklist")) renderChecklist();
+}
+
+function renderChecklist() {
+  const u = me() || {}, pv = (u.verification || {}).status || "unverified";
+  const drone = mine[0], dv = drone && (drone.verification || {}).status;
+  const steps = [
+    ["Create your account", true, "Done", ""],
+    ["Verify your pilot certificate", pv === "verified", pv === "pending" ? "Waiting for an officer" : pv === "verified" ? "Verified" : "Do this next", "pilotVerify"],
+    ["Add your drone", mine.length > 0, mine.length ? "Done" : "Add it below", "droneForm"],
+    ["Verify your drone", dv === "verified", dv === "pending" ? "Waiting for an officer" : dv === "verified" ? "Verified" : mine.length ? "Send its serial number" : "After adding it", "myDrones"],
+    ["Request permission when a spot needs it", false, "Check a spot, then press Request permission", ""]
+  ];
+  const done = steps.filter(s => s[1]).length;
+  $("checklist").innerHTML = `<div class="progress">${done} of 4 steps done</div><ul class="checklist">${steps.map((s, i) => `<li class="${s[1] ? "done" : ""}"><span class="n">${s[1] ? "&#10003;" : i + 1}</span><div><div class="t">${esc(s[0])}</div><div class="small">${esc(s[2])}</div></div></li>`).join("")}</ul>`;
 }
 
 function renderPilotVerify() {
+  if (!me()) return;
   const u = me(), v = (u && u.verification) || { status: "unverified" };
   $("pilotVerify").innerHTML = `<div class="item"><div class="head"><span class="title">Pilot certificate</span>${verifyBadge(v)}</div>
     ${v.status === "verified" ? `<div class="meta">Verified by ${esc(v.by)} on ${esc(fmtWhen(v.at))}</div>` : v.status === "pending" ? '<div class="meta">Waiting for an officer to check your documents.</div>' : `
@@ -62,14 +81,34 @@ async function submitDroneVerification(e, droneId) {
 }
 async function refreshMe() { const u = await api("/me"); const s = session(); s.user = u; saved("skyclear.session", s); }
 
+/* ---------- guidance: welcome, steps, examples, drone help ---------- */
+const CLASS_HELP = { nano: "Nano: up to 250 g", micro: "Micro: 250 g to 2 kg", small: "Small: 2 kg to 25 kg", medium: "Medium: 25 kg to 150 kg" };
+function updateDroneHelp() {
+  const all = [...mine, ...catalog], d = all.find(x => x.drone_id === $("drone").value);
+  $("droneHelp").textContent = d ? `${CLASS_HELP[d.class]}. The rules depend on the weight class.${me() ? "" : " Sign in to use your own registered drones."}` : "";
+}
+$("drone").addEventListener("change", updateDroneHelp);
+function setStep(n) { document.querySelectorAll("#stepper span").forEach(s => { const i = Number(s.dataset.s); s.className = i < n ? "done" : i === n ? "on" : ""; }); }
+function setPick(latlng) {
+  picked = latlng;
+  if (marker) marker.setLatLng(picked); else marker = L.marker(picked, { icon: pinIcon(), keyboard: false }).addTo(layers.work);
+  $("picked").innerHTML = `Selected <span class="mono">${picked.lat.toFixed(4)}, ${picked.lng.toFixed(4)}</span>. Step 2: check your drone and time, then press Check.`;
+  $("go").disabled = false; setStep(2);
+}
+function pickAndCheck(lat, lng) { showTab("check"); map.flyTo([lat, lng], 15, { duration: 0.6 }); setPick(L.latLng(lat, lng)); $("go").click(); }
+document.querySelectorAll("[data-ex]").forEach(b => b.addEventListener("click", () => {
+  const [lat, lng] = b.dataset.ex.split(",").map(Number);
+  if (b.textContent.includes("nano")) { const nano = catalog.find(d => d.class === "nano"); if (nano) $("drone").value = nano.drone_id; }
+  pickAndCheck(lat, lng);
+}));
+if (!saved("skyclear.welcome.hidden")) $("welcome").classList.remove("hidden");
+$("hideWelcome").addEventListener("click", () => { saved("skyclear.welcome.hidden", true); $("welcome").classList.add("hidden"); });
+bindMapSearch(map, ll => { if (tab === "check") setPick(L.latLng(ll.lat, ll.lng)); });
+
 /* ---------- map clicks ---------- */
 map.on("click", e => {
-  if (tab === "check") {
-    picked = e.latlng;
-    if (marker) marker.setLatLng(picked); else marker = L.marker(picked, { icon: pinIcon(), keyboard: false }).addTo(layers.work);
-    $("picked").innerHTML = `Selected <span class="mono">${picked.lat.toFixed(4)}, ${picked.lng.toFixed(4)}</span>`;
-    $("go").disabled = false;
-  } else if (tab === "sim") addWaypoint(e.latlng);
+  if (tab === "check") setPick(e.latlng);
+  else if (tab === "sim") addWaypoint(e.latlng);
 });
 
 /* ---------- check ---------- */
@@ -91,8 +130,8 @@ function renderCheck(r) {
   const near = (r.zones || []).filter(z => z.distance_km > 0);
   const zl = z => `<li><b>${esc(z.name)}</b> <span class="muted">${esc(z.zone_type)}</span><span class="meta mono" style="float:right">${z.distance_km === 0 ? "inside" : esc(z.distance_km) + " km"}</span></li>`;
   $("result").innerHTML = `
-    <div class="verdict ${esc(r.verdict)}"><div class="v">${esc(VERDICT_LABEL[r.verdict] || r.verdict)}</div><div class="s">For the selected drone, spot and time</div></div>
-    <p style="margin:0">${esc(r.summary)}</p>
+    <div class="verdict ${esc(r.verdict)}"><div class="v">${esc(VERDICT_LABEL[r.verdict] || r.verdict)}</div><div class="s">${esc(VERDICT_MEANING[r.verdict] || "")}</div></div>
+    <p style="margin:0"><b>Why:</b> ${esc(r.summary)}</p>
     <div class="small" style="margin-top:6px">${r.explained_by === "llm" ? "Explanation written by an AI model from the rules below. The verdict itself is decided by rules, not by the model." : "The verdict is decided by rules."}</div>
     ${inside.length ? `<div class="section"><h3>Inside</h3><ul class="list">${inside.map(zl).join("")}</ul></div>` : ""}
     ${r.notices.length ? `<div class="section"><h3>Active notices</h3><ul class="list">${r.notices.map(n => `<li><b>${esc(n.title)}</b><div class="meta">${esc(fmtWhen(n.starts_at))} to ${esc(fmtWhen(n.ends_at))}</div></li>`).join("")}</ul></div>` : ""}
@@ -142,7 +181,10 @@ $("go").addEventListener("click", async () => {
   const btn = $("go");
   btn.disabled = true; btn.textContent = "Checking...";
   $("result").innerHTML = skeleton(); $("actions").innerHTML = "";
+  $("welcome").classList.add("hidden");  // the pilot has found their feet, give the answer the room
+  $("result").scrollIntoView({ behavior: "smooth", block: "start" });
   try {
+    setStep(3);
     renderCheck(await api("/check", { method: "POST", auth: false, body: { lat: picked.lat, lng: picked.lng, drone_id: $("drone").value, datetime: toISO($("when").value) } }));
   } catch (e) { $("result").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
   finally { btn.disabled = false; btn.textContent = "Check this spot"; }
@@ -200,8 +242,8 @@ $("run").addEventListener("click", async () => {
   $("live").classList.add("hidden"); $("simResult").innerHTML = skeleton();
   simLayer.eachLayer(l => { if (l instanceof L.Polyline && l !== routeLine) simLayer.removeLayer(l); });
   try {
-    const out = await api("/simulate/route", { method: "POST", auth: false, body: { drone_id: $("drone").value, speed_mps: Number($("speed").value) || 10,
-      datetime: toISO($("when").value), waypoints: waypoints.map(w => ({ lat: w.lat, lng: w.lng })) } });
+    const out = await api("/simulate/route", { method: "POST", auth: false, body: { drone_id: $("simDrone").value, speed_mps: Number($("speed").value) || 10,
+      datetime: toISO($("simWhen").value), waypoints: waypoints.map(w => ({ lat: w.lat, lng: w.lng })) } });
     $("simResult").innerHTML = '<div class="hint">Simulating flight...</div>';
     play(out);
   } catch (e) { $("simResult").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
@@ -211,14 +253,15 @@ $("run").addEventListener("click", async () => {
 /* ---------- flights ---------- */
 function gate(id, bodyId, text) {
   const ok = !!me();
-  $(id).innerHTML = ok ? "" : `<p>${text}</p><a href="account.html"><button type="button">Sign in or register</button></a>`;
+  $(id).innerHTML = ok ? "" : `<div class="welcome"><h2>Sign in to continue</h2><p>${text}</p><div class="btnrow"><a class="btn-sm" href="account.html">Sign in</a><a class="btn-ghost" href="account.html?tab=register">Create a free account</a></div></div>`;
   $(bodyId).classList.toggle("hidden", !ok);
   return ok;
 }
 async function loadFlights() {
-  if (!gate("flightsGate", "flightsBody", "Sign in to register your drones, watch flights and request permission from the authority.")) return;
+  if (!gate("flightsGate", "flightsBody", "An account lets you register your drones, watch flights, request permission from the authority and get alerted when a restriction appears. Checking a spot never needs an account.")) return;
   await refreshMe().catch(() => {});
   await loadDrones();
+  renderChecklist();
   $("flightList").innerHTML = skeleton();
   try {
     const list = await api("/flights");
@@ -301,7 +344,7 @@ function renderAlerts(a) {
     </div>`).join("") : '<div class="hint">No alerts yet. When an authority publishes a restriction that touches one of your flights, it appears here.</div>';
 }
 async function loadAlerts() {
-  if (!gate("alertsGate", "alertsBody", "Sign in to get alerts about restrictions that affect your flights.")) return;
+  if (!gate("alertsGate", "alertsBody", "Alerts tell you when an official restriction touches one of your flights, and when an officer decides your request. Sign in to receive them.")) return;
   $("alertList").innerHTML = skeleton();
   const a = await pollAlerts(); if (a) renderAlerts(a);
 }
@@ -309,6 +352,12 @@ $("markRead").addEventListener("click", async () => { await api("/notifications/
 $("bannerBtn").addEventListener("click", () => showTab("alerts"));
 
 /* ---------- start ---------- */
-$("when").value = toLocalInput(new Date());
+$("when").value = toLocalInput(new Date()); $("simWhen").value = $("when").value;
 drawZones(layers); drawNotices(layers.notices); loadDrones();
 if (me()) { refreshMe().catch(() => {}); pollAlerts(); setInterval(() => { pollAlerts(); drawNotices(layers.notices); }, 5000); }
+
+// Example route: south to north across the Rajiv Gandhi Airport zone.
+$("exRoute").addEventListener("click", () => {
+  clearRoute(); map.fitBounds([[17.15, 78.43], [17.32, 78.43]], { padding: [60, 60] });
+  addWaypoint(L.latLng(17.15, 78.43)); addWaypoint(L.latLng(17.32, 78.43));
+});

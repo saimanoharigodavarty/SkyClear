@@ -37,7 +37,7 @@ async function loadRequests() {
     const list = await api("/flights" + (filter === "requested" ? "?status=requested" : ""));
     reqLayer.clearLayers();
     list.forEach(f => L.marker([f.lat, f.lng], { icon: pinIcon(f.status === "requested" ? "pending" : ""), keyboard: false }).bindPopup(`<b class="mono">${esc(f.flight_id)}</b><br>${esc(f.pilot_name)}`).addTo(reqLayer));
-    $("reqList").innerHTML = list.length ? list.map(reqCard).join("") : `<div class="hint">${filter === "requested" ? "No pending requests for your office." : "No flights yet."}</div>`;
+    $("reqList").innerHTML = list.length ? list.map(reqCard).join("") : `<div class="hint">${filter === "requested" ? "No pending requests for your office. A request appears here when a pilot asks for permission in an area you are responsible for. To see one, sign in as asha@example.com in another window and request permission near the Secretariat." : "No flights yet."}</div>`;
     $("reqList").querySelectorAll("[data-show]").forEach(b => b.addEventListener("click", () => { const [a, o] = b.dataset.show.split(",").map(Number); map.setView([a, o], 14); }));
     $("reqList").querySelectorAll("[data-decide]").forEach(b => b.addEventListener("click", () => decide(b.dataset.id, b.dataset.decide)));
     $("reqList").querySelectorAll("[data-revoke]").forEach(b => b.addEventListener("click", () => revoke(b.dataset.revoke)));
@@ -112,12 +112,13 @@ function drawPreview() {
   if (preview) { layers.work.removeLayer(preview); preview = null; }
   if (centre) preview = L.circle(centre, { radius: (Number($("nRadius").value) || 0) * 1000, color: NOTICE_COLOR, weight: 2, dashArray: "6 5", fillOpacity: 0.12 }).addTo(layers.work);
 }
-map.on("click", e => {
-  if (tab !== "publish") return;
-  centre = e.latlng; drawPreview();
+function setCentre(ll) {
+  centre = L.latLng(ll.lat, ll.lng); drawPreview();
   $("nCenter").innerHTML = `Centre <span class="mono">${centre.lat.toFixed(4)}, ${centre.lng.toFixed(4)}</span>`;
   $("nGo").disabled = false;
-});
+}
+map.on("click", e => { if (tab === "publish") setCentre(e.latlng); });
+bindMapSearch(map, ll => { if (tab === "publish") setCentre(ll); });
 $("nRadius").addEventListener("input", drawPreview);
 $("noticeForm").addEventListener("submit", async e => {
   e.preventDefault();
@@ -154,4 +155,13 @@ async function loadNotices() {
 const now = new Date();
 $("nStart").value = toLocalInput(now); $("nEnd").value = toLocalInput(new Date(now.getTime() + 3 * 3600000));
 drawZones(layers); drawNotices(layers.notices); loadStats(); loadRequests();
+(async () => {
+  const u = sess.user, box = $("office");
+  try {
+    const mine = (await api("/authorities")).find(a => a.authority_id === u.authority_id);
+    box.innerHTML = mine
+      ? `<b>${esc(mine.name)}</b><div class="small">You review permission requests for the areas this office is responsible for. Expected response time: ${esc(mine.sla_minutes)} minutes, after which a request is flagged overdue and shown to the supervising office.</div>`
+      : `<b>Administrator view</b><div class="small">You see every office, all requests and all verification requests.</div>`;
+  } catch (e) { box.textContent = ""; }
+})();
 setInterval(() => { loadStats(); if (tab === "requests") loadRequests(); }, 6000);

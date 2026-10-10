@@ -4,56 +4,92 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SkyClear, sign in</title>
+<script>try{var t=localStorage.getItem("skyclear.theme");t=t&&JSON.parse(t);if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
 <header class="top" id="top"></header>
-<main class="auth">
-  <h1>One platform for pilots and the authority</h1>
-  <p class="lead">Pilots check a flight, register their drones, request permission and get alerted. Officials review requests and publish restrictions such as VIP movements. Both sides see the same rules and the same map.</p>
-  <div class="authgrid">
-    <section class="authbox">
-      <h2>Sign in</h2>
-      <p class="small">Pilots and officials use the same form.</p>
-      <form id="loginForm">
-        <label for="lEmail">Email</label><input id="lEmail" type="email" required autocomplete="username">
-        <label for="lPass">Password</label><input id="lPass" type="password" required autocomplete="current-password">
-        <button type="submit">Sign in</button>
-        <div id="lMsg"></div>
-      </form>
-      <div class="msg" style="margin-top:16px"><b>Demo officer accounts</b> (password <span class="mono">skyclear-demo</span>)<br><span class="mono">official@skyclear.demo</span> sees everything<br><span class="mono">police@, rgia@, begumpet@, defence@, forest@, hq@</span> <span class="mono">skyclear.demo</span> see only their own office<br><span class="small">Prototype only. Change them before any shared deployment.</span></div>
-    </section>
-    <section class="authbox">
-      <h2>Register as a pilot</h2>
-      <p class="small">Free. Needed for alerts, saved flights and permission requests. Checking a spot never needs an account.</p>
-      <form id="regForm">
-        <label for="rName">Full name</label><input id="rName" required minlength="2" maxlength="80" autocomplete="name">
-        <label for="rEmail">Email</label><input id="rEmail" type="email" required autocomplete="email">
-        <label for="rPass">Password (8 or more characters)</label><input id="rPass" type="password" required minlength="8" autocomplete="new-password">
-        <label for="rCert">Remote pilot certificate no. (optional)</label><input id="rCert" maxlength="40" placeholder="Self-declared, not verified">
-        <button type="submit">Create pilot account</button>
-        <div id="rMsg"></div>
-      </form>
-    </section>
+<main class="authwrap">
+  <h1 id="title">Sign in to SkyClear</h1>
+  <p class="lead" id="lead">Pilots check flights, request permission and get alerts. Officials review requests and publish restrictions.</p>
+  <div id="notice"></div>
+
+  <div class="authtabs" id="tabs"><button type="button" data-t="signin" class="on">Sign in</button><button type="button" data-t="register">Create pilot account</button></div>
+
+  <div class="authbox2">
+    <!-- sign in -->
+    <form id="signinForm">
+      <label for="lId">Email or mobile number</label>
+      <input id="lId" required autocomplete="username" placeholder="you@example.com or 98765 43210">
+      <label for="lPass">Password</label>
+      <input id="lPass" type="password" required autocomplete="current-password">
+      <button type="submit">Sign in</button>
+      <button type="button" class="linkbtn" id="useOtp">Use a one-time code on my phone instead</button>
+      <div id="signinMsg"></div>
+    </form>
+
+    <!-- register -->
+    <form id="registerForm" class="hidden">
+      <label for="rName">Full name</label><input id="rName" required minlength="2" maxlength="80" autocomplete="name">
+      <label for="rEmail">Email</label><input id="rEmail" type="email" required autocomplete="email">
+      <label for="rPhone">Mobile number (India)</label><input id="rPhone" type="tel" required autocomplete="tel" placeholder="98765 43210">
+      <div class="help">We send a one-time code to confirm it. One account per number.</div>
+      <label for="rPass">Password</label><input id="rPass" type="password" required minlength="8" autocomplete="new-password">
+      <div class="help">At least 8 characters.</div>
+      <label class="consent"><input id="rConsent" type="checkbox" required><span>I agree to the <a href="terms.html" target="_blank">Terms of Service</a> and the <a href="privacy.html" target="_blank">Privacy Policy</a>, and to SkyClear storing my details to run my account.</span></label>
+      <button type="submit">Create account and send code</button>
+      <div id="registerMsg"></div>
+    </form>
+
+    <!-- one-time code -->
+    <form id="otpForm" class="hidden">
+      <p id="otpText" style="margin-top:0">Enter the 6-digit code we sent.</p>
+      <label for="otpCode">One-time code</label>
+      <input id="otpCode" class="codeinput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required>
+      <div id="devCode"></div>
+      <button type="submit">Verify and continue</button>
+      <button type="button" class="linkbtn" id="resend">Send a new code</button>
+      <button type="button" class="linkbtn" id="otpBack">Back</button>
+      <div id="otpMsg"></div>
+    </form>
+
+    <!-- one-time code request (no password) -->
+    <form id="otpAskForm" class="hidden">
+      <label for="oId">Mobile number or email of your pilot account</label>
+      <input id="oId" required placeholder="98765 43210">
+      <button type="submit">Send me a code</button>
+      <button type="button" class="linkbtn" id="otpAskBack">Back to password sign in</button>
+      <div id="otpAskMsg"></div>
+    </form>
+
+    <!-- officials: authenticator -->
+    <form id="mfaForm" class="hidden">
+      <p id="mfaText" style="margin-top:0">Enter the 6-digit code from your authenticator app.</p>
+      <div id="mfaSetup"></div>
+      <label for="mfaCode">Authenticator code</label>
+      <input id="mfaCode" class="codeinput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required>
+      <button type="submit">Verify and sign in</button>
+      <div id="mfaMsg"></div>
+    </form>
   </div>
+
+  <details class="demo">
+    <summary>Demo accounts for the hackathon</summary>
+    <p class="help" style="margin-top:8px">Click to fill the form, then press Sign in. These exist only in this prototype.</p>
+    <div class="examples">
+      <button type="button" data-demo="asha@example.com|longenough1">Pilot: Asha (verified, has a permit)</button>
+      <button type="button" data-demo="official@skyclear.demo|skyclear-demo">Officer: sees all offices</button>
+      <button type="button" data-demo="police@skyclear.demo|skyclear-demo">Officer: City Police desk</button>
+      <button type="button" data-demo="rgia@skyclear.demo|skyclear-demo">Officer: Airport desk</button>
+    </div>
+    <p class="help">To try registration, use any 10-digit number starting 6 to 9. In demo mode the code is shown on screen. In production it is sent by SMS.</p>
+  </details>
 </main>
 <footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a>Registration on SkyClear is not government registration of your drone or licence.</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="common.js"></script>
-<script>
-header(null);
-function done(r) { saved("skyclear.session", r); location.href = r.user.role === "official" ? "official.html" : "index.html"; }
-$("loginForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  try { done(await api("/auth/login", { method: "POST", auth: false, body: { email: $("lEmail").value, password: $("lPass").value } })); }
-  catch (err) { $("lMsg").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
-});
-$("regForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  try { done(await api("/auth/register", { method: "POST", auth: false, body: { name: $("rName").value, email: $("rEmail").value, password: $("rPass").value, pilot_cert: $("rCert").value || null } })); }
-  catch (err) { $("rMsg").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
-});
-</script>
+<script src="account.js"></script>
 </body>
 </html>

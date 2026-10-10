@@ -1,5 +1,6 @@
 // Shared helpers for all SkyClear pages.
-const API_BASE = "";  // empty = same origin as the backend
+// Opened straight from a file (file://)? Talk to the local server instead of failing silently.
+const API_BASE = location.protocol === "file:" ? "http://localhost:8000" : "";
 const HYD = [17.385, 78.4867];
 
 const $ = id => document.getElementById(id);
@@ -11,6 +12,12 @@ const VERDICT_LABEL = {
   prohibited: "Prohibited",
   cannot_determine: "Can't determine"
 };
+const VERDICT_MEANING = {
+  can_fly: "Our data shows no restriction at this spot, for this drone and time. That is not a guarantee. Confirm on the official portal before you fly.",
+  permission_needed: "You need permission from the authority before flying here. Request it below and we send it to the right officer.",
+  prohibited: "Do not fly here. Pick another spot or another time.",
+  cannot_determine: "Our data does not cover this spot. Ask the local authority or the official portal."
+};
 const STATUS_LABEL = { watching: "Watching", requested: "Pending", approved: "Approved", rejected: "Rejected", cancelled: "Cancelled", active: "Active", revoked: "Revoked", expired: "Expired", pending: "Pending", verified: "Verified", unverified: "Not verified" };
 const RED = "#b3261e", AMBER = "#a15c00", NOTICE_COLOR = "#1f4e79";
 // Severity grouping: defence zones are prohibited, the rest need permission (or depend on the drone).
@@ -21,34 +28,93 @@ function saved(key, value) {
   try { if (value === undefined) return JSON.parse(localStorage.getItem(key)); if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, JSON.stringify(value)); }
   catch (e) { return null; }
 }
+
+/* ---------- theme: light, dark, or follow the device ---------- */
+const THEMES = ["system", "light", "dark"];
+const THEME_LABEL = { system: "Theme: Auto", light: "Theme: Light", dark: "Theme: Dark" };
+const themeChoice = () => (THEMES.includes(saved("skyclear.theme")) ? saved("skyclear.theme") : "system");
+const isDark = () => themeChoice() === "dark" || (themeChoice() === "system" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+function applyTheme() {
+  const t = themeChoice();
+  if (t === "system") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  window.dispatchEvent(new Event("skyclear:theme"));
+}
+function cycleTheme() { saved("skyclear.theme", THEMES[(THEMES.indexOf(themeChoice()) + 1) % THEMES.length]); applyTheme(); const b = $("themeBtn"); if (b) b.textContent = THEME_LABEL[themeChoice()]; }
+if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (themeChoice() === "system") applyTheme(); });
+
+/* ---------- session and API ---------- */
 const session = () => saved("skyclear.session");
-const token = () => (session() || {}).token;
+const token = () => (session() || {}).access_token || (session() || {}).token;
+function setSession(t) { saved("skyclear.session", { access_token: t.access_token, token: t.access_token, refresh_token: t.refresh_token, user: t.user }); }
+function clearSession() { saved("skyclear.session", null); }
+
+function serverDown(show) {
+  let bar = $("serverDown");
+  if (!show) { if (bar) bar.remove(); return; }
+  if (bar) return;
+  bar = document.createElement("div"); bar.id = "serverDown"; bar.className = "serverdown"; bar.setAttribute("role", "alert");
+  bar.innerHTML = 'Cannot reach the SkyClear server. Start it with <code>./run.sh</code> in the project folder, then reload this page.';
+  document.body.insertBefore(bar, document.body.firstChild);
+}
+
+let refreshing = null;
+function refreshTokens() {
+  const s = session();
+  if (!s || !s.refresh_token) return Promise.reject(new Error("no session"));
+  refreshing = refreshing || fetch(API_BASE + "/auth/refresh", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: s.refresh_token }) })
+    .then(async r => { if (!r.ok) throw new Error("session ended"); setSession(await r.json()); })
+    .finally(() => { refreshing = null; });
+  return refreshing;
+}
+
+// fetch with the access token, one automatic refresh when it has expired.
+async function authFetch(path, opts = {}, auth = true) {
+  const go = () => {
+    const headers = { ...(opts.headers || {}) };
+    if (auth && token()) headers.Authorization = "Bearer " + token();
+    return fetch(API_BASE + path, { ...opts, headers });
+  };
+  let res;
+  try { res = await go(); serverDown(false); }
+  catch (e) { serverDown(true); throw new Error("Cannot reach the SkyClear server. Is it running?"); }
+  if (res.status === 401 && auth && session()) {
+    let detail = ""; try { detail = (await res.clone().json()).detail; } catch (e) { /* keep */ }
+    if (detail === "token_expired") {
+      try { await refreshTokens(); res = await go(); }
+      catch (e) { clearSession(); if (document.body.dataset.requireAuth) location.href = "account.html?expired=1"; }
+    } else { clearSession(); if (document.body.dataset.requireAuth) location.href = "account.html?expired=1"; }
+  }
+  return res;
+}
 
 async function api(path, { method = "GET", body, auth = true } = {}) {
-  const headers = {};
-  if (body !== undefined) headers["Content-Type"] = "application/json";
-  if (auth && token()) headers.Authorization = "Bearer " + token();
-  let res;
-  try { res = await fetch(API_BASE + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }); }
-  catch (e) { throw new Error("Cannot reach the SkyClear server. Is it running?"); }
-  if (res.status === 401 && token()) { saved("skyclear.session", null); }
+  const opts = { method };
+  if (body !== undefined) { opts.headers = { "Content-Type": "application/json" }; opts.body = JSON.stringify(body); }
+  const res = await authFetch(path, opts, auth);
   if (!res.ok) {
     let detail = res.status + "";
     try { const j = await res.json(); detail = typeof j.detail === "string" ? j.detail : (j.detail || []).map(d => d.msg).join(", ") || detail; } catch (e) { /* keep status */ }
-    throw new Error(detail);
+    const err = new Error(detail); err.status = res.status; throw err;
   }
   return res.json();
 }
 
+async function signOut() {
+  const s = session();
+  if (s && s.refresh_token) { try { await fetch(API_BASE + "/auth/logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: s.refresh_token }) }); } catch (e) { /* signing out anyway */ } }
+  clearSession(); location.href = "account.html";
+}
+
+/* ---------- formatting ---------- */
 function fmtWhen(iso) {
   const d = new Date(iso);
   return isNaN(d) ? String(iso) : d.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 function toLocalInput(d) { const x = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return x.toISOString().slice(0, 16); }
 const toISO = v => new Date(v).toISOString();
-
 function skeleton() { return '<div class="skel big"></div><div class="skel"></div><div class="skel w80"></div><div class="skel w50"></div>'; }
 
+/* ---------- header ---------- */
 function header(active) {
   const s = session();
   $("top").innerHTML = `
@@ -57,59 +123,89 @@ function header(active) {
       <a href="index.html" class="${active === "pilot" ? "on" : ""}">Pilot</a>
       <a href="official.html" class="${active === "official" ? "on" : ""}">Authority</a>
     </nav>
-    <div class="who">${s ? `<span>${esc(s.user.name)}</span><span class="role">${esc(s.user.role)}</span><a href="#" id="signout">Sign out</a>`
-                          : `<a href="account.html">Sign in</a>`}</div>`;
+    <div class="who">
+      <button id="themeBtn" class="themebtn" type="button" title="Switch between light, dark and automatic">${THEME_LABEL[themeChoice()]}</button>
+      ${s ? `<span>${esc(s.user.name)}</span><span class="role">${esc(s.user.role)}</span><a href="#" id="signout">Sign out</a>`
+          : `<a class="btn-ghost" href="account.html">Sign in</a><a class="btn-sm" href="account.html?tab=register">Create account</a>`}
+    </div>`;
+  $("themeBtn").addEventListener("click", cycleTheme);
   const out = $("signout");
-  if (out) out.addEventListener("click", e => { e.preventDefault(); saved("skyclear.session", null); location.href = "account.html"; });
+  if (out) out.addEventListener("click", e => { e.preventDefault(); signOut(); });
 }
 
-function footer() {
-  return '<footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a>Decision support only, not legal permission. Zones and rules are sample or derived data until verified.</footer>';
-}
-
+/* ---------- map ---------- */
 function circleOf(n) { return L.geoJSON(n.area || n.geometry, { style: { color: NOTICE_COLOR, weight: 2, dashArray: "6 5", fillColor: NOTICE_COLOR, fillOpacity: 0.1 }, interactive: false }); }
 
-// Base map: Hyderabad, calm light basemap, zones grouped by severity, active notices, clickable legend.
+// Base map: Hyderabad, calm basemap that follows the theme, satellite toggle, zones grouped by severity, active notices, clickable legend.
 function makeMap() {
   const map = L.map("map", { zoomControl: false, minZoom: 5 }).setView(HYD, 11);
   L.control.zoom({ position: "topright" }).addTo(map);
   L.control.scale({ metric: true, imperial: false, position: "bottomright" }).addTo(map);
-  const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-  // Esri gray canvas: calm, no API key. Reference layer adds place names on top.
-  const esri = name => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${dark ? "Dark" : "Light"}_Gray_${name}/MapServer/tile/{z}/{y}/{x}`;
   const tile = { maxNativeZoom: 16, maxZoom: 18, attribution: "Tiles © Esri, map data © OpenStreetMap contributors" };
-  const plain = L.layerGroup([L.tileLayer(esri("Base"), tile), L.tileLayer(esri("Reference"), { ...tile, attribution: "", pane: "shadowPane" })]).addTo(map);
-  // Satellite: Sentinel-2 cloudless by EOX (free, non-commercial). Place names on top.
+  const esri = (tone, name) => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${tone}_Gray_${name}/MapServer/tile/{z}/{y}/{x}`;
+  const plain = tone => L.layerGroup([L.tileLayer(esri(tone, "Base"), tile), L.tileLayer(esri(tone, "Reference"), { ...tile, attribution: "", pane: "shadowPane" })]);
+  const light = plain("Light"), dark = plain("Dark");
   const sat = L.layerGroup([L.tileLayer("https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2021_3857/default/g/{z}/{y}/{x}.jpg",
     { maxNativeZoom: 13, maxZoom: 18, attribution: "Sentinel-2 cloudless by EOX (contains modified Copernicus Sentinel data 2021)" }),
-    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}", { ...tile, attribution: "", pane: "shadowPane" })]);
-  const Base = L.Control.extend({ options: { position: "topright" }, onAdd() {
-    const d = L.DomUtil.create("div", "leaflet-bar basemap"); const a = L.DomUtil.create("a", "", d);
-    a.href = "#"; a.textContent = "Satellite"; a.title = "Switch between map and satellite";
-    let on = false;
-    L.DomEvent.on(a, "click", e => { L.DomEvent.preventDefault(e); on = !on;
-      if (on) { map.removeLayer(plain); sat.addTo(map); } else { map.removeLayer(sat); plain.addTo(map); }
-      a.textContent = on ? "Map" : "Satellite"; }); return d; } });
-  const layers = { red: L.layerGroup().addTo(map), amber: L.layerGroup().addTo(map), notices: L.layerGroup().addTo(map), work: L.layerGroup().addTo(map) };
+    L.tileLayer(esri("Dark", "Reference"), { ...tile, attribution: "", pane: "shadowPane" })]);
+  let satOn = false, current = null;
+  const show = () => {
+    const want = satOn ? sat : (isDark() ? dark : light);
+    if (current === want) return;
+    if (current) map.removeLayer(current);
+    current = want; want.addTo(map);
+  };
+  show();
+  window.addEventListener("skyclear:theme", show);
 
-  const Reset = L.Control.extend({ options: { position: "topright" }, onAdd() {
+  const control = (text, title, onclick) => new (L.Control.extend({ options: { position: "topright" }, onAdd() {
     const d = L.DomUtil.create("div", "leaflet-bar reset"); const a = L.DomUtil.create("a", "", d);
-    a.href = "#"; a.textContent = "Hyderabad"; a.title = "Back to Hyderabad";
-    L.DomEvent.on(a, "click", e => { L.DomEvent.preventDefault(e); map.setView(HYD, 11); }); return d; } });
-  new Reset().addTo(map);
-  new Base().addTo(map);
+    a.href = "#"; a.textContent = text; a.title = title;
+    L.DomEvent.on(a, "click", e => { L.DomEvent.preventDefault(e); onclick(a); }); return d; } }))().addTo(map);
+  control("Hyderabad", "Back to Hyderabad", () => map.setView(HYD, 11));
+  control("Satellite", "Switch between map and satellite", a => { satOn = !satOn; a.textContent = satOn ? "Map" : "Satellite"; show(); });
 
+  const layers = { red: L.layerGroup().addTo(map), amber: L.layerGroup().addTo(map), notices: L.layerGroup().addTo(map), work: L.layerGroup().addTo(map) };
   const legend = $("legend");
   if (legend) {
     const rows = [["red", RED, "Red: flying prohibited"], ["amber", AMBER, "Yellow: permission needed"], ["notices", NOTICE_COLOR, "Official notice, time limited"]];
-    legend.innerHTML = '<div class="label" style="margin:0 0 6px">Layers</div>' + rows.map(([k, col, text]) =>
-      `<label class="lg"><input type="checkbox" data-layer="${k}" checked><i style="border-color:${col};background:${col}22;${k === "notices" ? "border-style:dashed" : ""}"></i>${text}</label>`).join("") + '<div class="lg" style="cursor:default"><i style="border-color:#1a7f37;background:#1a7f3722"></i>Green: no restriction found in our data (not painted)</div>';
+    legend.innerHTML = '<details' + (window.innerWidth > 860 ? " open" : "") + '><summary class="label" style="margin:0;cursor:pointer">Map layers</summary>' + rows.map(([k, col, text]) =>
+      `<label class="lg"><input type="checkbox" data-layer="${k}" checked><i style="border-color:${col};background:${col}22;${k === "notices" ? "border-style:dashed" : ""}"></i>${text}</label>`).join("")
+      + '<div class="lg" style="cursor:default"><i style="border-color:#1a7f37;background:#1a7f3722"></i>Green: no restriction found in our data (not painted)</div></details>';
     legend.querySelectorAll("input").forEach(box => box.addEventListener("change", () => {
       const l = layers[box.dataset.layer]; box.checked ? l.addTo(map) : map.removeLayer(l); }));
   }
   const labelZoom = () => { const k = map.getContainer().classList; k.toggle("zoom-low", map.getZoom() < 10); k.toggle("zoom-mid", map.getZoom() < 13); };
   map.on("zoomend", labelZoom); labelZoom();
   return { map, layers };
+}
+
+// Search box on the map: our zones first (Atlas Search later), then places from OpenStreetMap's Nominatim.
+function bindMapSearch(map, onPick) {
+  const input = $("mapSearch"), list = $("mapResults");
+  if (!input) return;
+  let timer = null, seq = 0;
+  const close = () => list.classList.add("hidden");
+  const pick = (lat, lng, zoom) => { map.flyTo([lat, lng], zoom, { duration: 0.8 }); close(); if (onPick) onPick({ lat, lng }); };
+  async function run() {
+    const q = input.value.trim(), mine = ++seq;
+    if (q.length < 2) return close();
+    let zones = [], places = [];
+    try { zones = await api("/zones/search?q=" + encodeURIComponent(q), { auth: false }); } catch (e) { /* offline */ }
+    try {
+      const r = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=4&countrycodes=in&viewbox=77.9,17.8,78.9,17.0&q=" + encodeURIComponent(q));
+      places = r.ok ? await r.json() : [];
+    } catch (e) { /* offline */ }
+    if (mine !== seq) return;
+    const items = [...zones.map(z => ({ title: z.name, sub: "Restricted zone, " + z.zone_type, lat: z.center.lat, lng: z.center.lng, zoom: 13 })),
+      ...places.map(p => ({ title: p.display_name.split(",").slice(0, 2).join(","), sub: "Place", lat: Number(p.lat), lng: Number(p.lon), zoom: 15 }))];
+    list.innerHTML = items.length ? items.map((it, i) => `<li data-i="${i}">${esc(it.title)}<small>${esc(it.sub)}</small></li>`).join("") : '<li class="none">Nothing found. Try a zone name or an area in Hyderabad.</li>';
+    list.classList.remove("hidden");
+    list.querySelectorAll("li[data-i]").forEach(li => li.addEventListener("click", () => { const it = items[Number(li.dataset.i)]; input.value = it.title; pick(it.lat, it.lng, it.zoom); }));
+  }
+  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 300); });
+  input.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
+  document.addEventListener("click", e => { if (!e.target.closest(".mapsearch")) close(); });
 }
 
 function zoneStyle(type, strong) { const col = zoneColor(type); return { color: col, weight: strong ? 3 : 1.5, fillColor: col, fillOpacity: strong ? 0.22 : 0.08 }; }
@@ -132,25 +228,22 @@ async function drawNotices(layer) {
   layer.clearLayers();
   try {
     const list = await api("/notices/active", { auth: false });
-    list.forEach(n => circleOf(n).bindTooltip(esc(n.title), { permanent: true, direction: "center", className: "zlabel notice", interactive: false }).addTo(layer));
+    list.forEach(n => circleOf(n).bindTooltip(esc(n.title), { permanent: true, direction: "top", className: "zlabel notice", interactive: false }).addTo(layer));
   } catch (e) { /* the static sample notice still applies in checks */ }
 }
 
 // A square target pin, crisp at any zoom.
 function pinIcon(extra = "") { return L.divIcon({ className: "", html: `<div class="pin ${extra}"></div>`, iconSize: [22, 22], iconAnchor: [11, 11] }); }
 
-// Upload a file (JPG, PNG, PDF up to 5 MB). Returns the file id.
+/* ---------- uploads, QR, badges ---------- */
 async function uploadFile(file) {
   const fd = new FormData(); fd.append("file", file);
-  let res;
-  try { res = await fetch(API_BASE + "/uploads", { method: "POST", headers: { Authorization: "Bearer " + token() }, body: fd }); }
-  catch (e) { throw new Error("Cannot reach the SkyClear server. Is it running?"); }
+  const res = await authFetch("/uploads", { method: "POST", body: fd });
   if (!res.ok) { let d = res.status + ""; try { d = (await res.json()).detail || d; } catch (e) { /* keep */ } throw new Error(d); }
   return (await res.json()).file_id;
 }
-// Open an uploaded file in a new tab (needs the auth header, so fetch it first).
 async function openFile(fileId) {
-  const res = await fetch(API_BASE + "/uploads/" + fileId, { headers: { Authorization: "Bearer " + token() } });
+  const res = await authFetch("/uploads/" + fileId);
   if (!res.ok) throw new Error("Cannot open the file");
   window.open(URL.createObjectURL(await res.blob()), "_blank");
 }

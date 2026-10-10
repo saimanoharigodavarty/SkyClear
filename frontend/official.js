@@ -10,11 +10,12 @@ const reqLayer = L.layerGroup().addTo(layers.work);
 function showTab(t) {
   tab = t;
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
-  ["requests", "live", "verify", "publish", "notices", "team"].forEach(x => $("tab-" + x).classList.toggle("hidden", x !== t));
+  ["requests", "live", "verify", "publish", "notices", "insights", "team"].forEach(x => $("tab-" + x).classList.toggle("hidden", x !== t));
   if (t === "requests") loadRequests();
   if (t === "live") startLiveView(); else stopLiveView();
   if (t === "verify") loadVerification();
   if (t === "notices") loadNotices();
+  if (t === "insights") loadInsights();
   if (t === "team") loadTeam();
 }
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
@@ -174,7 +175,15 @@ window.addEventListener("skyclear:theme", () => { drawZones(layers); drawNotices
       : `<b>Administrator view</b><div class="small">You see every office, all requests and all verification requests.</div>`;
   } catch (e) { box.textContent = ""; }
 })();
-setInterval(() => { loadStats(); if (tab === "requests") loadRequests(); }, 6000);
+setInterval(() => { loadStats(); if (tab === "requests") loadRequests(); }, 20000);
+let pending = null;
+const soon = fn => { clearTimeout(pending); pending = setTimeout(fn, 150); };  // several events at once cause one refresh
+liveEvents({
+  flight: () => soon(() => { loadStats(); if (tab === "requests") loadRequests(); if (tab === "live") refreshLive(); }),
+  breach: () => soon(() => { if (tab === "live") refreshLive(); }),
+  notice: () => soon(() => { drawNotices(layers.notices); if (tab === "notices") loadNotices(); }),
+  status: ok => { const b = $("liveDot"); if (b) { b.textContent = ok ? "Live" : "Reconnecting"; b.className = "livedot " + (ok ? "on" : ""); } },
+});
 
 /* ---------- team (admin only) ---------- */
 if (!sess.user.authority_id) $("teamTab").classList.remove("hidden");
@@ -233,7 +242,7 @@ async function refreshLive() {
     $("breachList").innerHTML = br.breaches.length ? br.breaches.map(b => `<div class="breach"><b>${esc(b.name)}</b> <span class="muted">${esc(b.kind)}</span><div class="meta">${esc(b.drone_id)}, flight ${esc(b.flight_id)}, ${esc(fmtTime(b.ts))}</div></div>`).join("") : '<div class="hint">No breaches yet.</div>';
   } catch (e) { $("airList").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
-function startLiveView() { refreshLive(); if (!liveTimer) liveTimer = setInterval(refreshLive, 2500); }
+function startLiveView() { refreshLive(); if (!liveTimer) liveTimer = setInterval(refreshLive, 8000); }
 function stopLiveView() { clearInterval(liveTimer); liveTimer = null; }
 
 $("trafficN").addEventListener("input", () => { $("trafficLabel").textContent = $("trafficN").value; });
@@ -253,3 +262,28 @@ $("vipGo").addEventListener("click", async () => {
     drawNotices(layers.notices); refreshLive();
   } catch (e) { $("simMsg").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 });
+
+
+/* ---------- insights: what the data says (MongoDB aggregations), who did what (audit log), how updates reach the screens (change streams) ---------- */
+const STATUS_ORDER = ["requested", "approved", "watching", "flying", "completed", "recalled", "revoked", "rejected", "cancelled"];
+function bars(rows, labelOf) {
+  const max = Math.max(1, ...rows.map(r => r[1]));
+  return rows.map(r => `<div class="barrow"><span class="bl">${esc(labelOf ? labelOf(r[0]) : r[0])}</span><span class="bt"><i style="width:${Math.round(r[1] / max * 100)}%"></i></span><b>${esc(r[1])}</b></div>`).join("");
+}
+async function loadInsights() {
+  const box = $("insightBody"); box.innerHTML = skeleton();
+  try {
+    const isAdmin = !sess.user.authority_id;
+    const [a, audit, ev] = await Promise.all([api("/analytics/summary"), isAdmin ? api("/audit?limit=12").catch(() => []) : [], isAdmin ? api("/events/status").catch(() => null) : null]);
+    const statuses = STATUS_ORDER.filter(k => a.flights_by_status[k]).map(k => [k, a.flights_by_status[k]]);
+    const hot = (a.heatmap || []).slice(0, 6).map(h => [`${h.cell[1].toFixed(2)} N, ${h.cell[0].toFixed(2)} E`, h.count]);
+    const zb = (a.breaches_by_zone || []).slice(0, 6).map(z => [z.name || z.zone || z._id, z.count]);
+    box.innerHTML = `
+      <div class="section"><h3>Flights by status</h3>${bars(statuses, k => STATUS_LABEL[k] || k[0].toUpperCase() + k.slice(1)) || '<div class="hint">No flights yet.</div>'}</div>
+      <div class="section"><h3>Busiest areas for requests and checks</h3>${bars(hot) || '<div class="hint">No data.</div>'}<div class="meta">Grid cells counted by a MongoDB aggregation over saved flights.</div></div>
+      <div class="section"><h3>Breaches by zone</h3>${bars(zb) || '<div class="hint">No breaches recorded yet.</div>'}</div>
+      <div class="section"><h3>Response time</h3><div class="n2">${a.median_decision_minutes == null ? "n/a" : esc(a.median_decision_minutes)} min</div><div class="meta">Median time from request to decision. ${esc(a.zones)} zones in the data.</div></div>
+      ${isAdmin ? `<div class="section"><h3>Live updates</h3>${ev ? `<div>${esc(ev.mode === "mongodb_change_streams" ? "MongoDB change streams" : "In-process events")}, watching ${esc((ev.watching || []).join(", ") || "nothing")}</div><div class="meta">${esc(ev.events)} events delivered, ${esc(ev.restarts)} restarts</div>` : '<div class="hint">Not available.</div>'}</div>
+      <div class="section"><h3>Audit log, latest first</h3>${(audit || []).map(r => `<div class="item"><div class="head"><span class="title">${esc(r.action.replace(/_/g, " "))}</span><span class="meta">${esc(fmtTime(r.ts))}</span></div><div class="meta">${esc(r.actor)}, ${esc(r.target)}${r.detail ? ", " + esc(r.detail) : ""}</div></div>`).join("") || '<div class="hint">Nothing recorded yet.</div>'}<div class="meta">Append-only: written in the same MongoDB transaction as the action it records.</div></div>` : ""}`;
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}

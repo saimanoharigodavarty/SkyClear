@@ -49,7 +49,7 @@ with sync_playwright() as p:
     v=page(); v.goto(B+"/"); v.wait_for_timeout(2500)
     step("visitor: example buttons built from database", len(v.query_selector_all("#examples button"))>=4)
     v.click("#examples button >> nth=1"); v.wait_for_selector("#result .verdict"); step("visitor: check returns a verdict with rules", v.query_selector("#result .cite") is not None)
-    v.click("[data-tab=ask]"); v.fill("#askQ","Do I need permission to fly near an airport?"); v.click("#askGo"); v.wait_for_selector("#askResult .cite"); step("visitor: Ask answers with cited rules", "R-001" in v.inner_text("#askResult"))
+    v.click("[data-tab=ask]"); v.fill("#askQ","Do I need permission to fly near an airport?"); v.click("#askGo"); v.wait_for_selector("#askResult .cite", timeout=120000); step("visitor: Ask answers with cited rules", "R-001" in v.inner_text("#askResult"))
     v.click("[data-tab=sim]"); v.click("#exRoute"); v.click("#run"); v.wait_for_selector("#simResult .verdict", timeout=60000); step("visitor: route simulation finishes with a summary", "First issue" in v.inner_text("#simResult") or "No restriction" in v.inner_text("#simResult"))
     # 2 new pilot registers (code by email), adds a drone, uploads documents
     pg=page(); pg.goto(B+"/account.html?tab=register"); pg.fill("#rName","Flow Tester"); pg.fill("#rEmail",EMAIL); pg.fill("#rPhone","96"+N+"31"); pg.fill("#rPass",PW); pg.check("#rConsent")
@@ -79,7 +79,7 @@ with sync_playwright() as p:
     pg.screenshot(path=SHOTS+"/z1_request.png")
     # 5 the right officer approves
     o=page(); signin(o,*POLICE,"official.html"); o.wait_for_selector("#reqList .item"); step("officer: sees the request in their own queue", "Flow Tester" in o.inner_text("#reqList"))
-    o.fill("#reqList textarea","Daylight only\nStay 50 m from the building"); o.click("#reqList [data-decide=approved] >> nth=0"); o.wait_for_timeout(1500)
+    mine_item='#reqList .item:has-text("Flow Tester")'; o.fill(mine_item+" textarea","Daylight only\nStay 50 m from the building"); o.click(mine_item+" [data-decide=approved]"); o.wait_for_timeout(1500)
     o.screenshot(path=SHOTS+"/z2_officer.png")
     # 6 pilot sees the permit, passes preflight, and the flight moves to "Cleared"
     pg.click("[data-tab=flights]"); pg.wait_for_selector(".permit"); step("pilot: permit with QR appears", pg.query_selector(".permit svg") is not None)

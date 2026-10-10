@@ -530,3 +530,10 @@ body.pad { overflow: hidden; touch-action: none; user-select: none; -webkit-user
 .fgim { position: absolute; left: 330px; bottom: 14px; font-size: 12px; } .fgim i { display: block; font-style: normal; opacity: .75; }
 .fz { position: absolute; left: 50%; top: 168px; transform: translateX(-50%); font-size: 15px; font-weight: 600; padding: 6px 14px; border-radius: var(--r); background: rgba(8, 14, 20, .45); }
 .fz:empty { display: none; } .fz.warning { background: var(--amber); color: var(--on-fill); } .fz.breach { background: var(--red); color: var(--on-fill); }
+
+/* ---------- insights and the live indicator ---------- */
+.barrow { display: grid; grid-template-columns: 130px 1fr 36px; gap: 8px; align-items: center; padding: 3px 0; font-size: 13px; }
+.barrow .bt { height: 10px; background: var(--rule); border-radius: 3px; overflow: hidden; } .barrow .bt i { display: block; height: 100%; background: var(--accent); }
+.barrow b { text-align: right; } .n2 { font-size: 28px; font-weight: 800; }
+.livedot { position: fixed; z-index: 900; right: 14px; bottom: 14px; font-size: 11px; padding: 3px 8px; border-radius: var(--r); background: var(--panel); border: 1px solid var(--rule-strong); color: var(--muted); }
+.livedot.on { color: var(--green); }

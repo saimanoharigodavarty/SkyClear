@@ -321,3 +321,23 @@ function createLive(map, layer, onData, everyMs = 2000) {
   }
   return { start() { if (!timer) { tick(); timer = setInterval(tick, everyMs); } }, stop() { clearInterval(timer); timer = null; }, tick, markers };
 }
+
+/* ---------- live events: the server pushes alerts, flight changes, breaches and notices the moment MongoDB records them ---------- */
+// handlers: { alert, flight, breach, notice, status(isLive) }. Reconnects with a fresh token; the normal polling stays as a slower fallback.
+function liveEvents(handlers) {
+  let es = null, retry = null;
+  const say = ok => handlers.status && handlers.status(ok);
+  const open = () => {
+    if (!token() || typeof EventSource === "undefined") return;
+    es = new EventSource(API_BASE + "/events?token=" + encodeURIComponent(token()));
+    es.addEventListener("ready", () => say(true));
+    ["alert", "flight", "breach", "notice"].forEach(k => es.addEventListener(k, ev => { try { handlers[k] && handlers[k](JSON.parse(ev.data)); } catch (e) { /* ignore a bad event */ } }));
+    es.onerror = () => {
+      say(false); es.close(); clearTimeout(retry);
+      retry = setTimeout(async () => { try { await refreshTokens(); } catch (e) { /* the page notices on its next request */ } open(); }, 3000);
+    };
+  };
+  open();
+  // an access token lasts 15 minutes: reopen the stream with a fresh one before it expires
+  setInterval(async () => { if (es) es.close(); try { await refreshTokens(); } catch (e) { /* keep the old one */ } open(); }, 12 * 60 * 1000);
+}

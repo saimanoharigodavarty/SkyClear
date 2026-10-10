@@ -29,6 +29,7 @@
       <button data-tab="verify" type="button">Verify<span id="verCount" class="count hidden">0</span></button>
       <button data-tab="publish" type="button">Publish</button>
       <button data-tab="notices" type="button">Notices</button>
+      <button data-tab="insights" type="button">Insights</button>
       <button data-tab="team" id="teamTab" class="hidden" type="button">Team</button>
     </nav>
     <section class="pane">
@@ -84,6 +85,10 @@
       <div id="noticeList"></div>
     </section>
 
+    <section class="pane hidden" id="tab-insights" style="padding-top:0">
+      <div id="insightBody"></div>
+    </section>
+
     <section class="pane hidden" id="tab-team" style="padding-top:0">
       <p class="hint" style="margin-top:0">Officials are invited here, they cannot register themselves. You get a temporary password to hand over. They must choose their own at first sign-in.</p>
       <form id="inviteForm">
@@ -97,6 +102,7 @@
     </section>
   </aside>
 </main>
+<span id="liveDot" class="livedot">Offline</span>
 <footer class="foot"><a href="terms.html">Terms of Service</a><a href="privacy.html">Privacy Policy</a>Authority console, prototype. Actions are recorded with your name.</footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

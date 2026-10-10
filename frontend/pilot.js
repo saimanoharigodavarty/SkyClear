@@ -473,7 +473,14 @@ $("bannerBtn").addEventListener("click", () => showTab("alerts"));
 $("when").value = toLocalInput(new Date()); $("simWhen").value = $("when").value;
 drawZones(layers); drawNotices(layers.notices); loadDrones();
 window.addEventListener("skyclear:theme", () => { drawZones(layers); drawNotices(layers.notices); });
-if (me()) { api("/flights").then(watchAir).catch(() => {}); refreshMe().catch(() => {}); pollAlerts(); setInterval(() => { pollAlerts(); drawNotices(layers.notices); }, 5000); }
+if (me()) { api("/flights").then(watchAir).catch(() => {}); refreshMe().catch(() => {}); pollAlerts(); setInterval(() => { pollAlerts(); drawNotices(layers.notices); }, 15000);
+  liveEvents({
+    alert: () => { pollAlerts().then(a => { if (a && tab === "alerts") renderAlerts(a); }); },
+    flight: () => { if (tab === "flights") loadFlights(); },
+    notice: () => drawNotices(layers.notices),
+    status: ok => { const b = $("liveDot"); if (b) { b.textContent = ok ? "Live" : "Reconnecting"; b.className = "livedot " + (ok ? "on" : ""); } },
+  });
+}
 
 function loadExampleRoute() {
   if (!exampleRoute) return;

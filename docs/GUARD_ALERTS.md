@@ -14,6 +14,8 @@ Path of an alert: the drone enters the notice, the geofence records a breach in 
 
 ## Drill (test it with your own phone)
 
+Draw the real boundary first: Publish tab, "Draw the boundary", click the corners of the campus on the satellite map in order, then publish. For the drill, tick "Use the boundary I drew". A circle is only an approximation of a campus.
+
 Officer console, Notices tab, "Drill": type the area name, press "Use my location" (works when the page is opened as localhost on a laptop; otherwise type latitude and longitude), press "Start the drill". The area is declared as a restriction and one simulated drone starts about 600 m away and flies at it, arriving in under a minute. Every device with the guard page open sounds. "End the drill" cancels the restriction and removes the drone.
 
 ## Honest limits

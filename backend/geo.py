@@ -161,3 +161,40 @@ def circle(lat, lng, radius_km, n=32):
         coords.append([round(lng + dlng, 5), round(lat + dlat, 5)])
     coords.append(coords[0])
     return {"type": "Polygon", "coordinates": [coords]}
+
+
+def ring_from_points(points):
+    """A closed GeoJSON ring from [lng, lat] corners drawn by an official, or raise ValueError. Needs 3 to 60 corners, a real area, no crossing edges."""
+    pts = [[round(float(p[0]), 6), round(float(p[1]), 6)] for p in points]
+    if pts and pts[0] == pts[-1]:
+        pts = pts[:-1]
+    if not 3 <= len(pts) <= 60:
+        raise ValueError("draw between 3 and 60 corners")
+    if any(not (-180 <= x <= 180 and -90 <= y <= 90) for x, y in pts):
+        raise ValueError("a corner is outside the world")
+    if max(p[0] for p in pts) - min(p[0] for p in pts) > 0.5 or max(p[1] for p in pts) - min(p[1] for p in pts) > 0.5:
+        raise ValueError("the area is larger than about 50 km across")
+
+    def ccw(a, b, c):
+        return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0])
+    n = len(pts)
+    for i in range(n):
+        for j in range(i + 1, n):
+            if j == i + 1 or (i == 0 and j == n - 1):
+                continue  # neighbouring edges share a corner
+            a, b, c, d = pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n]
+            if ccw(a, c, d) != ccw(b, c, d) and ccw(a, b, c) != ccw(a, b, d):
+                raise ValueError("the edges cross each other, redraw the corners in order")
+    area2 = sum(pts[i][0] * pts[(i + 1) % len(pts)][1] - pts[(i + 1) % len(pts)][0] * pts[i][1] for i in range(len(pts)))
+    if abs(area2) < 1e-10:
+        raise ValueError("the corners are in a line, the area is empty")
+    return pts + [pts[0]]
+
+
+def ring_center_radius_km(ring):
+    """Centre (mean of the corners) and the distance in km from it to the farthest corner."""
+    pts = ring[:-1]
+    lat = sum(p[1] for p in pts) / len(pts)
+    lng = sum(p[0] for p in pts) / len(pts)
+    far = max(math.hypot((p[1] - lat) * 111.32, (p[0] - lng) * 111.32 * math.cos(math.radians(lat))) for p in pts)
+    return lat, lng, round(far, 3)

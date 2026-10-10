@@ -552,3 +552,4 @@ body.guard { min-height: 100vh; background: var(--bg); }
 .galarm .gsub { font-size: clamp(18px, 4vw, 28px); }
 .galarm button { width: auto; margin-top: 18px; padding: 14px 32px; font-size: 18px; background: var(--on-fill); color: var(--red); border: 0; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+label.check { display: flex; gap: 8px; align-items: flex-start; font-weight: 500; text-transform: none; letter-spacing: 0; margin-top: 10px; } label.check input { width: auto; margin-top: 3px; }

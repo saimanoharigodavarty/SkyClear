@@ -61,3 +61,42 @@ def test_the_drill_declares_the_area_and_flies_a_drone_at_it():
     assert 0.004 < abs(d.lat - 17.4) + abs(d.lng - 78.4) < 0.02  # starts a few hundred metres away
     client.delete("/sim/fleet", headers=auth(admin))
     client.post(f"/notices/{r.json()['notice_id']}/cancel", headers=auth(admin))
+
+
+POLY = [[78.3395, 17.3500], [78.3430, 17.3500], [78.3430, 17.3475], [78.3395, 17.3475]]
+
+
+def window():
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    return {"starts_at": (now - timedelta(minutes=1)).isoformat(timespec="seconds"), "ends_at": (now + timedelta(hours=1)).isoformat(timespec="seconds")}
+
+
+def test_a_drawn_boundary_becomes_the_restricted_area():
+    from geo import point_in_polygon
+    admin = official()
+    r = client.post("/notices", headers=auth(admin), json={"title": "Drawn campus", "polygon": POLY, **window()})
+    assert r.status_code == 200
+    n = r.json()
+    assert n["shape"] == "polygon" and n["area"]["coordinates"][0][0] == n["area"]["coordinates"][0][-1]
+    assert point_in_polygon(78.3412, 17.3489, n["area"]) and not point_in_polygon(78.3500, 17.3489, n["area"])  # the shape is the drawn one, not a circle
+    assert 0.1 < n["radius_km"] < 1 and abs(n["center"]["lat"] - 17.34875) < 0.001
+    client.post(f"/notices/{n['notice_id']}/cancel", headers=auth(admin))
+
+
+def test_a_bad_boundary_is_refused_with_a_reason():
+    admin = official()
+    bow = [[78.0, 17.0], [78.01, 17.01], [78.01, 17.0], [78.0, 17.01]]  # edges cross
+    line = [[78.0, 17.0], [78.01, 17.0], [78.02, 17.0]]
+    for pts, word in ((bow, "cross"), (line, "line"), ([[78.0, 17.0], [78.01, 17.0]], "corners"), ([[78.0, 17.0], [80.0, 17.0], [80.0, 19.0]], "larger")):
+        r = client.post("/notices", headers=auth(admin), json={"title": "Bad boundary", "polygon": pts, **window()})
+        assert r.status_code == 422 and word in r.json()["detail"], (word, r.json())
+    assert client.post("/notices", headers=auth(admin), json={"title": "No shape", **window()}).status_code == 422
+
+
+def test_the_drill_can_use_a_drawn_boundary():
+    admin = official()
+    r = client.post("/sim/scenarios/intruder", headers=auth(admin), json={"title": "Drill boundary", "polygon": POLY})
+    assert r.status_code == 200
+    client.delete("/sim/fleet", headers=auth(admin))
+    client.post(f"/notices/{r.json()['notice_id']}/cancel", headers=auth(admin))

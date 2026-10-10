@@ -66,7 +66,8 @@
     </section>
 
     <section class="pane hidden" id="tab-publish" style="padding-top:0">
-      <p class="hint" style="margin-top:0">Click the map to set the centre of the restricted area. Pilots with a watched or requested flight that overlaps are alerted at once.</p>
+      <p class="hint" style="margin-top:0">Choose the shape of the restricted area. Pilots with a watched or requested flight that overlaps are alerted at once.</p>
+      <div class="btnrow" style="margin-bottom:8px"><button type="button" class="inline" id="mCircle">Circle</button><button type="button" class="ghost inline" id="mDraw">Draw the boundary</button></div>
       <form id="noticeForm">
         <label for="nTitle">Title</label><input id="nTitle" required minlength="3" maxlength="100" placeholder="VIP movement, Begumpet">
         <label for="nNote">Public note (what pilots will read)</label><textarea id="nNote" maxlength="300" placeholder="Do not publish route details."></textarea>
@@ -74,7 +75,8 @@
           <div><label for="nStart">From</label><input id="nStart" type="datetime-local" required></div>
           <div><label for="nEnd">Until</label><input id="nEnd" type="datetime-local" required></div>
         </div>
-        <label for="nRadius">Radius (km)</label><input id="nRadius" type="number" min="0.2" max="25" step="0.1" value="2" required>
+        <div id="radiusBox"><label for="nRadius">Radius (km)</label><input id="nRadius" type="number" min="0.2" max="25" step="0.1" value="2" required></div>
+        <div id="drawBox" class="hidden"><div class="btnrow"><button type="button" class="ghost inline" id="cUndo">Undo last corner</button><button type="button" class="ghost inline" id="cClear">Clear</button></div></div>
         <div class="hint" id="nCenter">No centre chosen. Click the map.</div>
         <button id="nGo" type="submit" disabled>Publish notice</button>
         <div id="nMsg"></div>
@@ -92,6 +94,7 @@
         <label for="drTitle">Area name</label><input id="drTitle" value="KLH campus" maxlength="80">
         <div class="grid2"><div><label for="drLat">Latitude</label><input id="drLat" inputmode="decimal"></div><div><label for="drLng">Longitude</label><input id="drLng" inputmode="decimal"></div></div>
         <label for="drRad">Radius, metres</label><input id="drRad" type="number" min="30" max="2000" value="150">
+        <label class="check"><input type="checkbox" id="drUse" disabled> Use the boundary I drew in the Publish tab instead of a circle</label>
         <div class="btnrow"><button type="button" class="ghost inline" id="drHere">Use my location</button><button type="button" class="inline" id="drGo">Start the drill</button><button type="button" class="danger inline" id="drEnd">End the drill</button></div>
         <div id="drMsg"></div></div>
       <div id="noticeList"></div>

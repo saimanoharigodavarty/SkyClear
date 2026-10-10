@@ -12,7 +12,7 @@ import config
 import permits
 import routing
 import runtime
-from geo import circle, point_in_polygon
+from geo import circle, point_in_polygon, ring_center_radius_km, ring_from_points
 from pipeline import evaluate, get_drone, parse_when
 from security import current_user, flight_claims, make_pair_token, require, require_admin
 
@@ -419,9 +419,10 @@ def cancel_flight(flight_id: str, user=Depends(require("pilot"))):
 class NoticeIn(BaseModel):
     title: str = Field(min_length=3, max_length=100)
     note: str = Field(default="", max_length=300)
-    lat: float
-    lng: float
-    radius_km: float = Field(gt=0, le=25)
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    radius_km: Optional[float] = Field(default=None, gt=0, le=25)
+    polygon: Optional[list[list[float]]] = None  # corners drawn on the map as [lng, lat], used instead of a circle
     starts_at: str
     ends_at: str
 
@@ -441,15 +442,21 @@ def _window(n):
     return f"{s.astimezone().strftime('%d %b %H:%M')} to {e.astimezone().strftime('%H:%M')}"
 
 
-def create_notice(title, note, lat, lng, radius_km, starts_at, ends_at, published_by, actor=None):
+def create_notice(title, note, lat, lng, radius_km, starts_at, ends_at, published_by, actor=None, polygon=None):
     """Publish a restriction: store it, alert the pilots whose flights it touches, and list the permits it conflicts with.
     Used by the officer's form and by the simulation's VIP scenario, so both follow exactly the same path."""
+    if polygon:
+        ring = ring_from_points(polygon)
+        lat, lng, radius_km = ring_center_radius_km(ring)
+        area = {"type": "Polygon", "coordinates": [ring]}
+    else:
+        area = circle(lat, lng, radius_km)
     with runtime.atomic():  # the notice, every pilot's alert and the audit entry are one unit
         notice = runtime.insert("notices", {
             "notice_id": runtime.new_id("RN"), "title": title.strip(), "text": note.strip(),
             "status": "active", "origin": "official", "starts_at": starts_at, "ends_at": ends_at,
             "center": {"lat": lat, "lng": lng}, "radius_km": radius_km,
-            "area": circle(lat, lng, radius_km),
+            "area": area, "shape": "polygon" if polygon else "circle",
             "source": f"Published by {published_by}", "published_by": published_by, "published_at": runtime.now_iso()})
         hit = _affected(notice)
         for f in hit:
@@ -457,7 +464,7 @@ def create_notice(title, note, lat, lng, radius_km, starts_at, ends_at, publishe
                    f"A restriction overlaps your flight {f['flight_id']} ({_window(notice)}). Do not fly in this area during this time unless the authority says otherwise.",
                    severity="high", flight_id=f["flight_id"])
         if actor is not None:
-            runtime.audit(actor, "notice_published", notice["notice_id"], f"{notice['title']}, {radius_km} km, {len(hit)} flights alerted")
+            runtime.audit(actor, "notice_published", notice["notice_id"], f"{notice['title']}, {'drawn boundary' if polygon else str(radius_km) + ' km'}, {len(hit)} flights alerted")
     return {**notice, "affected_flights": len(hit), "conflicting_permits": permits.conflicting_permits(notice)}
 
 
@@ -465,7 +472,12 @@ def create_notice(title, note, lat, lng, radius_km, starts_at, ends_at, publishe
 def publish_notice(body: NoticeIn, user=Depends(require("official"))):
     if parse_when(body.ends_at) <= parse_when(body.starts_at):
         raise HTTPException(422, "end must be after start")
-    return create_notice(body.title, body.note, body.lat, body.lng, body.radius_km, body.starts_at, body.ends_at, user["name"], actor=user)
+    if body.polygon is None and (body.lat is None or body.lng is None or body.radius_km is None):
+        raise HTTPException(422, "give a centre and radius, or draw the boundary")
+    try:
+        return create_notice(body.title, body.note, body.lat, body.lng, body.radius_km, body.starts_at, body.ends_at, user["name"], actor=user, polygon=body.polygon)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
 
 
 @router.post("/notices/{notice_id}/cancel")

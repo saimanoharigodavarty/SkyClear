@@ -116,18 +116,45 @@ async function loadVerification() {
 }
 
 /* ---------- publish ---------- */
+let shape = "circle", corners = [];
+const drawLayer = L.layerGroup().addTo(layers.work);
 function drawPreview() {
   if (preview) { layers.work.removeLayer(preview); preview = null; }
-  if (centre) preview = L.circle(centre, { radius: (Number($("nRadius").value) || 0) * 1000, color: C.notice, weight: 2, dashArray: "6 5", fillOpacity: 0.12 }).addTo(layers.work);
+  drawLayer.clearLayers();
+  if (shape === "circle") { if (centre) preview = L.circle(centre, { radius: (Number($("nRadius").value) || 0) * 1000, color: C.notice, weight: 2, dashArray: "6 5", fillOpacity: 0.12 }).addTo(layers.work); return; }
+  corners.forEach((c, i) => L.circleMarker(c, { radius: 5, color: C.notice, weight: 2, fillColor: "#f4f7fa", fillOpacity: 1, interactive: false }).addTo(drawLayer));
+  if (corners.length >= 3) L.polygon(corners, { color: C.notice, weight: 2, dashArray: "6 5", fillColor: C.notice, fillOpacity: 0.15, interactive: false }).addTo(drawLayer);
+  else if (corners.length === 2) L.polyline(corners, { color: C.notice, weight: 2, dashArray: "6 5", interactive: false }).addTo(drawLayer);
+}
+function setShape(mode) {
+  shape = mode;
+  $("mCircle").className = "inline" + (mode === "circle" ? "" : " ghost"); $("mDraw").className = "inline" + (mode === "draw" ? "" : " ghost");
+  $("radiusBox").classList.toggle("hidden", mode !== "circle"); $("drawBox").classList.toggle("hidden", mode !== "draw");
+  if (mode === "circle") { $("nCenter").innerHTML = centre ? `Centre <span class="mono">${centre.lat.toFixed(4)}, ${centre.lng.toFixed(4)}</span>` : "No centre chosen. Click the map."; $("nGo").disabled = !centre; }
+  else cornersChanged();
+  drawPreview();
+}
+function cornersChanged() {
+  $("nCenter").textContent = corners.length < 3 ? `Click the corners of the area on the map, in order around its edge. ${corners.length} so far, at least 3 needed.` : `${corners.length} corners. Click more to refine the shape, or Undo.`;
+  $("nGo").disabled = corners.length < 3;
+  $("drUse").disabled = corners.length < 3; if (corners.length < 3) $("drUse").checked = false;
+  drawPreview();
 }
 function setCentre(ll) {
   centre = L.latLng(ll.lat, ll.lng); drawPreview();
   $("nCenter").innerHTML = `Centre <span class="mono">${centre.lat.toFixed(4)}, ${centre.lng.toFixed(4)}</span>`;
   $("nGo").disabled = false;
 }
-map.on("click", e => { if (tab === "publish") setCentre(e.latlng); });
+map.on("click", e => {
+  if (tab !== "publish") return;
+  if (shape === "circle") setCentre(e.latlng); else { corners.push(L.latLng(e.latlng.lat, e.latlng.lng)); cornersChanged(); }
+});
+$("mCircle").addEventListener("click", () => setShape("circle"));
+$("mDraw").addEventListener("click", () => setShape("draw"));
+$("cUndo").addEventListener("click", () => { corners.pop(); cornersChanged(); });
+$("cClear").addEventListener("click", () => { corners = []; cornersChanged(); });
 bindMapSearch(map, ll => {
-  if (tab === "publish") setCentre(ll);
+  if (tab === "publish" && shape === "circle") setCentre(ll);
   if ($("drLat")) { $("drLat").value = ll.lat.toFixed(5); $("drLng").value = ll.lng.toFixed(5); if (ll.name) $("drTitle").value = ll.name.split(",")[0]; }  // a searched place can be used for the drill
 });
 $("nRadius").addEventListener("input", drawPreview);
@@ -135,8 +162,8 @@ $("noticeForm").addEventListener("submit", async e => {
   e.preventDefault();
   $("nGo").disabled = true;
   try {
-    const n = await api("/notices", { method: "POST", body: { title: $("nTitle").value, note: $("nNote").value, lat: centre.lat, lng: centre.lng,
-      radius_km: Number($("nRadius").value), starts_at: toISO($("nStart").value), ends_at: toISO($("nEnd").value) } });
+    const where = shape === "draw" ? { polygon: corners.map(c => [c.lng, c.lat]) } : { lat: centre.lat, lng: centre.lng, radius_km: Number($("nRadius").value) };
+    const n = await api("/notices", { method: "POST", body: { title: $("nTitle").value, note: $("nNote").value, ...where, starts_at: toISO($("nStart").value), ends_at: toISO($("nEnd").value) } });
     const conflicts = n.conflicting_permits || [];
     $("nMsg").innerHTML = `<div class="msg">Published <span class="mono">${esc(n.notice_id)}</span>. ${n.affected_flights} flight${n.affected_flights === 1 ? "" : "s"} overlapped and the pilot${n.affected_flights === 1 ? " was" : "s were"} alerted.</div>`
       + (conflicts.length ? `<div class="msg err"><b>${conflicts.length} approved permit${conflicts.length === 1 ? "" : "s"} conflict${conflicts.length === 1 ? "s" : ""} with this notice.</b> Review ${conflicts.length === 1 ? "it" : "them"} in Requests, All flights, and revoke if needed.<ul class="reasons">${conflicts.map(c => `<li><span class="mono">${esc(c.permit_id)}</span>, ${esc(c.pilot_name)}</li>`).join("")}</ul></div>` : "");
@@ -153,7 +180,7 @@ async function loadNotices() {
     $("noticeList").innerHTML = list.length ? list.map(n => `
       <div class="item">
         <div class="head"><span class="title">${esc(n.title)}</span><span class="tag ${esc(n.status)}">${esc(STATUS_LABEL[n.status])}</span></div>
-        <div class="meta">${esc(fmtWhen(n.starts_at))} to ${esc(fmtWhen(n.ends_at))}, radius ${esc(n.radius_km)} km</div>
+        <div class="meta">${esc(fmtWhen(n.starts_at))} to ${esc(fmtWhen(n.ends_at))}, ${n.shape === "polygon" ? "drawn boundary" : "radius " + esc(n.radius_km) + " km"}</div>
         ${n.text ? `<div>${esc(n.text)}</div>` : ""}
         <div class="meta">${esc(n.source)}${n.status === "active" ? `, ${n.affected_flights} flight${n.affected_flights === 1 ? "" : "s"} affected` : ""}</div>
         <div class="btnrow"><button class="ghost inline" type="button" data-show="${n.center.lat},${n.center.lng}">Show on map</button>
@@ -314,7 +341,8 @@ $("drHere").addEventListener("click", () => {
 });
 $("drGo").addEventListener("click", async () => {
   try {
-    const r = await api("/sim/scenarios/intruder", { method: "POST", body: { lat: Number($("drLat").value), lng: Number($("drLng").value), radius_m: Number($("drRad").value) || 150, title: $("drTitle").value.trim() || "Protected area drill" } });
+    const where = $("drUse").checked ? { polygon: corners.map(c => [c.lng, c.lat]) } : { lat: Number($("drLat").value), lng: Number($("drLng").value) };
+    const r = await api("/sim/scenarios/intruder", { method: "POST", body: { ...where, radius_m: Number($("drRad").value) || 150, title: $("drTitle").value.trim() || "Protected area drill" } });
     drillNotice = r.notice_id; drawNotices(layers.notices);
     $("drMsg").innerHTML = `<div class="msg">Drill started. <b>${esc(r.title)}</b> is declared. The drone ${esc(r.drone_id)} reaches it in about ${esc(r.arrives_in_s)} seconds. Devices with the guard page open will sound.</div>`;
   } catch (e) { $("drMsg").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }

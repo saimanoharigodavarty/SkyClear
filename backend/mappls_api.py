@@ -47,7 +47,7 @@ def place_search(q: str = Query(min_length=2, max_length=45), lat: float | None 
         "name": item.get("placeName") or item.get("name") or "Unnamed place",
         "address": item.get("placeAddress") or item.get("address") or "",
         "eloc": item.get("eLoc") or item.get("eloc"),
-        "provider": "Mappls place search — not airspace data",
+        "provider": "Mappls place search, not airspace data",
     } for item in locations[:6] if item.get("eLoc") or item.get("eloc")]
 
 
@@ -65,4 +65,4 @@ def place_detail(eloc: str):
     except (RuntimeError, KeyError, TypeError, ValueError):
         raise HTTPException(502, "Mappls did not return coordinates for this place")
     return {"name": item.get("name") or item.get("poi") or eloc, "address": item.get("address") or "",
-            "lat": lat, "lng": lng, "provider": "Mappls place search — not airspace data"}
+            "lat": lat, "lng": lng, "provider": "Mappls place search, not airspace data"}

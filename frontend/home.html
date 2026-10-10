@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyClear, Drone Airspace Clearance and Safety Platform</title>
+<script>try{var t=localStorage.getItem("skyclear.theme");t=t&&JSON.parse(t);if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top" id="top"></header>
+<main class="page-container">
+  <!-- Hero Section -->
+  <section class="hero-block">
+    <div class="hero-inner">
+      <span class="pill-tag">Autonomous Airspace Intelligence</span>
+      <h1 class="hero-title">Airspace clearance and real-time drone safety</h1>
+      <p class="hero-lead">Instant pre-flight zone verification, 100+ drone fleet simulation, predictive geofence breach monitoring, and statutory civil aviation regulatory citations for Indian airspace.</p>
+      <div class="hero-actions">
+        <a class="btn-hero-primary" href="index.html">Launch Pilot Clearance Map</a>
+        <a class="btn-hero-secondary" href="official.html">Authority Console</a>
+        <a class="btn-hero-ghost" href="about.html">About the Platform</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Live Airspace Statistics (4 columns) -->
+  <section class="stat-section">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <span class="stat-value">100+</span>
+        <span class="stat-label">Simulated aircraft</span>
+        <p class="stat-desc">Continuous multi-agent fleet simulation with realistic kinematics and telemetry streaming.</p>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">10 Hz</span>
+        <span class="stat-label">Real-time update loop</span>
+        <p class="stat-desc">Sub-second position monitoring and manual phone stick control over MAVLink bridge.</p>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">24 h</span>
+        <span class="stat-label">Time-series audit TTL</span>
+        <p class="stat-desc">Automated MongoDB telemetry collection with auto-expiring time-to-live index.</p>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">100%</span>
+        <span class="stat-label">Deterministic verdicts</span>
+        <p class="stat-desc">Geospatial polygon containment evaluated before legal rules are cited by local AI.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Core Capabilities (4 cards in 2x2 grid) -->
+  <section class="section-container">
+    <div class="section-header">
+      <span class="pill-tag">Core Architecture</span>
+      <h2>Built for compliant, safe, and transparent operations</h2>
+      <p class="muted">Engineered to support pilots, fleet operators, and civil aviation regulators in full alignment with DGCA Drone Rules 2021.</p>
+    </div>
+
+    <div class="grid-2x2">
+      <div class="cap-card">
+        <span class="card-num">01</span>
+        <h3>Instant GIS Clearance</h3>
+        <p>Evaluate any coordinate or multi-waypoint flight corridor against red, yellow, and green airspace zones. Calculates exact perimeter distance to airport runways, defence installations, and sensitive government perimeters.</p>
+        <div class="card-footer-link">
+          <a href="index.html">Open interactive map</a>
+        </div>
+      </div>
+
+      <div class="cap-card">
+        <span class="card-num">02</span>
+        <h3>Predictive Geofencing</h3>
+        <p>Live kinematic trajectory extrapolation flags potential airspace violations up to 30 seconds before boundary penetration. Automatically broadcasts recall orders to airborne drones if temporary restrictions are activated.</p>
+        <div class="card-footer-link">
+          <a href="display.html">View live tracking screen</a>
+        </div>
+      </div>
+
+      <div class="cap-card">
+        <span class="card-num">03</span>
+        <h3>Statutory Rule Citations</h3>
+        <p>Offline language model integration queries local civil aviation rules. Never hallucinates permissions: every verdict states the exact legal section, circular date, and responsible governing body.</p>
+        <div class="card-footer-link">
+          <a href="index.html">Ask rule engine</a>
+        </div>
+      </div>
+
+      <div class="cap-card">
+        <span class="card-num">04</span>
+        <h3>Civil Authority Portal</h3>
+        <p>Dedicated review portal for designated airspace officers. Review pilot credentials, verify drone registration certificates, issue time-bounded flight permits, and publish temporary NOTAM airspace restrictions.</p>
+        <div class="card-footer-link">
+          <a href="official.html">Access authority portal</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Walkthrough Banner -->
+  <section class="banner-box">
+    <div class="banner-inner">
+      <div class="banner-content">
+        <h3>Step-by-step guided evaluation</h3>
+        <p>Explore the complete flight lifecycle from initial map check and document verification to pre-flight clearance, simulated takeoff, and automatic return home.</p>
+      </div>
+      <div class="banner-btn-wrap">
+        <a class="btn-hero-primary" href="guide.html">View 10-Minute Tour</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="foot-links">
+    <a href="home.html">Home</a>
+    <a href="index.html">Pilot Map</a>
+    <a href="official.html">Authority</a>
+    <a href="about.html">About Us</a>
+    <a href="guide.html">Guide</a>
+    <a href="display.html">Demo Screen</a>
+    <a href="signin.html">Sign In</a>
+    <a href="terms.html">Terms of Service</a>
+    <a href="privacy.html">Privacy Policy</a>
+  </div>
+  <div class="small muted">Registration on SkyClear is not government registration of your drone or licence. Confirm all flights with Digital Sky.</div>
+</footer>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>header("home");</script>
+</body>
+</html>

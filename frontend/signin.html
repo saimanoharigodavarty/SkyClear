@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyClear, sign in</title>
+<script>try{var t=localStorage.getItem("skyclear.theme");t=t&&JSON.parse(t);if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="app.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+<header class="top" id="top"></header>
+<main class="authwrap">
+  <div class="auth-card">
+    <div class="auth-header">
+      <span class="pill-tag">Secure Access</span>
+      <h1 id="title">Sign in to SkyClear</h1>
+      <p class="lead" id="lead">Pilots check flight corridors, request permits and receive live alerts. Officials review air authorizations.</p>
+    </div>
+    <div id="notice"></div>
+    <div id="setupHint"></div>
+
+    <div class="authtabs" id="tabs">
+      <button type="button" data-t="signin" class="on">Sign in</button>
+      <button type="button" data-t="register">Create pilot account</button>
+    </div>
+
+    <div class="authbox2">
+      <!-- Google authentication -->
+      <div id="googleAuthWrap" class="hidden" style="margin-bottom:16px;text-align:center">
+        <div id="g_id_signin" style="display:inline-block"></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px">or continue with password or one-time code</div>
+      </div>
+
+      <!-- Sign in form -->
+      <form id="signinForm">
+        <label for="lId">Email or mobile number</label>
+        <input id="lId" required autocomplete="username" placeholder="Email or 10-digit mobile number">
+        <label for="lPass">Password</label>
+        <input id="lPass" type="password" required autocomplete="current-password">
+        <button type="submit">Sign in</button>
+        <div class="auth-links">
+          <button type="button" class="linkbtn" id="useOtp" data-pilot-only>Sign in with a one-time code instead</button>
+          <button type="button" class="linkbtn" id="forgot">Forgot your password?</button>
+        </div>
+        <div id="signinMsg"></div>
+      </form>
+
+      <!-- Register form -->
+      <form id="registerForm" class="hidden">
+        <label for="rName">Full name</label>
+        <input id="rName" required minlength="2" maxlength="80" autocomplete="name">
+        <label for="rEmail">Email address</label>
+        <input id="rEmail" type="email" required autocomplete="email">
+        <label for="rPhone">Mobile number (India)</label>
+        <input id="rPhone" type="tel" required autocomplete="tel" placeholder="10-digit mobile number">
+        <div class="help" id="phoneHelp">One account per number.</div>
+        <label for="rPass">Password</label>
+        <input id="rPass" type="password" required minlength="8" autocomplete="new-password">
+        <div class="help">At least 8 characters.</div>
+        <label class="consent">
+          <input id="rConsent" type="checkbox" required>
+          <span>I agree to the <a href="terms.html" target="_blank">Terms of Service</a> and the <a href="privacy.html" target="_blank">Privacy Policy</a>, and to SkyClear storing my details to run my account.</span>
+        </label>
+        <button type="submit">Create account and send code</button>
+        <div id="registerMsg"></div>
+      </form>
+
+      <!-- One-time code verification -->
+      <form id="otpForm" class="hidden">
+        <p id="otpText" style="margin-top:0">Enter the 6-digit code we sent.</p>
+        <label for="otpCode">One-time code</label>
+        <input id="otpCode" class="codeinput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required>
+        <div id="devCode"></div>
+        <button type="submit">Verify and continue</button>
+        <div class="auth-links">
+          <button type="button" class="linkbtn" id="resend">Send a new code</button>
+          <button type="button" class="linkbtn" id="otpBack">Back</button>
+        </div>
+        <div id="otpMsg"></div>
+      </form>
+
+      <!-- One-time code request -->
+      <form id="otpAskForm" class="hidden">
+        <label for="oId">Email or mobile number of your pilot account</label>
+        <input id="oId" required placeholder="Email or 10-digit mobile number">
+        <button type="submit">Send me a code</button>
+        <button type="button" class="linkbtn" id="otpAskBack">Back to password sign in</button>
+        <div id="otpAskMsg"></div>
+      </form>
+
+      <!-- Forgot password -->
+      <form id="forgotForm" class="hidden">
+        <label for="fId">Email or mobile number of your account</label>
+        <input id="fId" required placeholder="Email or 10-digit mobile number">
+        <button type="submit">Send me a code</button>
+        <button type="button" class="linkbtn" data-back>Back to sign in</button>
+        <div id="forgotMsg"></div>
+      </form>
+
+      <!-- Reset password -->
+      <form id="resetForm" class="hidden">
+        <p id="resetText" style="margin-top:0">Enter the code and choose a new password.</p>
+        <label for="resetCode">One-time code</label>
+        <input id="resetCode" class="codeinput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required>
+        <div id="resetDev"></div>
+        <label for="resetPass">New password</label>
+        <input id="resetPass" type="password" required minlength="8" autocomplete="new-password">
+        <div class="help">At least 8 characters. You will be signed out everywhere else.</div>
+        <button type="submit">Set the new password</button>
+        <div id="resetMsg"></div>
+      </form>
+
+      <!-- Initial password change for invited official -->
+      <form id="changeForm" class="hidden">
+        <p style="margin-top:0">You signed in with a temporary password. Choose your own to continue.</p>
+        <label for="curPass">Temporary password</label>
+        <input id="curPass" type="password" required autocomplete="current-password">
+        <label for="newPass">New password</label>
+        <input id="newPass" type="password" required minlength="8" autocomplete="new-password">
+        <div class="help">At least 8 characters.</div>
+        <button type="submit">Save and continue</button>
+        <div id="changeMsg"></div>
+      </form>
+
+      <!-- Official authenticator MFA -->
+      <form id="mfaForm" class="hidden">
+        <p id="mfaText" style="margin-top:0">Enter the 6-digit code from your authenticator app.</p>
+        <div id="mfaSetup"></div>
+        <label for="mfaCode">Authenticator code</label>
+        <input id="mfaCode" class="codeinput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required>
+        <button type="submit">Verify and sign in</button>
+        <div id="mfaMsg"></div>
+      </form>
+    </div>
+
+    <div class="auth-footer-help">
+      <span>Need an authority account?</span>
+      <span class="muted">Civil aviation officers are invite-only by the administrator.</span>
+    </div>
+  </div>
+</main>
+<footer class="foot">
+  <div class="foot-links">
+    <a href="home.html">Home</a>
+    <a href="index.html">Pilot Map</a>
+    <a href="about.html">About Us</a>
+    <a href="guide.html">Guide</a>
+    <a href="terms.html">Terms of Service</a>
+    <a href="privacy.html">Privacy Policy</a>
+  </div>
+  <div class="small muted">Registration on SkyClear is not government registration of your drone or licence.</div>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script src="account.js"></script>
+</body>
+</html>

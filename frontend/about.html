@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About Us, SkyClear Drone Safety Platform</title>
+<script>try{var t=localStorage.getItem("skyclear.theme");t=t&&JSON.parse(t);if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top" id="top"></header>
+<main class="page-container">
+  <!-- About Hero -->
+  <section class="hero-block">
+    <div class="hero-inner">
+      <span class="pill-tag">Mission and Architecture</span>
+      <h1 class="hero-title">Engineering safer skies for autonomous aviation</h1>
+      <p class="hero-lead">SkyClear was created to solve pre-flight airspace authorization, live fleet monitoring, and statutory compliance for commercial and recreational drone operations in India.</p>
+    </div>
+  </section>
+
+  <!-- Mission Overview -->
+  <section class="section-container">
+    <div class="section-header">
+      <span class="pill-tag">The Challenge</span>
+      <h2>Bridging pilots and aviation authorities</h2>
+      <p class="muted">As unmanned aviation grows across delivery, survey, agriculture, and infrastructure, airspace safety requires transparent rules, instant clearance decisions, and proactive geofence monitoring.</p>
+    </div>
+
+    <div class="grid-2x2">
+      <div class="cap-card">
+        <span class="card-num">01</span>
+        <h3>Deterministic Safety</h3>
+        <p>In safety-critical aviation, decisions cannot rely on unpredictable models. SkyClear runs strict mathematical polygon intersections against official boundaries before any rule explanation is provided.</p>
+      </div>
+
+      <div class="cap-card">
+        <span class="card-num">02</span>
+        <h3>Real-time Deconfliction</h3>
+        <p>Airspace restrictions change dynamically with VIP movements and emergency operations. SkyClear links active flight permits with live NOTAM publishing, alerting pilots in the air within seconds.</p>
+      </div>
+
+      <div class="cap-card">
+        <span class="card-num">03</span>
+        <h3>Statutory Compliance</h3>
+        <p>Every decision links directly to the DGCA Drone Rules 2021, Ministry of Civil Aviation circulars, and local airfield advisories, ensuring full regulatory clarity for pilots and authorities alike.</p>
+      </div>
+
+      <div class="cap-card">
+        <span class="card-num">04</span>
+        <h3>Open Architecture</h3>
+        <p>Built with modular REST APIs, standard Leaflet mapping, ArduPilot and MAVLink telemetry adapters, and local LLM acceleration, enabling offline operation and easy integration.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Technical Stack Specification -->
+  <section class="section-container">
+    <div class="section-header">
+      <span class="pill-tag">Engineering Stack</span>
+      <h2>System architecture and performance specifications</h2>
+    </div>
+
+    <div class="spec-table-wrap">
+      <table class="spec-table">
+        <thead>
+          <tr>
+            <th>Subsystem</th>
+            <th>Technology</th>
+            <th>Role and Guarantee</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">Geospatial Engine</td>
+            <td>Shapely, GeoJSON, Leaflet</td>
+            <td>Sub-millisecond point-in-polygon checks and 100 m corridor route sampling.</td>
+          </tr>
+          <tr>
+            <td class="mono">Fleet Simulation</td>
+            <td>Python asyncio, Kinematics</td>
+            <td>100+ concurrent drone simulation with forward 30-second breach projection.</td>
+          </tr>
+          <tr>
+            <td class="mono">Hybrid Storage</td>
+            <td>SQLite, MongoDB Time-series</td>
+            <td>Relational schemas for permits paired with 24-hour auto-expiring telemetry TTL.</td>
+          </tr>
+          <tr>
+            <td class="mono">Regulatory RAG</td>
+            <td>Ollama, Local Embeddings</td>
+            <td>Deterministic rule citations from statutory civil aviation documents without external leakage.</td>
+          </tr>
+          <tr>
+            <td class="mono">Authentication</td>
+            <td>JWT, Google GIS, TOTP</td>
+            <td>Multi-tier role access: self-registered pilots and invite-only officials with MFA.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Team Workstreams -->
+  <section class="section-container">
+    <div class="section-header">
+      <span class="pill-tag">Development Team</span>
+      <h2>Collaborative engineering workstreams</h2>
+      <p class="muted">SkyClear is built by an integrated engineering team dividing responsibilities across core aviation domains.</p>
+    </div>
+
+    <div class="grid-2x2">
+      <div class="cap-card">
+        <span class="card-num">S1</span>
+        <h3>Geospatial Core and Rules</h3>
+        <p>Sai Manohar Godavarty: Pipeline design, polygon verification, zone schemas, and airport buffer calculations.</p>
+      </div>
+
+      <div class="cap-card">
+        <span class="card-num">S2</span>
+        <h3>Authority and Permits</h3>
+        <p>P. Charitha: Civil authority console, multi-office review workflows, permit QR verification, and team administration.</p>
+      </div>
+
+      <div class="cap-card">
+        <span class="card-num">S3</span>
+        <h3>Simulation and Telemetry</h3>
+        <p>Thanvi Nagalla: 100+ drone fleet engine, MongoDB time-series TTL, live SSE streams, and MAVLink integration.</p>
+      </div>
+
+      <div class="cap-card">
+        <span class="card-num">S4</span>
+        <h3>Regulatory RAG and LLM</h3>
+        <p>Ch. V. S. S. Sravanthi: Rule passage indexing, statutory citation engine, prompt safety, and offline model integration.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Call to action -->
+  <section class="banner-box">
+    <div class="banner-inner">
+      <div class="banner-content">
+        <h3>Ready to verify your flight spot?</h3>
+        <p>Open the pilot map to check airspace boundaries, simulate flight corridors, or submit permission requests.</p>
+      </div>
+      <div class="banner-btn-wrap">
+        <a class="btn-hero-primary" href="index.html">Open Pilot Map</a>
+        <a class="btn-hero-secondary" href="signin.html">Sign In</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="foot-links">
+    <a href="home.html">Home</a>
+    <a href="index.html">Pilot Map</a>
+    <a href="official.html">Authority</a>
+    <a href="about.html">About Us</a>
+    <a href="guide.html">Guide</a>
+    <a href="signin.html">Sign In</a>
+    <a href="terms.html">Terms of Service</a>
+    <a href="privacy.html">Privacy Policy</a>
+  </div>
+  <div class="small muted">Registration on SkyClear is not government registration of your drone or licence.</div>
+</footer>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>header("about");</script>
+</body>
+</html>

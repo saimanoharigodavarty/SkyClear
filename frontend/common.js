@@ -107,7 +107,7 @@ async function api(path, { method = "GET", body, auth = true } = {}) {
 async function signOut() {
   const s = session();
   if (s && s.refresh_token) { try { await fetch(API_BASE + "/auth/logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: s.refresh_token }) }); } catch (e) { /* signing out anyway */ } }
-  clearSession(); location.href = "account.html";
+  clearSession(); location.href = "signin.html";
 }
 
 /* ---------- formatting ---------- */
@@ -123,17 +123,19 @@ function skeleton() { return '<div class="skel big"></div><div class="skel"></di
 function header(active) {
   const s = session();
   $("top").innerHTML = `
-    <a class="brand" href="index.html">Sky<b>Clear</b>${CFG.city ? `<small>${esc(CFG.city)}</small>` : ""}</a>
+    <a class="brand" href="home.html">Sky<b>Clear</b>${CFG.city ? `<small>${esc(CFG.city)}</small>` : ""}</a>
     <nav class="nav">
-      <a href="index.html" class="${active === "pilot" ? "on" : ""}">Pilot</a>
+      <a href="home.html" class="${active === "home" ? "on" : ""}">Home</a>
+      <a href="index.html" class="${active === "pilot" ? "on" : ""}">Pilot Map</a>
       <a href="official.html" class="${active === "official" ? "on" : ""}">Authority</a>
-      <a href="display.html" class="${active === "display" ? "on" : ""}">Demo screen</a>
+      <a href="about.html" class="${active === "about" ? "on" : ""}">About Us</a>
       <a href="guide.html" class="${active === "guide" ? "on" : ""}">Guide</a>
+      <a href="display.html" class="${active === "display" ? "on" : ""}">Demo screen</a>
     </nav>
     <div class="who">
       <div class="seg" role="group" aria-label="Theme">${THEMES.map(t => `<button type="button" data-theme="${t}" class="${themeChoice() === t ? "on" : ""}" aria-pressed="${themeChoice() === t}">${{ system: "Auto", light: "Light", dark: "Dark" }[t]}</button>`).join("")}</div>
       ${s ? `<span>${esc(s.user.name)}</span><span class="role">${esc(s.user.role)}</span><a href="#" id="signout">Sign out</a>`
-          : `<a class="btn-ghost" href="account.html">Sign in</a><a class="btn-sm" href="account.html?tab=register">Create account</a>`}
+          : `<a class="btn-ghost" href="signin.html">Sign in</a><a class="btn-sm" href="signin.html?tab=register">Create account</a>`}
     </div>`;
   document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
   const out = $("signout");

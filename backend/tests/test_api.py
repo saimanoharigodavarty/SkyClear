@@ -83,3 +83,14 @@ def test_examples_are_built_from_real_zones():
     zones = {f["properties"]["name"] for f in client.get("/zones").json()["features"]}
     assert all(s["label"] in zones for s in ex["spots"] if s["kind"] != "clear")
     assert len(ex["route"]) == 2
+
+
+def test_example_buttons_only_use_zones_we_can_answer_for():
+    import json
+    from config import DATA_DIR
+    with_rules = {r["zone_type"] for r in json.load(open(DATA_DIR / "rules.json", encoding="utf-8"))}
+    ex = client.get("/examples").json()
+    assert all(s["kind"] in with_rules or s["kind"] == "clear" for s in ex["spots"])
+    for s in ex["spots"]:  # each example gives a real answer, never "can't determine"
+        v = client.post("/check", json={"lat": s["lat"], "lng": s["lng"], "drone_id": "nano-200", "explain": False}).json()["verdict"]
+        assert v != "cannot_determine", s

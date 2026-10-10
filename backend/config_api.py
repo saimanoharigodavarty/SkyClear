@@ -42,10 +42,18 @@ def _center(geometry):
     return sum(y for _, y in ring) / len(ring), sum(x for x, _ in ring) / len(ring)
 
 
+def _rule_zone_types():
+    """Zone types we hold a rule for. A spot in any other zone can only be answered with "can't determine"."""
+    if hasattr(store, "rules"):
+        return {r["zone_type"] for r in store.rules}
+    return set(store.db.rules.distinct("zone_type"))
+
+
 @router.get("/examples")
 def examples():
-    """One real spot per kind of zone, one clear spot, and a route across the first airport zone."""
-    feats = store.all_zones_geojson()["features"]
+    """One real spot per kind of zone that we can answer for, one clear spot, and a route across the first airport zone."""
+    answerable = _rule_zone_types()
+    feats = [f for f in store.all_zones_geojson()["features"] if f["properties"]["zone_type"] in answerable]
     center = config.REGION["center"]
     out, seen, route = [], set(), None
     for f in sorted(feats, key=lambda f: abs(_center(f["geometry"])[0] - center[0]) + abs(_center(f["geometry"])[1] - center[1])):

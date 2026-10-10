@@ -20,7 +20,8 @@ if os.environ.get("USE_MONGO") == "1":
     from db import get_db
     test_db = get_db()
     for collection_name in test_db.list_collection_names():
-        test_db.drop_collection(collection_name)
+        if not collection_name.startswith("system."):  # MongoDB's own bookkeeping (system.views holds the time-series telemetry view)
+            test_db.drop_collection(collection_name)
     import load_data
     # The small Atlas tier cannot duplicate production Search indexes. Search pipelines have
     # focused unit tests and direct production checks; this database covers CRUD and geo queries.

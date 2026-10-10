@@ -51,6 +51,7 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5:7b")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 USE_LLM = os.getenv("USE_LLM", "0") == "1"
+MAPPLS_API_KEY = os.getenv("MAPPLS_API_KEY", "")
 LLM_TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", "60"))   # a small model on a laptop CPU needs a few seconds, the first call also loads it
 LLM_KEEP_ALIVE = os.getenv("LLM_KEEP_ALIVE", "30m")      # keep the model loaded on the Ollama laptop between questions
 

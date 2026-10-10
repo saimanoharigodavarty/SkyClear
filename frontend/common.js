@@ -199,16 +199,24 @@ function bindMapSearch(map, onPick) {
     let zones = [], places = [];
     try { zones = await api("/zones/search?q=" + encodeURIComponent(q), { auth: false }); } catch (e) { /* offline */ }
     try {
+      const near = map.getCenter();
+      places = await api(`/places/search?q=${encodeURIComponent(q)}&lat=${near.lat}&lng=${near.lng}`, { auth: false });
+    } catch (e) { /* Mappls is optional */ }
+    if (!places.length) try {
       const vb = CFG.searchViewbox ? "&viewbox=" + CFG.searchViewbox.join(",") : "";
       const r = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=4&countrycodes=" + CFG.countryCode + vb + "&q=" + encodeURIComponent(q));
-      places = r.ok ? await r.json() : [];
+      places = r.ok ? (await r.json()).map(p => ({ name: p.display_name.split(",").slice(0, 2).join(","), address: "", lat: Number(p.lat), lng: Number(p.lon), provider: "OpenStreetMap place search" })) : [];
     } catch (e) { /* offline */ }
     if (mine !== seq) return;
     const items = [...zones.map(z => ({ title: z.name, sub: "Restricted zone, " + z.zone_type, lat: z.center.lat, lng: z.center.lng, zoom: 13 })),
-      ...places.map(p => ({ title: p.display_name.split(",").slice(0, 2).join(","), sub: "Place", lat: Number(p.lat), lng: Number(p.lon), zoom: 15 }))];
+      ...places.map(p => ({ title: p.name, sub: p.provider || "Place", lat: p.lat, lng: p.lng, eloc: p.eloc, zoom: 15 }))];
     list.innerHTML = items.length ? items.map((it, i) => `<li data-i="${i}">${esc(it.title)}<small>${esc(it.sub)}</small></li>`).join("") : '<li class="none">Nothing found. Try a zone name or an area in Hyderabad.</li>';
     list.classList.remove("hidden");
-    list.querySelectorAll("li[data-i]").forEach(li => li.addEventListener("click", () => { const it = items[Number(li.dataset.i)]; input.value = it.title; pick(it.lat, it.lng, it.zoom); }));
+    list.querySelectorAll("li[data-i]").forEach(li => li.addEventListener("click", async () => {
+      const it = items[Number(li.dataset.i)]; input.value = it.title;
+      if (it.eloc) { try { const detail = await api("/places/" + encodeURIComponent(it.eloc), { auth: false }); pick(detail.lat, detail.lng, it.zoom); } catch (e) { li.querySelector("small").textContent = "Mappls could not provide coordinates for this place."; } }
+      else pick(it.lat, it.lng, it.zoom);
+    }));
   }
   input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 300); });
   input.addEventListener("keydown", e => { if (e.key === "Escape") close(); });

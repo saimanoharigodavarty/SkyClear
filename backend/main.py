@@ -15,6 +15,7 @@ from auth import router as auth_router, setup_indexes as auth_indexes
 from bridge import router as bridge_router
 from config_api import router as config_router
 from live import router as live_router, sim_router
+from mappls_api import router as mappls_router
 from verification import router as verification_router
 from zones_api import router as zones_router
 from pipeline import evaluate, get_drone, parse_when, store
@@ -36,6 +37,7 @@ app.include_router(ask_router)
 app.include_router(auth_router)
 app.include_router(bridge_router)
 app.include_router(zones_router)
+app.include_router(mappls_router)
 app.include_router(live_router)
 app.include_router(sim_router)
 app.include_router(analytics_router)

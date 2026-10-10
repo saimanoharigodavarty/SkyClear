@@ -105,7 +105,8 @@ def _read(name):
         return json.load(f)
 
 
-def load(verbose=True):
+def load(verbose=True, search_indexes=("rules", "zones"), embeddings=True):
+    """Load seed data; tests may limit external Search indexes to fit small Atlas tiers."""
     db = get_db()
     log = print if verbose else (lambda *a, **k: None)
     ensure_zones_collection(db)
@@ -127,7 +128,7 @@ def load(verbose=True):
 
     # rules, with embeddings when Ollama is available
     rules = _read("rules.json")
-    vectors = embed([r["text"] for r in rules], "document")
+    vectors = embed([r["text"] for r in rules], "document") if embeddings else None
     if vectors:
         for r, v in zip(rules, vectors):
             r["embedding"] = v
@@ -136,8 +137,10 @@ def load(verbose=True):
     db.rules.create_index([("text", "text")])
     db.rules.create_index([("zone_type", 1), ("drone_classes", 1)])
 
-    ensure_search_index(db.rules, RULES_SEARCH_INDEX, RULES_SEARCH_DEFINITION, log)
-    ensure_search_index(db.zones, ZONES_SEARCH_INDEX, ZONES_SEARCH_DEFINITION, log)
+    if "rules" in search_indexes:
+        ensure_search_index(db.rules, RULES_SEARCH_INDEX, RULES_SEARCH_DEFINITION, log)
+    if "zones" in search_indexes:
+        ensure_search_index(db.zones, ZONES_SEARCH_INDEX, ZONES_SEARCH_DEFINITION, log)
 
     if vectors:
         _vector_index(db, log)

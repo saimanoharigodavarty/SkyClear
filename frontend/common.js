@@ -21,10 +21,13 @@ const VERDICT_MEANING = {
   cannot_determine: "Our data does not cover this spot. Ask the local authority or the official portal."
 };
 const STATUS_LABEL = { watching: "Watching", requested: "Pending", approved: "Approved", rejected: "Rejected", cancelled: "Cancelled", active: "Active", revoked: "Revoked", expired: "Expired", pending: "Pending", verified: "Verified", unverified: "Not verified" };
-const RED = "#b3261e", AMBER = "#a15c00", NOTICE_COLOR = "#1f4e79";
+// Colours are read from the theme (CSS variables), so the map follows light and dark.
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C = { get red() { return cssVar("--red"); }, get amber() { return cssVar("--amber"); }, get green() { return cssVar("--green"); },
+  get grey() { return cssVar("--grey"); }, get notice() { return cssVar("--notice"); }, get ink() { return cssVar("--ink"); }, get accent() { return cssVar("--accent"); } };
 // Severity grouping: defence zones are prohibited, the rest need permission (or depend on the drone).
 const ZONE_GROUP = { military: "red", airport: "amber", park: "amber", government: "amber" };
-const zoneColor = type => (ZONE_GROUP[type] === "red" ? RED : AMBER);
+const zoneColor = type => (ZONE_GROUP[type] === "red" ? C.red : C.amber);
 
 function saved(key, value) {
   try { if (value === undefined) return JSON.parse(localStorage.getItem(key)); if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, JSON.stringify(value)); }
@@ -41,7 +44,7 @@ function applyTheme() {
   if (t === "system") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
   window.dispatchEvent(new Event("skyclear:theme"));
 }
-function cycleTheme() { saved("skyclear.theme", THEMES[(THEMES.indexOf(themeChoice()) + 1) % THEMES.length]); applyTheme(); const b = $("themeBtn"); if (b) b.textContent = THEME_LABEL[themeChoice()]; }
+function setTheme(t) { saved("skyclear.theme", t); applyTheme(); document.querySelectorAll(".seg button").forEach(b => b.classList.toggle("on", b.dataset.theme === t)); }
 if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (themeChoice() === "system") applyTheme(); });
 
 /* ---------- session and API ---------- */
@@ -120,23 +123,23 @@ function skeleton() { return '<div class="skel big"></div><div class="skel"></di
 function header(active) {
   const s = session();
   $("top").innerHTML = `
-    <a class="brand" href="index.html">SkyClear<small>${esc(CFG.city)}</small></a>
+    <a class="brand" href="index.html">Sky<b>Clear</b>${CFG.city ? `<small>${esc(CFG.city)}</small>` : ""}</a>
     <nav class="nav">
       <a href="index.html" class="${active === "pilot" ? "on" : ""}">Pilot</a>
       <a href="official.html" class="${active === "official" ? "on" : ""}">Authority</a>
     </nav>
     <div class="who">
-      <button id="themeBtn" class="themebtn" type="button" title="Switch between light, dark and automatic">${THEME_LABEL[themeChoice()]}</button>
+      <div class="seg" role="group" aria-label="Theme">${THEMES.map(t => `<button type="button" data-theme="${t}" class="${themeChoice() === t ? "on" : ""}" aria-pressed="${themeChoice() === t}">${{ system: "Auto", light: "Light", dark: "Dark" }[t]}</button>`).join("")}</div>
       ${s ? `<span>${esc(s.user.name)}</span><span class="role">${esc(s.user.role)}</span><a href="#" id="signout">Sign out</a>`
           : `<a class="btn-ghost" href="account.html">Sign in</a><a class="btn-sm" href="account.html?tab=register">Create account</a>`}
     </div>`;
-  $("themeBtn").addEventListener("click", cycleTheme);
+  document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.theme)));
   const out = $("signout");
   if (out) out.addEventListener("click", e => { e.preventDefault(); signOut(); });
 }
 
 /* ---------- map ---------- */
-function circleOf(n) { return L.geoJSON(n.area || n.geometry, { style: { color: NOTICE_COLOR, weight: 2, dashArray: "6 5", fillColor: NOTICE_COLOR, fillOpacity: 0.1 }, interactive: false }); }
+function circleOf(n) { return L.geoJSON(n.area || n.geometry, { style: { color: C.notice, weight: 2, dashArray: "6 5", fillColor: C.notice, fillOpacity: 0.12 }, interactive: false }); }
 
 // Base map: centred on the configured city, calm basemap that follows the theme, satellite toggle, zones grouped by severity, active notices, clickable legend.
 function makeMap() {
@@ -170,10 +173,10 @@ function makeMap() {
   const layers = { red: L.layerGroup().addTo(map), amber: L.layerGroup().addTo(map), notices: L.layerGroup().addTo(map), work: L.layerGroup().addTo(map) };
   const legend = $("legend");
   if (legend) {
-    const rows = [["red", RED, "Red: flying prohibited"], ["amber", AMBER, "Yellow: permission needed"], ["notices", NOTICE_COLOR, "Official notice, time limited"]];
+    const rows = [["red", "var(--red)", "Red: flying prohibited"], ["amber", "var(--amber)", "Yellow: permission needed"], ["notices", "var(--notice)", "Official notice, time limited"]];
     legend.innerHTML = '<details' + (window.innerWidth > 860 ? " open" : "") + '><summary class="label" style="margin:0;cursor:pointer">Map layers</summary>' + rows.map(([k, col, text]) =>
-      `<label class="lg"><input type="checkbox" data-layer="${k}" checked><i style="border-color:${col};background:${col}22;${k === "notices" ? "border-style:dashed" : ""}"></i>${text}</label>`).join("")
-      + '<div class="lg" style="cursor:default"><i style="border-color:#1a7f37;background:#1a7f3722"></i>Green: no restriction found in our data (not painted)</div></details>';
+      `<label class="lg"><input type="checkbox" data-layer="${k}" checked><i style="border-color:${col};background:color-mix(in srgb, ${col} 14%, transparent);${k === "notices" ? "border-style:dashed" : ""}"></i>${text}</label>`).join("")
+      + '<div class="lg" style="cursor:default"><i style="border-color:var(--green);background:color-mix(in srgb, var(--green) 14%, transparent)"></i>Green: no restriction found in our data (not painted)</div></details>';
     legend.querySelectorAll("input").forEach(box => box.addEventListener("change", () => {
       const l = layers[box.dataset.layer]; box.checked ? l.addTo(map) : map.removeLayer(l); }));
   }
@@ -211,7 +214,7 @@ function bindMapSearch(map, onPick) {
   document.addEventListener("click", e => { if (!e.target.closest(".mapsearch")) close(); });
 }
 
-function zoneStyle(type, strong) { const col = zoneColor(type); return { color: col, weight: strong ? 3 : 1.5, fillColor: col, fillOpacity: strong ? 0.22 : 0.08 }; }
+function zoneStyle(type, strong) { const col = zoneColor(type); return { color: col, weight: strong ? 2.5 : 1.5, fillColor: col, fillOpacity: strong ? 0.1 : 0.07 }; }
 
 async function drawZones(layers) {
   layers.red.clearLayers(); layers.amber.clearLayers();

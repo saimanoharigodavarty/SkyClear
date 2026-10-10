@@ -2,7 +2,7 @@
 header("pilot");
 if (session() && session().user.must_change_password) location.href = "account.html?change=1";
 const { map, layers } = makeMap();
-const VCOLOR = { can_fly: "#1a7f37", permission_needed: "#a15c00", prohibited: "#b3261e", cannot_determine: "#5b6570" };
+const VCOLOR = { get can_fly() { return C.green; }, get permission_needed() { return C.amber; }, get prohibited() { return C.red; }, get cannot_determine() { return C.grey; } };
 let tab = "check", picked = null, marker = null, catalog = [], mine = [], lastCheck = null;
 const me = () => (session() || {}).user;
 
@@ -129,7 +129,7 @@ function drawCheck(r) {
   resultLayer.clearLayers();
   const shapes = [];
   (r.zones || []).filter(z => z.distance_km === 0).forEach(z => shapes.push(L.geoJSON(z.geometry, { style: zoneStyle(z.zone_type, true), interactive: false }).addTo(resultLayer)));
-  (r.notices || []).forEach(n => shapes.push(L.geoJSON(n.geometry, { style: { color: NOTICE_COLOR, weight: 3, dashArray: "6 5", fillColor: NOTICE_COLOR, fillOpacity: 0.18 }, interactive: false }).addTo(resultLayer)));
+  (r.notices || []).forEach(n => shapes.push(L.geoJSON(n.geometry, { style: { color: C.notice, weight: 3, dashArray: "6 5", fillColor: C.notice, fillOpacity: 0.18 }, interactive: false }).addTo(resultLayer)));
   if (shapes.length && picked) {  // frame the spot together with what it is inside
     const b = L.latLngBounds([picked]); shapes.forEach(s => b.extend(s.getBounds()));
     map.fitBounds(b, { padding: [40, 40], maxZoom: 14 });
@@ -210,8 +210,8 @@ let waypoints = [], routeLine = null, playTimer = null;
 const simLayer = L.layerGroup().addTo(layers.work);
 function addWaypoint(ll) {
   stopPlayback(); waypoints.push(ll);
-  L.circleMarker(ll, { radius: 5, color: NOTICE_COLOR, fillColor: NOTICE_COLOR, fillOpacity: 1 }).addTo(simLayer);
-  if (routeLine) routeLine.setLatLngs(waypoints); else routeLine = L.polyline(waypoints, { color: NOTICE_COLOR, weight: 2, dashArray: "4 4" }).addTo(simLayer);
+  L.circleMarker(ll, { radius: 5, color: C.notice, fillColor: C.notice, fillOpacity: 1 }).addTo(simLayer);
+  if (routeLine) routeLine.setLatLngs(waypoints); else routeLine = L.polyline(waypoints, { color: C.notice, weight: 2, dashArray: "4 4" }).addTo(simLayer);
   $("wpHint").textContent = waypoints.length + " waypoint" + (waypoints.length > 1 ? "s" : "") + ". " + (waypoints.length < 2 ? "Add at least 2." : "Ready to run.");
   $("run").disabled = waypoints.length < 2;
 }
@@ -236,7 +236,7 @@ function simSummary(out) {
 function play(out) {
   stopPlayback();
   const s = out.samples, rate = Number($("playback").value);
-  const dot = L.circleMarker([s[0].lat, s[0].lng], { radius: 8, color: "#1b1f24", weight: 2, fillColor: VCOLOR[s[0].verdict], fillOpacity: 1 }).addTo(simLayer);
+  const dot = L.circleMarker([s[0].lat, s[0].lng], { radius: 8, color: C.ink, weight: 2, fillColor: VCOLOR[s[0].verdict], fillOpacity: 1 }).addTo(simLayer);
   let i = 0, t = 0;
   $("live").classList.remove("hidden");
   playTimer = setInterval(() => {
@@ -369,6 +369,7 @@ $("bannerBtn").addEventListener("click", () => showTab("alerts"));
 /* ---------- start ---------- */
 $("when").value = toLocalInput(new Date()); $("simWhen").value = $("when").value;
 drawZones(layers); drawNotices(layers.notices); loadDrones();
+window.addEventListener("skyclear:theme", () => { drawZones(layers); drawNotices(layers.notices); });
 if (me()) { refreshMe().catch(() => {}); pollAlerts(); setInterval(() => { pollAlerts(); drawNotices(layers.notices); }, 5000); }
 
 function loadExampleRoute() {

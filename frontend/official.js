@@ -112,7 +112,7 @@ async function loadVerification() {
 /* ---------- publish ---------- */
 function drawPreview() {
   if (preview) { layers.work.removeLayer(preview); preview = null; }
-  if (centre) preview = L.circle(centre, { radius: (Number($("nRadius").value) || 0) * 1000, color: NOTICE_COLOR, weight: 2, dashArray: "6 5", fillOpacity: 0.12 }).addTo(layers.work);
+  if (centre) preview = L.circle(centre, { radius: (Number($("nRadius").value) || 0) * 1000, color: C.notice, weight: 2, dashArray: "6 5", fillOpacity: 0.12 }).addTo(layers.work);
 }
 function setCentre(ll) {
   centre = L.latLng(ll.lat, ll.lng); drawPreview();
@@ -157,6 +157,7 @@ async function loadNotices() {
 const now = new Date();
 $("nStart").value = toLocalInput(now); $("nEnd").value = toLocalInput(new Date(now.getTime() + 3 * 3600000));
 drawZones(layers); drawNotices(layers.notices); loadStats(); loadRequests();
+window.addEventListener("skyclear:theme", () => { drawZones(layers); drawNotices(layers.notices); });
 (async () => {
   const u = sess.user, box = $("office");
   try {

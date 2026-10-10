@@ -55,6 +55,11 @@ def _secret(name):
 DATA_DIR = ROOT / "data"
 FRONTEND_DIR = ROOT / "frontend"
 
+def ollama_timeout(read_s=None):
+    import httpx
+    return httpx.Timeout(read_s or LLM_TIMEOUT_S, connect=LLM_CONNECT_TIMEOUT_S)
+
+
 USE_MONGO = os.getenv("USE_MONGO", "0") == "1"
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/?directConnection=true")
 MONGO_DB = os.getenv("MONGO_DB", "skyclear")
@@ -64,7 +69,8 @@ LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5:7b")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 USE_LLM = os.getenv("USE_LLM", "0") == "1"
 MAPPLS_API_KEY = os.getenv("MAPPLS_API_KEY", "")
-LLM_TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", "60"))   # a small model on a laptop CPU needs a few seconds, the first call also loads it
+LLM_TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", "60"))
+LLM_CONNECT_TIMEOUT_S = float(os.getenv("LLM_CONNECT_TIMEOUT_S", "3"))  # an Ollama laptop that is off or asleep must fail fast, not hang   # a small model on a laptop CPU needs a few seconds, the first call also loads it
 LLM_KEEP_ALIVE = os.getenv("LLM_KEEP_ALIVE", "30m")      # keep the model loaded on the Ollama laptop between questions
 
 # Area our data covers: (min_lng, min_lat, max_lng, max_lat). Outside it the verdict is cannot_determine.

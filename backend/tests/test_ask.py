@@ -100,3 +100,8 @@ def test_a_quick_answer_does_not_wait_for_the_model(monkeypatch):
 def test_metrics_are_exposed_in_prometheus_format():
     text = TestClient(app).get("/metrics").text
     assert "skyclear_http_requests_total" in text and "skyclear_simulated_drones" in text
+
+
+def test_an_unreachable_model_laptop_fails_in_seconds_not_a_minute():
+    t = config.ollama_timeout()
+    assert t.connect <= 5 and t.read >= 20  # a switched-off laptop is given up on quickly, a slow model still gets its time

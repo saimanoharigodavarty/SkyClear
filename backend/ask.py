@@ -71,7 +71,7 @@ def retrieve(question):
 
 def _chat(prompt):
     import ollama
-    client = ollama.Client(host=config.OLLAMA_URL, timeout=config.LLM_TIMEOUT_S)
+    client = ollama.Client(host=config.OLLAMA_URL, timeout=config.ollama_timeout())
     out = client.chat(model=config.LLM_MODEL, format="json", options={"temperature": 0.1}, keep_alive=config.LLM_KEEP_ALIVE,
                       messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}])
     return out["message"]["content"]

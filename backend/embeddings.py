@@ -15,7 +15,7 @@ def embed(texts, kind="document"):
         return None
     try:
         import ollama
-        client = ollama.Client(host=config.OLLAMA_URL)
+        client = ollama.Client(host=config.OLLAMA_URL, timeout=config.ollama_timeout(20))
         out = client.embed(model=config.EMBED_MODEL, input=[f"search_{kind}: {t}" for t in texts])
         return out["embeddings"]
     except Exception as e:  # Ollama missing, model not pulled, network

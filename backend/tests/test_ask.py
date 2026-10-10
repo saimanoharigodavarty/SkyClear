@@ -84,5 +84,19 @@ def test_a_general_answer_may_say_prohibited_but_never_safe(monkeypatch):
     ask._down_until = 0
     monkeypatch.setattr(ask, "_chat", lambda p: json.dumps({"answer": "Flying over military areas is prohibited for all drones [R-002].", "citations": ["R-002"]}))
     assert post(question="Can I fly over a military area?").json()["answered_by"] == "llm"
+    ask._cache.clear()  # the first answer was kept for repeat questions
     monkeypatch.setattr(ask, "_chat", lambda p: json.dumps({"answer": "Military areas are safe to fly over [R-002].", "citations": ["R-002"]}))
     assert post(question="Can I fly over a military area?").json()["answered_by"] == "extracted"
+
+
+def test_a_quick_answer_does_not_wait_for_the_model(monkeypatch):
+    monkeypatch.setattr(config, "USE_LLM", True)
+    ask._down_until = 0
+    monkeypatch.setattr(ask, "_chat", lambda p: (_ for _ in ()).throw(AssertionError("the model must not be called")))
+    r = post(question="Can I fly over a military area?", explain=False).json()
+    assert r["answered_by"] == "extracted" and r["citations"]
+
+
+def test_metrics_are_exposed_in_prometheus_format():
+    text = TestClient(app).get("/metrics").text
+    assert "skyclear_http_requests_total" in text and "skyclear_simulated_drones" in text

@@ -74,25 +74,25 @@ The model is a small one. The rule is: it may only reword what the rules and the
 - Automated local suite: 130 passed, 7 skipped. MongoDB integration had previously passed 133 with 1 expected autocomplete-index skip; rerun it after loading an official geometry export.
 
 
-## Load test (10 Oct 2026, after the geofence speed-up)
+## Load test (10 Oct 2026, after gzip, zone caching and the geofence speed-up)
 
 Run with `.venv/bin/python scripts/loadtest.py`. One uvicorn process, MongoDB in Docker, the load generator on the same Mac, so the generator takes CPU from the server. 8 seconds per row. No AI calls in these runs (`explain: false`).
 
-Machine: macOS-26.6.2-arm64-arm-64bit-Mach-O, 8 CPUs, Python 3.14.8, server http://localhost:8000, 8 s per row
-
 | Endpoint | Concurrent users | Requests per second | p50 (ms) | p95 (ms) | p99 (ms) | Errors |
 |---|---|---|---|---|---|---|
-| POST /check (zone + rules, no AI) | 10 | 468 | 20 | 32 | 45 | 0 |
-| POST /check (zone + rules, no AI) | 50 | 464 | 107 | 142 | 165 | 0 |
-| POST /check (zone + rules, no AI) | 200 | 106 | 1341 | 6487 | 8409 | 0 |
-| GET /zones?bbox (2dsphere) | 10 | 835 | 11 | 19 | 26 | 0 |
-| GET /zones?bbox (2dsphere) | 50 | 240 | 105 | 713 | 1187 | 0 |
-| GET /zones?bbox (2dsphere) | 200 | 116 | 1201 | 5691 | 7782 | 0 |
-| GET /live/drones | 10 | 1690 | 5 | 6 | 17 | 0 |
-| GET /live/drones | 50 | 387 | 63 | 482 | 912 | 0 |
-| GET /live/drones | 200 | 171 | 592 | 5149 | 5856 | 0 |
+| POST /check (zone + rules, no AI) | 10 | 372 | 26 | 44 | 58 | 0 |
+| POST /check (zone + rules, no AI) | 50 | 394 | 126 | 170 | 201 | 0 |
+| POST /check (zone + rules, no AI) | 200 | 396 | 522 | 661 | 718 | 0 |
+| GET /zones?bbox (2dsphere) | 10 | 678 | 14 | 24 | 36 | 0 |
+| GET /zones?bbox (2dsphere) | 50 | 353 | 76 | 537 | 980 | 0 |
+| GET /zones?bbox (2dsphere) | 200 | 146 | 789 | 5283 | 6412 | 0 |
+| GET /live/drones | 10 | 1628 | 5 | 7 | 22 | 0 |
+| GET /live/drones | 50 | 411 | 59 | 452 | 896 | 1 |
+| GET /live/drones | 200 | 177 | 611 | 4959 | 5878 | 1 |
 
-| Simulator drones | Tick time (ms), median of 20 | Worst of 20 (ms) |
+Simulator tick (in process, 1 second step):
+
+| Simulated drones | Tick time (ms), median of 20 | Worst of 20 (ms) |
 |---|---|---|
 | 100 | 27.5 | 60.6 |
 | 500 | 123.5 | 174.8 |
@@ -100,6 +100,6 @@ Machine: macOS-26.6.2-arm64-arm-64bit-Mach-O, 8 CPUs, Python 3.14.8, server http
 
 How to read it:
 
-- Up to about 50 concurrent users the server answers every kind of request in well under 150 ms at the 95th percentile for the check, with no errors.
-- At 200 concurrent users on one process the latency grows into seconds. Nothing failed, requests queue. The fix is more worker processes behind a reverse proxy (see docs/SCALING.md). That has not been run or measured here.
-- The simulator tick was 207 ms for 100 drones and 2.1 s for 1000 before the change. Skipping zones by bounding box and reading zones every 5 seconds instead of every tick brought 1000 drones to about 245 ms per tick. A tick must stay under the 1 second step, so 1000 drones fits, 2000 would not.
+- The check holds about 390 requests per second from 50 to 200 users. At 200 users the 95th percentile is 661 ms with no errors. Before the changes the same row was 106 requests per second and a 95th percentile of 6.5 s.
+- The zone map and the live drone list still queue at 200 users (95th percentile about 5 s), and each had 1 failed request in some rows. One process handles one request at a time per thread, and these two return the most data. More processes behind Nginx is the next step, but the simulator and the event channel keep state in one process, so the simulator must be split out first. That has not been done or measured.
+- Before the geofence change the tick was 207 ms for 100 drones and 2.1 s for 1000. Skipping zones by bounding box and reading zones every 5 seconds instead of every tick brought 1000 drones to about 245 ms. The tick must stay under the 1 second step, so 1000 drones fits and 2000 would not.

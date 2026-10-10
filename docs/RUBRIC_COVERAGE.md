@@ -6,7 +6,7 @@ Status is as of the last commit. "Gap" means not done, said plainly.
 
 - FastAPI backend (67 API paths, OpenAPI at `/docs`), vanilla JS pages, Leaflet 2D and MapLibre plus three.js 3D, MongoDB, Ollama for the language model, Mailpit for mail in development. See `ARCHITECTURE.md`.
 - `docker-compose.yml` runs MongoDB and the mail catcher; `run.sh` starts everything.
-- Gap: no reverse proxy or production compose file, no container image for the app.
+- Production-style stack: `Dockerfile`, `docker-compose.prod.yml` and `deploy/nginx.conf` (Nginx with gzip, request limits, security headers, no buffering for the live stream). The image builds; the full prod stack has not been load tested.
 
 ## MongoDB architecture and implementation
 
@@ -53,6 +53,6 @@ Gap: no Atlas Charts dashboard, no sharding or replica-set write concern discuss
 ## Security, performance and scalability
 
 - Security: argon2id, short access tokens with rotating refresh tokens and reuse detection, lockout and rate limits, one-time codes, optional authenticator app, invite-only officials, signed permits, scoped phone tokens, hardened Google sign-in, an audit trail.
-- Performance, measured on one Mac (see `docs/RESULTS.md`): about 470 checks per second at 10 users, 95th percentile 32 ms; 1000 simulated drones tick in about 245 ms.
-- Scalability: at 200 concurrent users on one process latency reaches seconds with no errors. Multiple workers and a proxy are the documented next step and are not measured.
-- Gaps: no monitoring or metrics endpoint, no secrets manager, no penetration test.
+- Performance, measured on one Mac (see `docs/RESULTS.md`): about 390 checks per second from 50 to 200 users (95th percentile 661 ms at 200); 1000 simulated drones tick in about 245 ms. `GET /metrics` exposes request counts and latency in Prometheus format.
+- Scalability: the zone map and live list still queue at 200 users on one process (95th percentile about 5 s). Splitting the simulator into its own process and running several API workers behind Nginx is the next step, not done.
+- Gaps: no dashboard on top of `/metrics`, no secrets manager, no penetration test.

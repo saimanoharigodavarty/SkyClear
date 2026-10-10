@@ -4,6 +4,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -47,6 +48,10 @@ def _warm_up_model():
     import llm
     llm.warm_up()  # loads the model on the Ollama laptop in the background (does nothing when USE_LLM=0)
 # Bearer tokens, no cookies, so a page opened from a file can still talk to the API in development.
+app.add_middleware(GZipMiddleware, minimum_size=1000)  # zone maps are large JSON: gzip makes them several times smaller
+import metrics  # noqa: E402
+app.add_middleware(metrics.Middleware)
+app.include_router(metrics.router)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(config_router)
 app.include_router(events_router)

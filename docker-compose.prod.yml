@@ -1,0 +1,29 @@
+# Production-style stack: Nginx in front of the app, MongoDB and the mail catcher behind it.
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Open http://localhost (port 80). The app container is not reachable from outside, only Nginx is.
+# The simulator and the live event channel keep their state inside one app process, so run ONE app container.
+# To scale the API itself, split the simulator into its own process first (see docs/SCALING.md).
+services:
+  mongo:
+    image: mongodb/mongodb-atlas-local:latest
+    volumes: [skyclear-mongo:/data/db]
+  mailpit:
+    image: axllent/mailpit:latest
+  app:
+    build: .
+    environment:
+      USE_MONGO: "1"
+      MONGO_URI: "mongodb://mongo:27017/?directConnection=true"
+      OTP_PROVIDER: "smtp"
+      SMTP_HOST: "mailpit"
+      SMTP_PORT: "1025"
+    env_file: [.env]
+    depends_on: [mongo, mailpit]
+    volumes: [./data:/app/data]
+  nginx:
+    image: nginx:1.27-alpine
+    ports: ["80:80"]
+    volumes: [./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro]
+    depends_on: [app]
+volumes:
+  skyclear-mongo:

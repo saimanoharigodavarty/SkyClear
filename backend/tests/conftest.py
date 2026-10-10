@@ -1,4 +1,5 @@
 import os
+import pytest
 import sys
 import tempfile
 from pathlib import Path
@@ -37,3 +38,10 @@ manage.create_user(ADMIN_EMAIL, "Test Admin", "official", PASSWORD)
 for _a in routing.all_authorities():
     manage.create_user(officer_email(_a["authority_id"]), _a["name"], "official", PASSWORD, authority_id=_a["authority_id"])
 
+
+
+@pytest.fixture(autouse=True)
+def _clear_ask_cache():
+    import ask
+    ask._cache.clear()
+    yield

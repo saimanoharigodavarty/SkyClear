@@ -511,15 +511,22 @@ $("askForm").addEventListener("submit", async e => {
   e.preventDefault();
   const body = { question: $("askQ").value };
   if ($("askSpot").checked && picked) Object.assign(body, { lat: picked.lat, lng: picked.lng, drone_id: $("drone").value, datetime: toISO($("when").value) });
-  const btn = $("askGo"); btn.disabled = true; btn.textContent = CFG.llm ? "Searching the rules, the AI model is writing the answer (about 10 seconds)..." : "Searching the rules...";
+  const btn = $("askGo"); btn.disabled = true; btn.textContent = "Searching the rules...";
   $("askResult").innerHTML = skeleton();
-  try {
-    const r = await api("/ask", { method: "POST", auth: false, body });
+  const draw = (r, writing) => {
     const spot = r.spot ? `<div class="explain" style="margin-top:10px"><b>For your spot:</b> ${esc(VERDICT_LABEL[r.spot.verdict])}${r.spot.zones.length ? ", inside " + esc(r.spot.zones.join(", ")) : ""}. <span class="small">Decided by rules for ${esc(r.spot.drone)}.</span></div>` : "";
     $("askResult").innerHTML = `
       <div class="explain" style="background:var(--panel);border-color:var(--rule-strong)">${esc(r.answer)}</div>${spot}
       ${r.citations.length ? `<div class="section"><h3>The rules behind this answer</h3>${r.citations.map(c => `<div class="cite"><span class="id">${esc(c.rule_id)}</span>${esc(c.text)}<div class="small">${esc(c.source)}</div></div>`).join("")}</div>` : ""}
-      <div class="small">Found with ${esc(r.retrieval)}. ${r.answered_by === "llm" ? "Worded by an AI model from these rules only." : r.answered_by === "extracted" ? "Taken directly from the rules, no AI guessing." : ""} ${esc(r.disclaimer)}</div>`;
+      <div class="small">Found with ${esc(r.retrieval)}. ${writing ? "The AI model is wording a clearer answer from these rules..." : r.answered_by === "llm" ? "Worded by an AI model from these rules only." : r.answered_by === "extracted" ? "Taken directly from the rules, no AI guessing." : ""} ${esc(r.disclaimer)}</div>`;
+  };
+  try {
+    const quick = await api("/ask", { method: "POST", auth: false, body: { ...body, explain: false } });  // the rules appear at once
+    draw(quick, CFG.llm && quick.answered_by !== "none");
+    if (CFG.llm && quick.answered_by !== "none") {
+      btn.textContent = "Writing the answer...";
+      try { draw(await api("/ask", { method: "POST", auth: false, body }), false); } catch (e) { draw(quick, false); }  // keep the rules if the model is slow
+    }
   } catch (err) { $("askResult").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
   finally { btn.disabled = false; btn.textContent = "Ask"; }
 });

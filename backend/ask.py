@@ -35,6 +35,10 @@ class AskIn(BaseModel):
     lng: Optional[float] = None
     drone_id: Optional[str] = None
     datetime: Optional[str] = None
+    explain: bool = True  # False: answer at once from the passages, the page then asks again with True for the AI wording
+
+
+_cache = {}  # (question, spot) -> (time, response): the same question within 10 minutes is answered without the model
 
 
 def _tokens(text):
@@ -111,7 +115,11 @@ def ask(body: AskIn, request: Request):
         return {"answer": "I could not find this in the rule passages we have. Try asking about permission, airports, military areas, parks, government sites or temporary restrictions, or check the official portal.",
                 "citations": [], "spot": None, "retrieval": method, "answered_by": "none", "disclaimer": config.DISCLAIMER}
     answer, cited, source = None, [], "extracted"
-    if config.USE_LLM and time.time() >= _down_until:
+    key = (body.question.strip().lower(), body.lat, body.lng, body.drone_id)
+    hit = _cache.get(key)
+    if body.explain and hit and time.time() - hit[0] < 600:
+        return hit[1]
+    if config.USE_LLM and body.explain and time.time() >= _down_until:
         facts = (f"SPOT FACTS (decided by software): verdict {spot['verdict']}, drone {spot['drone']}, inside {spot['zones'] or 'no known zone'}, notices {spot['notices'] or 'none'}.\n") if spot else ""
         prompt = f"QUESTION: {_clip(body.question, 400)}\n{facts}PASSAGES:\n" + "\n".join(f"[{p['rule_id']}] {_clip(p['text'], 320)}" for p in evidence)
         try:
@@ -127,5 +135,10 @@ def ask(body: AskIn, request: Request):
         answer = _extract(evidence, spot, deciding=bool(used))
         cited = [p["rule_id"] for p in evidence[:2]]
     cited = list(dict.fromkeys([*[r["rule_id"] for r in used], *cited]))
-    return {"answer": answer, "citations": [{"rule_id": i, "text": by_id[i]["text"], "source": by_id[i]["source"], "score": by_id[i].get("score")} for i in cited if i in by_id],
-            "spot": spot, "retrieval": method, "answered_by": source, "disclaimer": config.DISCLAIMER}
+    out = {"answer": answer, "citations": [{"rule_id": i, "text": by_id[i]["text"], "source": by_id[i]["source"], "score": by_id[i].get("score")} for i in cited if i in by_id],
+           "spot": spot, "retrieval": method, "answered_by": source, "disclaimer": config.DISCLAIMER}
+    if source == "llm":
+        if len(_cache) > 200:
+            _cache.clear()
+        _cache[key] = (time.time(), out)
+    return out
